@@ -1,0 +1,43 @@
+namespace Game.Domain.Common
+{
+    public enum GameEventType
+    {
+        CombatStarted,
+        TurnStarted,
+        TurnEnded,
+        SkillUsed,
+        BasicAttackUsed,
+        DamageDealt,
+        DamageMissed,
+        CriticalHit,
+        ResourceSpent,
+        ResourceRegenerated,
+        ResourceNotEnough,
+        BuffApplied,
+        BuffExpired,
+        DebuffApplied,
+        DebuffResisted,
+        DebuffExpired,
+        CleanseResolved,
+        PassiveTriggered,
+        FeatureTriggered,
+        TraitRevealed,
+        StatusTick,
+        ActionBlocked,
+        CombatEnded,
+        CognitionTriggered,
+        TeachingFixed,
+        TeachingEquipped,
+        MissionStarted,
+        MissionCompleted,
+        MissionFailed,
+        RewardGranted,
+        CodexEntryDiscovered,
+        CodexEntryCompleted,
+        BattleRewardGranted,
+        AiDecisionMade,
+        ObjectiveProgressed,
+        PersistenceSaved,
+        PersistenceLoaded
+    }
+}
