@@ -21,9 +21,10 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 & (Join-Path $here "03_Player_Cognition_Classes_Equipment_Codex.ps1") -Root $Root
 & (Join-Path $here "04_Missions_AI_Persistence.ps1") -Root $Root
 & (Join-Path $here "05_Slice_And_Validation.ps1") -Root $Root
+& (Join-Path $here "06_Iteration2_NahualPath.ps1") -Root $Root
 
 Write-Host ""
-Write-Host "NovaFoundation generated successfully at:" -ForegroundColor Green
+Write-Host "NovaFoundation V2 generated successfully at:" -ForegroundColor Green
 Write-Host "  $Root"
 Write-Host ""
 Write-Host "Suggested next step: git init"
