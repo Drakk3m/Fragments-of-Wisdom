@@ -47,5 +47,17 @@ namespace Game.SmokeTests
                 throw new InvalidOperationException(message);
             }
         }
+            var log = FoundationVerticalSlice.Run();
+
+            if (log.Events.Count == 0)
+            {
+                Console.Error.WriteLine("Foundation vertical slice produced no events.");
+                return 1;
+            }
+
+            Console.WriteLine("Foundation vertical slice smoke test passed.");
+            Console.WriteLine("Events: " + log.Events.Count);
+            return 0;
+        }
     }
 }
