@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using Game.Domain.Alignment;
 using Game.Domain.Narrative;
 using Game.Domain.Player;
+using Game.Domain.Transmutation;
 using Game.Slice;
 
 namespace Game.SmokeTests
@@ -31,6 +33,9 @@ namespace Game.SmokeTests
             AssertDefaultNahualTeachingState(profile);
             AssertAcceptedNahualTeachingState();
             AssertRejectedNahualTeachingState();
+            AssertDefaultTransmutationAccess(profile);
+            AssertAcceptedTransmutationAccess();
+            AssertRejectedTransmutationAccess();
 
             var log = FoundationVerticalSlice.Run();
 
@@ -110,7 +115,21 @@ namespace Game.SmokeTests
             FirstNahualTeachingResult result,
             string tag)
         {
-            foreach (var narrativeTag in result.NarrativeTags)
+            return ContainsTag(result.NarrativeTags, tag);
+        }
+
+        private static bool ContainsTag(
+            TransmutationAccessResult result,
+            string tag)
+        {
+            return ContainsTag(result.NarrativeTags, tag);
+        }
+
+        private static bool ContainsTag(
+            IReadOnlyList<string> narrativeTags,
+            string tag)
+        {
+            foreach (var narrativeTag in narrativeTags)
             {
                 if (narrativeTag == tag)
                 {
@@ -119,6 +138,66 @@ namespace Game.SmokeTests
             }
 
             return false;
+        }
+
+        private static void AssertDefaultTransmutationAccess(PlayerProfile profile)
+        {
+            var result = new TransmutationAccessPolicy().Evaluate(profile);
+
+            Assert(
+                !result.CanAccessTransmutation,
+                "Default profile should not access transmutation.");
+
+            Assert(
+                result.RequiredAlignment == KnowledgeAlignment.NahualPath,
+                "Blocked transmutation should require NahualPath alignment.");
+
+            Assert(
+                result.RequiredTeachingPath == "nahual.first_teaching.accepted",
+                "Blocked transmutation should require accepted first Nahual teaching path.");
+        }
+
+        private static void AssertAcceptedTransmutationAccess()
+        {
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentProgress(KnowledgeAlignment.NahualPath, 1);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var result = new TransmutationAccessPolicy().Evaluate(profile);
+
+            Assert(
+                result.CanAccessTransmutation,
+                "Accepted Nahual teaching path should access transmutation.");
+
+            Assert(
+                result.BlockReason == "",
+                "Allowed transmutation access should not include a block reason.");
+
+            Assert(
+                ContainsTag(result, "transmutation.access.allowed"),
+                "Allowed transmutation access should include an allowed narrative tag.");
+        }
+
+        private static void AssertRejectedTransmutationAccess()
+        {
+            var profile = new PlayerProfile();
+            profile.AddAlignmentProgress(KnowledgeAlignment.SharedWisdom, 1);
+            profile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+
+            var result = new TransmutationAccessPolicy().Evaluate(profile);
+
+            Assert(
+                !result.CanAccessTransmutation,
+                "Rejected Nahual teaching path should not access transmutation.");
+
+            Assert(
+                result.BlockReason != "",
+                "Blocked transmutation access should include a block reason.");
+
+            Assert(
+                ContainsTag(result, "transmutation.access.blocked"),
+                "Blocked transmutation access should include a blocked narrative tag.");
         }
 
         private static void Assert(bool condition, string message)
