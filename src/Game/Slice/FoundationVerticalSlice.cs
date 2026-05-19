@@ -9,7 +9,6 @@ using Game.Domain.Combat.AI;
 using Game.Domain.Combat.Outcomes;
 using Game.Domain.Combat.Passives;
 using Game.Domain.Combat.Stats;
-using Game.Domain.Combat.CombatEntity;
 using Game.Domain.Equipment;
 using Game.Domain.Missions;
 using Game.Domain.Player;
