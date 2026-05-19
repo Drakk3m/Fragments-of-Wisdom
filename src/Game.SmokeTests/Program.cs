@@ -1,5 +1,6 @@
 using System;
 using Game.Domain.Alignment;
+using Game.Domain.Narrative;
 using Game.Domain.Player;
 using Game.Slice;
 
@@ -27,27 +28,15 @@ namespace Game.SmokeTests
                 profile.AlignmentFlags.Count == 0,
                 "Default alignment flags should be empty.");
 
+            AssertDefaultNahualTeachingState(profile);
+            AssertAcceptedNahualTeachingState();
+            AssertRejectedNahualTeachingState();
+
             var log = FoundationVerticalSlice.Run();
 
             Assert(
                 log.Events.Count == 38,
                 "Foundation V1 event count changed.");
-
-            Console.WriteLine("Alignment foundation smoke test passed.");
-            Console.WriteLine("Events: " + log.Events.Count);
-            return 0;
-        }
-
-        private static void Assert(
-            bool condition,
-            string message)
-        {
-            if (!condition)
-            {
-                throw new InvalidOperationException(message);
-            }
-        }
-            var log = FoundationVerticalSlice.Run();
 
             if (log.Events.Count == 0)
             {
@@ -55,9 +44,89 @@ namespace Game.SmokeTests
                 return 1;
             }
 
-            Console.WriteLine("Foundation vertical slice smoke test passed.");
+            Console.WriteLine("Alignment foundation smoke test passed.");
             Console.WriteLine("Events: " + log.Events.Count);
             return 0;
+        }
+
+        private static void AssertDefaultNahualTeachingState(PlayerProfile profile)
+        {
+            var result = new FirstNahualTeachingEvaluator().Evaluate(profile);
+
+            Assert(
+                !result.AcceptedTeachingPath,
+                "Default profile should not have accepted the first Nahual teaching.");
+
+            Assert(
+                !result.RejectedTeachingPath,
+                "Default profile should not have rejected the first Nahual teaching.");
+        }
+
+        private static void AssertAcceptedNahualTeachingState()
+        {
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentProgress(KnowledgeAlignment.NahualPath, 1);
+            profile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var result = new FirstNahualTeachingEvaluator().Evaluate(profile);
+
+            Assert(
+                result.AcceptedTeachingPath,
+                "Nahual-aligned profile should describe the accepted teaching path.");
+
+            Assert(
+                !result.RejectedTeachingPath,
+                "Accepted Nahual teaching path should not also be rejected.");
+
+            Assert(
+                ContainsTag(result, "nahual.first_teaching.accepted"),
+                "Accepted result should include an accepted narrative tag.");
+        }
+
+        private static void AssertRejectedNahualTeachingState()
+        {
+            var profile = new PlayerProfile();
+            profile.AddAlignmentProgress(KnowledgeAlignment.SharedWisdom, 1);
+            profile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+
+            var result = new FirstNahualTeachingEvaluator().Evaluate(profile);
+
+            Assert(
+                !result.AcceptedTeachingPath,
+                "Shared Wisdom profile should not describe the accepted teaching path.");
+
+            Assert(
+                result.RejectedTeachingPath,
+                "Shared Wisdom profile with discovery progress should describe the rejected teaching path.");
+
+            Assert(
+                ContainsTag(result, "nahual.first_teaching.rejected"),
+                "Rejected result should include a rejected narrative tag.");
+        }
+
+        private static bool ContainsTag(
+            FirstNahualTeachingResult result,
+            string tag)
+        {
+            foreach (var narrativeTag in result.NarrativeTags)
+            {
+                if (narrativeTag == tag)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static void Assert(bool condition, string message)
+        {
+            if (!condition)
+            {
+                throw new InvalidOperationException(message);
+            }
         }
     }
 }
