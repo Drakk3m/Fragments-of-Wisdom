@@ -46,54 +46,54 @@ namespace Game.Domain.Narrative
 
             var hooks = new List<NarrativeHook>();
 
-            if (HasTag(narrativeTags, "transmutation.access.allowed"))
+            if (HasTag(narrativeTags, NarrativeTags.TransmutationAccessAllowed))
             {
                 hooks.Add(BuildHook(
-                    "hook.transmutation.forbidden_practice",
+                    NarrativeHookIds.TransmutationForbiddenPractice,
                     NarrativeHookType.World,
                     90,
                     narrativeTags,
-                    "World"));
+                    SuggestedNarrativeSystem.World));
             }
 
-            if (HasTag(narrativeTags, "npc.reaction.wary"))
+            if (HasTag(narrativeTags, NarrativeTags.NpcReactionWary))
             {
                 hooks.Add(BuildHook(
-                    "hook.dialogue.npc_wary_forbidden_practice",
+                    NarrativeHookIds.DialogueNpcWaryForbiddenPractice,
                     NarrativeHookType.Dialogue,
                     80,
                     narrativeTags,
-                    "Dialogue"));
+                    SuggestedNarrativeSystem.Dialogue));
             }
 
-            if (HasTag(narrativeTags, "nahual.first_teaching.accepted"))
+            if (HasTag(narrativeTags, NarrativeTags.NahualFirstTeachingAccepted))
             {
                 hooks.Add(BuildHook(
-                    "hook.codex.nahual_path",
+                    NarrativeHookIds.CodexNahualPath,
                     NarrativeHookType.Codex,
                     70,
                     narrativeTags,
-                    "Codex"));
+                    SuggestedNarrativeSystem.Codex));
             }
 
-            if (HasTag(narrativeTags, "nahual.first_teaching.rejected"))
+            if (HasTag(narrativeTags, NarrativeTags.NahualFirstTeachingRejected))
             {
                 hooks.Add(BuildHook(
-                    "hook.mission.shared_wisdom_followup",
+                    NarrativeHookIds.MissionSharedWisdomFollowup,
                     NarrativeHookType.Mission,
                     60,
                     narrativeTags,
-                    "Missions"));
+                    SuggestedNarrativeSystem.Missions));
             }
 
-            if (HasTag(narrativeTags, "transmutation.access.blocked"))
+            if (HasTag(narrativeTags, NarrativeTags.TransmutationAccessBlocked))
             {
                 hooks.Add(BuildHook(
-                    "hook.dialogue.transmutation_blocked",
+                    NarrativeHookIds.DialogueTransmutationBlocked,
                     NarrativeHookType.Dialogue,
                     50,
                     narrativeTags,
-                    "Dialogue"));
+                    SuggestedNarrativeSystem.Dialogue));
             }
 
             return hooks;

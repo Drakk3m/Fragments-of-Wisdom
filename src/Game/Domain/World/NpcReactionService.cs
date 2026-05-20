@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Game.Domain.Narrative;
 
 namespace Game.Domain.World
 {
@@ -17,37 +18,37 @@ namespace Game.Domain.World
                 throw new ArgumentNullException(nameof(context));
             }
 
-            if (HasTag(context.NarrativeTags, "transmutation.access.allowed"))
+            if (HasTag(context.NarrativeTags, NarrativeTags.TransmutationAccessAllowed))
             {
                 return BuildResult(
                     context.NarrativeTags,
                     NpcReactionTone.Wary,
                     -2,
                     2,
-                    "npc.hook.forbidden_practice",
-                    "npc.reaction.wary");
+                    NpcNarrativeHooks.ForbiddenPractice,
+                    NarrativeTags.NpcReactionWary);
             }
 
-            if (HasTag(context.NarrativeTags, "nahual.first_teaching.accepted"))
+            if (HasTag(context.NarrativeTags, NarrativeTags.NahualFirstTeachingAccepted))
             {
                 return BuildResult(
                     context.NarrativeTags,
                     NpcReactionTone.Cautious,
                     -1,
                     1,
-                    "npc.hook.nahual_path",
-                    "npc.reaction.cautious");
+                    NpcNarrativeHooks.NahualPath,
+                    NarrativeTags.NpcReactionCautious);
             }
 
-            if (HasTag(context.NarrativeTags, "nahual.first_teaching.rejected"))
+            if (HasTag(context.NarrativeTags, NarrativeTags.NahualFirstTeachingRejected))
             {
                 return BuildResult(
                     context.NarrativeTags,
                     NpcReactionTone.Reassured,
                     1,
                     0,
-                    "npc.hook.shared_wisdom",
-                    "npc.reaction.reassured");
+                    NpcNarrativeHooks.SharedWisdom,
+                    NarrativeTags.NpcReactionReassured);
             }
 
             return BuildResult(
@@ -55,8 +56,8 @@ namespace Game.Domain.World
                 NpcReactionTone.Neutral,
                 0,
                 0,
-                "npc.hook.none",
-                "npc.reaction.neutral");
+                NpcNarrativeHooks.None,
+                NarrativeTags.NpcReactionNeutral);
         }
 
         private static NpcReactionResult BuildResult(

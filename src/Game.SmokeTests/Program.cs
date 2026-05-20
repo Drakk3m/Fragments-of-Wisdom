@@ -165,7 +165,7 @@ namespace Game.SmokeTests
                 "Accepted Nahual teaching path should not also be rejected.");
 
             Assert(
-                ContainsTag(result, "nahual.first_teaching.accepted"),
+                ContainsTag(result, NarrativeTags.NahualFirstTeachingAccepted),
                 "Accepted result should include an accepted narrative tag.");
         }
 
@@ -186,7 +186,7 @@ namespace Game.SmokeTests
                 "Shared Wisdom profile with discovery progress should describe the rejected teaching path.");
 
             Assert(
-                ContainsTag(result, "nahual.first_teaching.rejected"),
+                ContainsTag(result, NarrativeTags.NahualFirstTeachingRejected),
                 "Rejected result should include a rejected narrative tag.");
         }
 
@@ -284,7 +284,7 @@ namespace Game.SmokeTests
                 "Blocked transmutation should require NahualPath alignment.");
 
             Assert(
-                result.RequiredTeachingPath == "nahual.first_teaching.accepted",
+                result.RequiredTeachingPath == NarrativeTags.NahualFirstTeachingAccepted,
                 "Blocked transmutation should require accepted first Nahual teaching path.");
         }
 
@@ -306,7 +306,7 @@ namespace Game.SmokeTests
                 "Allowed transmutation access should not include a block reason.");
 
             Assert(
-                ContainsTag(result, "transmutation.access.allowed"),
+                ContainsTag(result, NarrativeTags.TransmutationAccessAllowed),
                 "Allowed transmutation access should include an allowed narrative tag.");
         }
 
@@ -327,7 +327,7 @@ namespace Game.SmokeTests
                 "Blocked transmutation access should include a block reason.");
 
             Assert(
-                ContainsTag(result, "transmutation.access.blocked"),
+                ContainsTag(result, NarrativeTags.TransmutationAccessBlocked),
                 "Blocked transmutation access should include a blocked narrative tag.");
         }
 
@@ -363,7 +363,7 @@ namespace Game.SmokeTests
                 "Accepted Nahual teaching tags should produce cautious NPC reaction tone.");
 
             Assert(
-                ContainsHook(result, "npc.hook.nahual_path"),
+                ContainsHook(result, NpcNarrativeHooks.NahualPath),
                 "Accepted Nahual teaching reaction should expose the Nahual path hook.");
         }
 
@@ -389,7 +389,7 @@ namespace Game.SmokeTests
                 "Allowed transmutation reaction should preview fear gain.");
 
             Assert(
-                ContainsHook(result, "npc.hook.forbidden_practice"),
+                ContainsHook(result, NpcNarrativeHooks.ForbiddenPractice),
                 "Allowed transmutation reaction should expose the forbidden practice hook.");
         }
 
@@ -421,7 +421,7 @@ namespace Game.SmokeTests
             var hooks = new NarrativeHookService().Resolve(teachingResult);
 
             Assert(
-                ContainsHook(hooks, "hook.codex.nahual_path"),
+                ContainsHook(hooks, NarrativeHookIds.CodexNahualPath),
                 "Accepted Nahual teaching should produce the Nahual path codex hook.");
 
             Assert(
@@ -439,11 +439,11 @@ namespace Game.SmokeTests
             var hooks = new NarrativeHookService().Resolve(accessResult);
 
             Assert(
-                ContainsHook(hooks, "hook.transmutation.forbidden_practice"),
+                ContainsHook(hooks, NarrativeHookIds.TransmutationForbiddenPractice),
                 "Allowed transmutation should produce a forbidden practice world hook.");
 
             Assert(
-                ContainsHook(hooks, "hook.codex.nahual_path"),
+                ContainsHook(hooks, NarrativeHookIds.CodexNahualPath),
                 "Allowed transmutation should preserve the accepted Nahual codex hook.");
         }
 
@@ -458,7 +458,7 @@ namespace Game.SmokeTests
             var hooks = new NarrativeHookService().Resolve(reactionResult);
 
             Assert(
-                ContainsHook(hooks, "hook.dialogue.npc_wary_forbidden_practice"),
+                ContainsHook(hooks, NarrativeHookIds.DialogueNpcWaryForbiddenPractice),
                 "Wary NPC reaction should produce a wary dialogue hook.");
 
             Assert(
@@ -477,11 +477,11 @@ namespace Game.SmokeTests
             var hooks = new NarrativeHookService().Resolve(accessResult);
 
             Assert(
-                ContainsHook(hooks, "hook.mission.shared_wisdom_followup"),
+                ContainsHook(hooks, NarrativeHookIds.MissionSharedWisdomFollowup),
                 "Rejected Nahual teaching should produce a Shared Wisdom mission hook.");
 
             Assert(
-                ContainsHook(hooks, "hook.dialogue.transmutation_blocked"),
+                ContainsHook(hooks, NarrativeHookIds.DialogueTransmutationBlocked),
                 "Blocked transmutation should produce a blocked-transmutation dialogue hook.");
         }
 
@@ -497,11 +497,11 @@ namespace Game.SmokeTests
             var candidates = new MissionTriggerService().Resolve(hooks);
 
             Assert(
-                ContainsTrigger(candidates, "trigger.shared_wisdom.followup"),
+                ContainsTrigger(candidates, MissionTriggerIds.SharedWisdomFollowup),
                 "Shared Wisdom hook should produce a Shared Wisdom follow-up trigger candidate.");
 
             Assert(
-                candidates[0].SuggestedMissionFamily == "SharedWisdom",
+                candidates[0].SuggestedMissionFamily == MissionFamilies.SharedWisdom,
                 "Shared Wisdom trigger should suggest the SharedWisdom mission family.");
         }
 
@@ -516,11 +516,11 @@ namespace Game.SmokeTests
             var candidates = new MissionTriggerService().Resolve(hooks);
 
             Assert(
-                ContainsTrigger(candidates, "trigger.nahual.transmutation_discovery"),
+                ContainsTrigger(candidates, MissionTriggerIds.NahualTransmutationDiscovery),
                 "Forbidden practice hook should produce a Nahual transmutation discovery trigger candidate.");
 
             Assert(
-                candidates[0].SourceHookId == "hook.transmutation.forbidden_practice",
+                candidates[0].SourceHookId == NarrativeHookIds.TransmutationForbiddenPractice,
                 "Forbidden practice trigger should preserve the source hook id.");
         }
 
@@ -532,7 +532,7 @@ namespace Game.SmokeTests
             var candidates = new MissionTriggerService().Resolve(hooks);
 
             Assert(
-                ContainsTrigger(candidates, "trigger.nahual.transmutation_blocked_warning"),
+                ContainsTrigger(candidates, MissionTriggerIds.NahualTransmutationBlockedWarning),
                 "Blocked transmutation hook should produce a blocked-transmutation warning trigger candidate.");
 
             Assert(
@@ -576,7 +576,7 @@ namespace Game.SmokeTests
                 "Default flow should preserve the blocked-transmutation dialogue hook only.");
 
             Assert(
-                ContainsTrigger(candidates, "trigger.nahual.transmutation_blocked_warning"),
+                ContainsTrigger(candidates, MissionTriggerIds.NahualTransmutationBlockedWarning),
                 "Default flow should produce a blocked transmutation warning trigger.");
         }
 
@@ -605,7 +605,7 @@ namespace Game.SmokeTests
                 "Accepted forbidden teaching flow should allow transmutation access.");
 
             Assert(
-                ContainsTag(accessResult, "transmutation.access.allowed"),
+                ContainsTag(accessResult, NarrativeTags.TransmutationAccessAllowed),
                 "Accepted forbidden teaching flow should carry the allowed transmutation tag.");
 
             Assert(
@@ -613,15 +613,15 @@ namespace Game.SmokeTests
                 "Accepted forbidden teaching flow should produce wary NPC reaction.");
 
             Assert(
-                ContainsHook(reactionResult, "npc.hook.forbidden_practice"),
+                ContainsHook(reactionResult, NpcNarrativeHooks.ForbiddenPractice),
                 "Accepted forbidden teaching flow should expose the forbidden practice NPC hook.");
 
             Assert(
-                ContainsHook(hooks, "hook.transmutation.forbidden_practice"),
+                ContainsHook(hooks, NarrativeHookIds.TransmutationForbiddenPractice),
                 "Accepted forbidden teaching flow should produce the forbidden practice narrative hook.");
 
             Assert(
-                ContainsTrigger(candidates, "trigger.nahual.transmutation_discovery"),
+                ContainsTrigger(candidates, MissionTriggerIds.NahualTransmutationDiscovery),
                 "Accepted forbidden teaching flow should produce a transmutation discovery trigger.");
         }
 
@@ -648,7 +648,7 @@ namespace Game.SmokeTests
                 "Rejected flow should block transmutation access.");
 
             Assert(
-                ContainsTag(accessResult, "transmutation.access.blocked"),
+                ContainsTag(accessResult, NarrativeTags.TransmutationAccessBlocked),
                 "Rejected flow should carry the blocked transmutation tag.");
 
             Assert(
@@ -656,15 +656,15 @@ namespace Game.SmokeTests
                 "Rejected flow should produce reassured NPC reaction.");
 
             Assert(
-                ContainsHook(reactionResult, "npc.hook.shared_wisdom"),
+                ContainsHook(reactionResult, NpcNarrativeHooks.SharedWisdom),
                 "Rejected flow should expose the Shared Wisdom NPC hook.");
 
             Assert(
-                ContainsHook(hooks, "hook.mission.shared_wisdom_followup"),
+                ContainsHook(hooks, NarrativeHookIds.MissionSharedWisdomFollowup),
                 "Rejected flow should produce the Shared Wisdom follow-up narrative hook.");
 
             Assert(
-                ContainsTrigger(candidates, "trigger.shared_wisdom.followup"),
+                ContainsTrigger(candidates, MissionTriggerIds.SharedWisdomFollowup),
                 "Rejected flow should produce the Shared Wisdom follow-up trigger.");
         }
 
