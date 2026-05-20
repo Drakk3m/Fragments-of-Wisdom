@@ -11,52 +11,97 @@ namespace Game.SmokeTests
 {
     public static class Program
     {
+        private static int assertionsExecuted;
+
         public static int Main()
         {
             var profile = new PlayerProfile();
 
-            Assert(
-                profile.CurrentAlignment == KnowledgeAlignment.SharedWisdom,
-                "Default alignment should be SharedWisdom.");
-
-            Assert(
-                profile.AlignmentProgression.GetProgress(KnowledgeAlignment.SharedWisdom) == 0,
-                "Default SharedWisdom progress should be zero.");
-
-            Assert(
-                profile.AlignmentProgression.GetProgress(KnowledgeAlignment.NahualPath) == 0,
-                "Default NahualPath progress should be zero.");
-
-            Assert(
-                profile.AlignmentFlags.Count == 0,
-                "Default alignment flags should be empty.");
-
-            AssertDefaultNahualTeachingState(profile);
-            AssertAcceptedNahualTeachingState();
-            AssertRejectedNahualTeachingState();
-            AssertDefaultTransmutationAccess(profile);
-            AssertAcceptedTransmutationAccess();
-            AssertRejectedTransmutationAccess();
-            AssertNeutralNpcReaction(profile);
-            AssertAcceptedNahualNpcReaction();
-            AssertAllowedTransmutationNpcReaction();
-            AssertRejectedNahualNpcReaction();
+            Console.WriteLine("Fragments of Wisdom smoke validation");
+            Console.WriteLine();
 
             var log = FoundationVerticalSlice.Run();
 
-            Assert(
-                log.Events.Count == 38,
-                "Foundation V1 event count changed.");
+            RunSection(
+                "V1 slice emitted event count",
+                delegate
+                {
+                    Assert(
+                        log.Events.Count == 38,
+                        "Foundation V1 event count changed.");
 
-            if (log.Events.Count == 0)
-            {
-                Console.Error.WriteLine("Foundation vertical slice produced no events.");
-                return 1;
-            }
+                    Assert(
+                        log.Events.Count != 0,
+                        "Foundation vertical slice produced no events.");
 
-            Console.WriteLine("Alignment foundation smoke test passed.");
-            Console.WriteLine("Events: " + log.Events.Count);
+                    Console.WriteLine("  Events emitted: " + log.Events.Count);
+                    Console.WriteLine("  Expected events: 38");
+                });
+
+            RunSection(
+                "Alignment assertions",
+                delegate
+                {
+                    Assert(
+                        profile.CurrentAlignment == KnowledgeAlignment.SharedWisdom,
+                        "Default alignment should be SharedWisdom.");
+
+                    Assert(
+                        profile.AlignmentProgression.GetProgress(KnowledgeAlignment.SharedWisdom) == 0,
+                        "Default SharedWisdom progress should be zero.");
+
+                    Assert(
+                        profile.AlignmentProgression.GetProgress(KnowledgeAlignment.NahualPath) == 0,
+                        "Default NahualPath progress should be zero.");
+
+                    Assert(
+                        profile.AlignmentFlags.Count == 0,
+                        "Default alignment flags should be empty.");
+                });
+
+            RunSection(
+                "Nahual evaluator assertions",
+                delegate
+                {
+                    AssertDefaultNahualTeachingState(profile);
+                    AssertAcceptedNahualTeachingState();
+                    AssertRejectedNahualTeachingState();
+                });
+
+            RunSection(
+                "Transmutation policy assertions",
+                delegate
+                {
+                    AssertDefaultTransmutationAccess(profile);
+                    AssertAcceptedTransmutationAccess();
+                    AssertRejectedTransmutationAccess();
+                });
+
+            RunSection(
+                "NPC reaction assertions",
+                delegate
+                {
+                    AssertNeutralNpcReaction(profile);
+                    AssertAcceptedNahualNpcReaction();
+                    AssertAllowedTransmutationNpcReaction();
+                    AssertRejectedNahualNpcReaction();
+                });
+
+            Console.WriteLine();
+            Console.WriteLine("Total smoke assertions executed: " + assertionsExecuted);
             return 0;
+        }
+
+        private static void RunSection(
+            string name,
+            Action assertions)
+        {
+            int before = assertionsExecuted;
+
+            Console.WriteLine(name);
+            assertions();
+            Console.WriteLine("  Assertions passed: " + (assertionsExecuted - before));
+            Console.WriteLine();
         }
 
         private static void AssertDefaultNahualTeachingState(PlayerProfile profile)
@@ -313,6 +358,8 @@ namespace Game.SmokeTests
             {
                 throw new InvalidOperationException(message);
             }
+
+            assertionsExecuted++;
         }
     }
 }
