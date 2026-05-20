@@ -4,6 +4,7 @@ using Game.Domain.Alignment;
 using Game.Domain.Narrative;
 using Game.Domain.Player;
 using Game.Domain.Transmutation;
+using Game.Domain.World;
 using Game.Slice;
 
 namespace Game.SmokeTests
@@ -36,6 +37,10 @@ namespace Game.SmokeTests
             AssertDefaultTransmutationAccess(profile);
             AssertAcceptedTransmutationAccess();
             AssertRejectedTransmutationAccess();
+            AssertNeutralNpcReaction(profile);
+            AssertAcceptedNahualNpcReaction();
+            AssertAllowedTransmutationNpcReaction();
+            AssertRejectedNahualNpcReaction();
 
             var log = FoundationVerticalSlice.Run();
 
@@ -126,12 +131,34 @@ namespace Game.SmokeTests
         }
 
         private static bool ContainsTag(
+            NpcReactionResult result,
+            string tag)
+        {
+            return ContainsTag(result.NarrativeTags, tag);
+        }
+
+        private static bool ContainsTag(
             IReadOnlyList<string> narrativeTags,
             string tag)
         {
             foreach (var narrativeTag in narrativeTags)
             {
                 if (narrativeTag == tag)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsHook(
+            NpcReactionResult result,
+            string hook)
+        {
+            foreach (var availableHook in result.AvailableNarrativeHooks)
+            {
+                if (availableHook == hook)
                 {
                     return true;
                 }
@@ -198,6 +225,86 @@ namespace Game.SmokeTests
             Assert(
                 ContainsTag(result, "transmutation.access.blocked"),
                 "Blocked transmutation access should include a blocked narrative tag.");
+        }
+
+        private static void AssertNeutralNpcReaction(PlayerProfile profile)
+        {
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var result = new NpcReactionService().Resolve(teachingResult.NarrativeTags);
+
+            Assert(
+                result.ReactionTone == NpcReactionTone.Neutral,
+                "Default narrative tags should produce neutral NPC reaction tone.");
+
+            Assert(
+                result.TrustDeltaPreview == 0,
+                "Default NPC reaction should not preview trust changes.");
+
+            Assert(
+                result.FearDeltaPreview == 0,
+                "Default NPC reaction should not preview fear changes.");
+        }
+
+        private static void AssertAcceptedNahualNpcReaction()
+        {
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var result = new NpcReactionService().Resolve(teachingResult.NarrativeTags);
+
+            Assert(
+                result.ReactionTone == NpcReactionTone.Cautious,
+                "Accepted Nahual teaching tags should produce cautious NPC reaction tone.");
+
+            Assert(
+                ContainsHook(result, "npc.hook.nahual_path"),
+                "Accepted Nahual teaching reaction should expose the Nahual path hook.");
+        }
+
+        private static void AssertAllowedTransmutationNpcReaction()
+        {
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var accessResult = new TransmutationAccessPolicy().Evaluate(profile);
+            var result = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+
+            Assert(
+                result.ReactionTone == NpcReactionTone.Wary,
+                "Allowed transmutation tags should produce wary NPC reaction tone.");
+
+            Assert(
+                result.TrustDeltaPreview < 0,
+                "Allowed transmutation reaction should preview trust loss.");
+
+            Assert(
+                result.FearDeltaPreview > 0,
+                "Allowed transmutation reaction should preview fear gain.");
+
+            Assert(
+                ContainsHook(result, "npc.hook.forbidden_practice"),
+                "Allowed transmutation reaction should expose the forbidden practice hook.");
+        }
+
+        private static void AssertRejectedNahualNpcReaction()
+        {
+            var profile = new PlayerProfile();
+            profile.AddAlignmentProgress(KnowledgeAlignment.SharedWisdom, 1);
+            profile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var result = new NpcReactionService().Resolve(teachingResult.NarrativeTags);
+
+            Assert(
+                result.ReactionTone == NpcReactionTone.Reassured,
+                "Rejected Nahual teaching tags should produce reassured NPC reaction tone.");
+
+            Assert(
+                result.TrustDeltaPreview > 0,
+                "Rejected Nahual teaching reaction should preview trust gain.");
         }
 
         private static void Assert(bool condition, string message)
