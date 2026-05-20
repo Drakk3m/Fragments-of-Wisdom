@@ -51,16 +51,16 @@ namespace Game.Domain.Narrative
 
             if (hasDiscoveredTeaching)
             {
-                tags.Add("nahual.first_teaching.discovered");
+                tags.Add(NarrativeTags.NahualFirstTeachingDiscovered);
             }
 
             if (acceptedTeachingPath)
             {
-                tags.Add("nahual.first_teaching.accepted");
+                tags.Add(NarrativeTags.NahualFirstTeachingAccepted);
             }
             else if (rejectedTeachingPath)
             {
-                tags.Add("nahual.first_teaching.rejected");
+                tags.Add(NarrativeTags.NahualFirstTeachingRejected);
             }
 
             return tags;

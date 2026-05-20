@@ -39,35 +39,35 @@ namespace Game.Domain.Missions
             NarrativeHook hook,
             List<MissionTriggerCandidate> candidates)
         {
-            if (hook.HookId == "hook.mission.shared_wisdom_followup")
+            if (hook.HookId == NarrativeHookIds.MissionSharedWisdomFollowup)
             {
                 candidates.Add(BuildCandidate(
-                    "trigger.shared_wisdom.followup",
+                    MissionTriggerIds.SharedWisdomFollowup,
                     MissionTriggerType.FollowUp,
                     hook.Priority,
-                    "SharedWisdom",
+                    MissionFamilies.SharedWisdom,
                     hook));
                 return;
             }
 
-            if (hook.HookId == "hook.transmutation.forbidden_practice")
+            if (hook.HookId == NarrativeHookIds.TransmutationForbiddenPractice)
             {
                 candidates.Add(BuildCandidate(
-                    "trigger.nahual.transmutation_discovery",
+                    MissionTriggerIds.NahualTransmutationDiscovery,
                     MissionTriggerType.Discovery,
                     hook.Priority,
-                    "NahualPath",
+                    MissionFamilies.NahualPath,
                     hook));
                 return;
             }
 
-            if (hook.HookId == "hook.dialogue.transmutation_blocked")
+            if (hook.HookId == NarrativeHookIds.DialogueTransmutationBlocked)
             {
                 candidates.Add(BuildCandidate(
-                    "trigger.nahual.transmutation_blocked_warning",
+                    MissionTriggerIds.NahualTransmutationBlockedWarning,
                     MissionTriggerType.Warning,
                     hook.Priority,
-                    "NahualPath",
+                    MissionFamilies.NahualPath,
                     hook));
             }
         }

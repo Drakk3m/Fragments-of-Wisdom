@@ -8,7 +8,7 @@ namespace Game.Domain.Transmutation
 {
     public class TransmutationAccessPolicy
     {
-        private const string RequiredPath = "nahual.first_teaching.accepted";
+        private const string RequiredPath = NarrativeTags.NahualFirstTeachingAccepted;
 
         private readonly FirstNahualTeachingEvaluator firstNahualTeachingEvaluator;
 
@@ -56,7 +56,7 @@ namespace Game.Domain.Transmutation
 
             return new TransmutationAccessResult(
                 false,
-                "Requires accepted first Nahual teaching path.",
+                TransmutationAccessBlockReasons.RequiresAcceptedFirstNahualTeachingPath,
                 KnowledgeAlignment.NahualPath,
                 RequiredPath,
                 BuildNarrativeTags(teachingResult, false));
@@ -74,8 +74,8 @@ namespace Game.Domain.Transmutation
             }
 
             tags.Add(canAccessTransmutation
-                ? "transmutation.access.allowed"
-                : "transmutation.access.blocked");
+                ? NarrativeTags.TransmutationAccessAllowed
+                : NarrativeTags.TransmutationAccessBlocked);
 
             return tags;
         }
