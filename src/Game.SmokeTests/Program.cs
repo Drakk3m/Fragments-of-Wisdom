@@ -88,6 +88,16 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Narrative hook assertions",
+                delegate
+                {
+                    AssertAcceptedTeachingNarrativeHooks();
+                    AssertAllowedTransmutationNarrativeHooks();
+                    AssertWaryNpcReactionNarrativeHooks();
+                    AssertRejectedTeachingNarrativeHooks();
+                });
+
+            RunSection(
                 "V2 foundation flow assertions",
                 delegate
                 {
@@ -213,6 +223,21 @@ namespace Game.SmokeTests
             foreach (var availableHook in result.AvailableNarrativeHooks)
             {
                 if (availableHook == hook)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsHook(
+            IReadOnlyList<NarrativeHook> hooks,
+            string hookId)
+        {
+            foreach (var hook in hooks)
+            {
+                if (hook.HookId == hookId)
                 {
                     return true;
                 }
@@ -361,6 +386,80 @@ namespace Game.SmokeTests
                 "Rejected Nahual teaching reaction should preview trust gain.");
         }
 
+        private static void AssertAcceptedTeachingNarrativeHooks()
+        {
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var hooks = new NarrativeHookService().Resolve(teachingResult);
+
+            Assert(
+                ContainsHook(hooks, "hook.codex.nahual_path"),
+                "Accepted Nahual teaching should produce the Nahual path codex hook.");
+
+            Assert(
+                hooks[0].SourceTags.Count > 0,
+                "Narrative hooks should preserve source tags.");
+        }
+
+        private static void AssertAllowedTransmutationNarrativeHooks()
+        {
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var accessResult = new TransmutationAccessPolicy().Evaluate(profile);
+            var hooks = new NarrativeHookService().Resolve(accessResult);
+
+            Assert(
+                ContainsHook(hooks, "hook.transmutation.forbidden_practice"),
+                "Allowed transmutation should produce a forbidden practice world hook.");
+
+            Assert(
+                ContainsHook(hooks, "hook.codex.nahual_path"),
+                "Allowed transmutation should preserve the accepted Nahual codex hook.");
+        }
+
+        private static void AssertWaryNpcReactionNarrativeHooks()
+        {
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var accessResult = new TransmutationAccessPolicy().Evaluate(profile);
+            var reactionResult = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+            var hooks = new NarrativeHookService().Resolve(reactionResult);
+
+            Assert(
+                ContainsHook(hooks, "hook.dialogue.npc_wary_forbidden_practice"),
+                "Wary NPC reaction should produce a wary dialogue hook.");
+
+            Assert(
+                hooks[0].Priority >= hooks[1].Priority,
+                "Narrative hooks should be emitted in priority order for the current foundation rules.");
+        }
+
+        private static void AssertRejectedTeachingNarrativeHooks()
+        {
+            var profile = new PlayerProfile();
+            profile.AddAlignmentProgress(KnowledgeAlignment.SharedWisdom, 1);
+            profile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
+            var hooks = new NarrativeHookService().Resolve(accessResult);
+
+            Assert(
+                ContainsHook(hooks, "hook.mission.shared_wisdom_followup"),
+                "Rejected Nahual teaching should produce a Shared Wisdom mission hook.");
+
+            Assert(
+                ContainsHook(hooks, "hook.dialogue.transmutation_blocked"),
+                "Blocked transmutation should produce a blocked-transmutation dialogue hook.");
+        }
+
         private static void AssertDefaultSharedWisdomFlow()
         {
             Console.WriteLine("  Flow scenario: default SharedWisdom player");
@@ -369,6 +468,7 @@ namespace Game.SmokeTests
             var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
             var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
             var reactionResult = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+            var hooks = new NarrativeHookService().Resolve(reactionResult);
 
             Assert(
                 profile.CurrentAlignment == KnowledgeAlignment.SharedWisdom,
@@ -389,6 +489,10 @@ namespace Game.SmokeTests
             Assert(
                 reactionResult.ReactionTone == NpcReactionTone.Neutral,
                 "Default flow should produce neutral NPC reaction.");
+
+            Assert(
+                hooks.Count == 1,
+                "Default flow should preserve the blocked-transmutation dialogue hook only.");
         }
 
         private static void AssertAcceptedForbiddenTeachingFlow()
@@ -404,6 +508,7 @@ namespace Game.SmokeTests
             var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
             var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
             var reactionResult = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+            var hooks = new NarrativeHookService().Resolve(reactionResult);
 
             Assert(
                 teachingResult.AcceptedTeachingPath,
@@ -424,6 +529,10 @@ namespace Game.SmokeTests
             Assert(
                 ContainsHook(reactionResult, "npc.hook.forbidden_practice"),
                 "Accepted forbidden teaching flow should expose the forbidden practice NPC hook.");
+
+            Assert(
+                ContainsHook(hooks, "hook.transmutation.forbidden_practice"),
+                "Accepted forbidden teaching flow should produce the forbidden practice narrative hook.");
         }
 
         private static void AssertRejectedBlockedTransmutationFlow()
@@ -437,6 +546,7 @@ namespace Game.SmokeTests
             var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
             var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
             var reactionResult = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+            var hooks = new NarrativeHookService().Resolve(reactionResult);
 
             Assert(
                 teachingResult.RejectedTeachingPath,
@@ -457,6 +567,10 @@ namespace Game.SmokeTests
             Assert(
                 ContainsHook(reactionResult, "npc.hook.shared_wisdom"),
                 "Rejected flow should expose the Shared Wisdom NPC hook.");
+
+            Assert(
+                ContainsHook(hooks, "hook.mission.shared_wisdom_followup"),
+                "Rejected flow should produce the Shared Wisdom follow-up narrative hook.");
         }
 
         private static void Assert(bool condition, string message)
