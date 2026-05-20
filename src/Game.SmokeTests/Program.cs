@@ -87,6 +87,15 @@ namespace Game.SmokeTests
                     AssertRejectedNahualNpcReaction();
                 });
 
+            RunSection(
+                "V2 foundation flow assertions",
+                delegate
+                {
+                    AssertDefaultSharedWisdomFlow();
+                    AssertAcceptedForbiddenTeachingFlow();
+                    AssertRejectedBlockedTransmutationFlow();
+                });
+
             Console.WriteLine();
             Console.WriteLine("Total smoke assertions executed: " + assertionsExecuted);
             return 0;
@@ -350,6 +359,104 @@ namespace Game.SmokeTests
             Assert(
                 result.TrustDeltaPreview > 0,
                 "Rejected Nahual teaching reaction should preview trust gain.");
+        }
+
+        private static void AssertDefaultSharedWisdomFlow()
+        {
+            Console.WriteLine("  Flow scenario: default SharedWisdom player");
+
+            var profile = new PlayerProfile();
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
+            var reactionResult = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+
+            Assert(
+                profile.CurrentAlignment == KnowledgeAlignment.SharedWisdom,
+                "Default flow should begin from SharedWisdom alignment.");
+
+            Assert(
+                !teachingResult.AcceptedTeachingPath,
+                "Default flow should not accept the first Nahual teaching.");
+
+            Assert(
+                !teachingResult.RejectedTeachingPath,
+                "Default flow should not reject an undiscovered Nahual teaching.");
+
+            Assert(
+                !accessResult.CanAccessTransmutation,
+                "Default flow should block transmutation access.");
+
+            Assert(
+                reactionResult.ReactionTone == NpcReactionTone.Neutral,
+                "Default flow should produce neutral NPC reaction.");
+        }
+
+        private static void AssertAcceptedForbiddenTeachingFlow()
+        {
+            Console.WriteLine("  Flow scenario: accepted forbidden/Nahual teaching path");
+
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentProgress(KnowledgeAlignment.NahualPath, 1);
+            profile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
+            var reactionResult = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+
+            Assert(
+                teachingResult.AcceptedTeachingPath,
+                "Accepted forbidden teaching flow should accept the Nahual teaching path.");
+
+            Assert(
+                accessResult.CanAccessTransmutation,
+                "Accepted forbidden teaching flow should allow transmutation access.");
+
+            Assert(
+                ContainsTag(accessResult, "transmutation.access.allowed"),
+                "Accepted forbidden teaching flow should carry the allowed transmutation tag.");
+
+            Assert(
+                reactionResult.ReactionTone == NpcReactionTone.Wary,
+                "Accepted forbidden teaching flow should produce wary NPC reaction.");
+
+            Assert(
+                ContainsHook(reactionResult, "npc.hook.forbidden_practice"),
+                "Accepted forbidden teaching flow should expose the forbidden practice NPC hook.");
+        }
+
+        private static void AssertRejectedBlockedTransmutationFlow()
+        {
+            Console.WriteLine("  Flow scenario: rejected/blocked transmutation path");
+
+            var profile = new PlayerProfile();
+            profile.AddAlignmentProgress(KnowledgeAlignment.SharedWisdom, 1);
+            profile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
+            var reactionResult = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+
+            Assert(
+                teachingResult.RejectedTeachingPath,
+                "Rejected flow should mark the first Nahual teaching as rejected.");
+
+            Assert(
+                !accessResult.CanAccessTransmutation,
+                "Rejected flow should block transmutation access.");
+
+            Assert(
+                ContainsTag(accessResult, "transmutation.access.blocked"),
+                "Rejected flow should carry the blocked transmutation tag.");
+
+            Assert(
+                reactionResult.ReactionTone == NpcReactionTone.Reassured,
+                "Rejected flow should produce reassured NPC reaction.");
+
+            Assert(
+                ContainsHook(reactionResult, "npc.hook.shared_wisdom"),
+                "Rejected flow should expose the Shared Wisdom NPC hook.");
         }
 
         private static void Assert(bool condition, string message)
