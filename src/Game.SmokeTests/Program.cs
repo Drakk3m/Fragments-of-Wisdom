@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Game.Domain.Alignment;
+using Game.Domain.Codex;
 using Game.Domain.Missions;
 using Game.Domain.Narrative;
 using Game.Domain.Player;
@@ -105,6 +106,16 @@ namespace Game.SmokeTests
                     AssertSharedWisdomMissionTriggerCandidate();
                     AssertForbiddenPracticeMissionTriggerCandidate();
                     AssertBlockedTransmutationMissionTriggerCandidate();
+                });
+
+            RunSection(
+                "Codex entry assertions",
+                delegate
+                {
+                    AssertNahualPathCodexEntryCandidate();
+                    AssertForbiddenPracticeCodexEntryCandidate();
+                    AssertSharedWisdomCodexEntryCandidate();
+                    AssertBlockedTransmutationCodexEntryCandidate();
                 });
 
             RunSection(
@@ -263,6 +274,21 @@ namespace Game.SmokeTests
             foreach (var candidate in candidates)
             {
                 if (candidate.TriggerId == triggerId)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsEntry(
+            IReadOnlyList<CodexEntryCandidate> candidates,
+            string entryId)
+        {
+            foreach (var candidate in candidates)
+            {
+                if (candidate.EntryId == entryId)
                 {
                     return true;
                 }
@@ -538,6 +564,82 @@ namespace Game.SmokeTests
             Assert(
                 candidates[0].NarrativeTags.Count > 0,
                 "Mission trigger candidates should preserve narrative tags.");
+        }
+
+        private static void AssertNahualPathCodexEntryCandidate()
+        {
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var hooks = new NarrativeHookService().Resolve(teachingResult);
+            var candidates = new CodexEntryService().ResolveHooks(hooks);
+
+            Assert(
+                ContainsEntry(candidates, CodexEntryIds.NahualPath),
+                "Accepted Nahual teaching codex hook should produce a Nahual path codex entry candidate.");
+
+            Assert(
+                candidates[0].SourceHookId == NarrativeHookIds.CodexNahualPath,
+                "Nahual path codex entry candidate should preserve the source hook id.");
+        }
+
+        private static void AssertForbiddenPracticeCodexEntryCandidate()
+        {
+            var profile = new PlayerProfile();
+            profile.SetAlignment(KnowledgeAlignment.NahualPath);
+            profile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var accessResult = new TransmutationAccessPolicy().Evaluate(profile);
+            var hooks = new NarrativeHookService().Resolve(accessResult);
+            var candidates = new CodexEntryService().ResolveHooks(hooks);
+
+            Assert(
+                ContainsEntry(candidates, CodexEntryIds.ForbiddenTransmutation),
+                "Forbidden practice hook should produce a forbidden transmutation codex entry candidate.");
+
+            Assert(
+                candidates[0].EntryType == CodexEntryType.Practice,
+                "Forbidden transmutation codex entry candidate should be a practice entry.");
+        }
+
+        private static void AssertSharedWisdomCodexEntryCandidate()
+        {
+            var profile = new PlayerProfile();
+            profile.AddAlignmentProgress(KnowledgeAlignment.SharedWisdom, 1);
+            profile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(profile);
+            var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
+            var hooks = new NarrativeHookService().Resolve(accessResult);
+            var missionTriggerCandidates = new MissionTriggerService().Resolve(hooks);
+            var candidates = new CodexEntryService().ResolveMissionTriggers(missionTriggerCandidates);
+
+            Assert(
+                ContainsEntry(candidates, CodexEntryIds.SharedWisdomFollowup),
+                "Shared Wisdom mission trigger should produce a Shared Wisdom codex entry candidate.");
+
+            Assert(
+                candidates[0].SourceTriggerId == MissionTriggerIds.SharedWisdomFollowup,
+                "Shared Wisdom codex entry candidate should preserve the source trigger id.");
+        }
+
+        private static void AssertBlockedTransmutationCodexEntryCandidate()
+        {
+            var profile = new PlayerProfile();
+            var accessResult = new TransmutationAccessPolicy().Evaluate(profile);
+            var hooks = new NarrativeHookService().Resolve(accessResult);
+            var missionTriggerCandidates = new MissionTriggerService().Resolve(hooks);
+            var candidates = new CodexEntryService().Resolve(hooks, missionTriggerCandidates);
+
+            Assert(
+                ContainsEntry(candidates, CodexEntryIds.TransmutationWarning),
+                "Blocked transmutation facts should produce a transmutation warning codex entry candidate.");
+
+            Assert(
+                candidates[0].NarrativeTags.Count > 0,
+                "Codex entry candidates should preserve narrative tags.");
         }
 
         private static void AssertDefaultSharedWisdomFlow()
