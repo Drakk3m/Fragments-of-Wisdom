@@ -12,6 +12,9 @@ PlayerProfile
   -> NpcReactionService
   -> NarrativeHookService
   -> MissionTriggerService
+  -> MissionTriggerCandidateDeduplicator
+  -> CodexEntryService
+  -> CodexEntryCandidateDeduplicator
 ```
 
 The flow is fact-based. Each step reads the facts it is allowed to know about, returns a lightweight result, and leaves state mutation to future explicit systems.
@@ -58,6 +61,23 @@ It translates already-known narrative facts into hook candidates for future syst
 
 It names possible mission trigger candidates for future journal or mission systems. It does not start missions, track objectives, apply rewards, save progress, or alter the V1 slice.
 
+### CodexEntryService
+
+`CodexEntryService` consumes `NarrativeHook` facts and `MissionTriggerCandidate` facts and returns `CodexEntryCandidate` facts.
+
+It names possible encyclopedia/codex entry candidates by entry id, type, priority, source hook or trigger id, concept key, and narrative tags. It does not unlock entries, write to `CodexProfile`, create an encyclopedia database, track completion, grant rewards, save progress, or drive UI.
+
+### Candidate Deduplication
+
+Candidate deduplication is a pure domain cleanup step applied after candidates are generated. It does not change generation rules; it only collapses repeated facts into stable candidate lists.
+
+Current rules:
+
+- `CodexEntryCandidate` values deduplicate by `EntryId`.
+- `MissionTriggerCandidate` values deduplicate by `TriggerId`.
+- When duplicates exist, the candidate with the highest `Priority` provides the retained candidate fields.
+- `NarrativeTags` are merged in first-seen order without duplicates.
+
 ## Allowed Dependencies
 
 The dependency direction should stay narrow and domain-first:
@@ -68,6 +88,7 @@ The dependency direction should stay narrow and domain-first:
 - `Game.Domain.Transmutation` may depend on narrative facts when deciding access policy.
 - `Game.Domain.World` may consume narrative tags to preview NPC reaction facts.
 - `Game.Domain.Missions` may consume narrative hooks to preview mission trigger candidates.
+- `Game.Domain.Codex` may consume narrative hooks and mission trigger candidates to preview codex entry candidates.
 - Smoke tests may compose the full chain to prove the foundation still works.
 
 Domain services may depend on other pure domain services or result objects when that keeps the flow explicit. Prefer constructor injection only when a service genuinely composes another service, as `TransmutationAccessPolicy` does with `FirstNahualTeachingEvaluator`.
@@ -80,6 +101,7 @@ Do not introduce these couplings into the V2 foundation:
 - Narrative evaluators starting missions, adding codex entries, opening UI, triggering combat, granting rewards, or changing inventory.
 - NPC reaction services mutating reputation, world state, or `PlayerProfile`.
 - Mission trigger candidates becoming active mission tracking or journal state.
+- Codex entry candidates becoming active encyclopedia entries, completion state, rewards, persistence, or UI.
 - Transmutation access checks implementing actual transmutation mechanics.
 - Generated Unity YAML edits for narrative foundation work.
 - Giant orchestration MonoBehaviours that contain gameplay rules.
@@ -109,8 +131,10 @@ Use stable, centralized names for cross-system facts:
 - Transmutation block reasons live in `TransmutationAccessBlockReasons`.
 - Mission trigger ids live in `MissionTriggerIds`.
 - Mission family names live in `MissionFamilies`.
+- Codex entry ids live in `CodexEntryIds`.
+- Codex concept/title keys live in `CodexConceptKeys`.
 
-Prefer clear domain names over generic ids. Avoid repeated string literals for tags, hook ids, trigger ids, mission families, suggested systems, or block reasons.
+Prefer clear domain names over generic ids. Avoid repeated string literals for tags, hook ids, trigger ids, codex entry ids, concept keys, mission families, suggested systems, or block reasons.
 
 ## Narrative Tag Philosophy
 
@@ -132,7 +156,7 @@ When adding a tag, add or update smoke coverage for the behavior that consumes i
 
 ### Codex System
 
-Future codex work should consume `NarrativeHook` facts, especially hooks with `NarrativeHookType.Codex` or `SuggestedNarrativeSystem.Codex`. Codex systems should decide how and when entries are discovered or completed outside the evaluator chain.
+Future codex work should consume `CodexEntryCandidate` facts. Codex systems should decide how and when entries are discovered, persisted, displayed, or completed outside the evaluator chain.
 
 ### Mission Journal
 
@@ -168,7 +192,9 @@ Current smoke expectations:
 - NPC reaction assertions still run.
 - Narrative hook assertions still run.
 - Mission trigger assertions still run.
+- Codex entry assertions still run.
+- Candidate deduplication assertions still run.
 - V2 foundation flow assertions still run.
-- Total smoke assertions remain `69` unless a branch intentionally adds or renames smoke coverage and explains why.
+- Total smoke assertions remain `86` unless a branch intentionally adds or renames smoke coverage and explains why.
 
 Documentation-only changes should not alter smoke counts, gameplay behavior, Unity assets, scenes, prefabs, or `.meta` files.
