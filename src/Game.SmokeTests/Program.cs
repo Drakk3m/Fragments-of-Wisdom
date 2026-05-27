@@ -128,6 +128,16 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Codex profile assertions",
+                delegate
+                {
+                    AssertCodexProfileDiscoversOneEntry();
+                    AssertCodexProfileDuplicateDiscoveryIsIdempotent();
+                    AssertCodexProfileDiscoversMultipleEntries();
+                    AssertCodexProfilePreservesNarrativeTags();
+                });
+
+            RunSection(
                 "V2 foundation flow assertions",
                 delegate
                 {
@@ -805,6 +815,135 @@ namespace Game.SmokeTests
             Assert(
                 CountTriggers(missionTriggerCandidates, MissionTriggerIds.NahualTransmutationBlockedWarning) == 1,
                 "Mission trigger service should keep blocked transmutation trigger candidates stable.");
+        }
+
+        private static void AssertCodexProfileDiscoversOneEntry()
+        {
+            var profile = new CodexProfile();
+            var candidate = BuildCodexCandidate(
+                CodexEntryIds.NahualPath,
+                CodexEntryType.Concept,
+                CodexConceptKeys.NahualPath,
+                NarrativeHookIds.CodexNahualPath,
+                "",
+                NarrativeTags.NahualFirstTeachingAccepted);
+
+            bool discovered = new CodexDiscoveryService().Discover(profile, candidate);
+            var record = profile.GetDiscoveredEntry(CodexEntryIds.NahualPath);
+
+            Assert(
+                discovered,
+                "Codex discovery should report a new entry discovery.");
+
+            Assert(
+                profile.IsDiscovered(CodexEntryIds.NahualPath),
+                "Codex profile should track the discovered entry id.");
+
+            Assert(
+                record != null && record.ConceptKey == CodexConceptKeys.NahualPath,
+                "Codex profile should preserve the discovered entry concept key.");
+        }
+
+        private static void AssertCodexProfileDuplicateDiscoveryIsIdempotent()
+        {
+            var profile = new CodexProfile();
+            var candidate = BuildCodexCandidate(
+                CodexEntryIds.ForbiddenTransmutation,
+                CodexEntryType.Practice,
+                CodexConceptKeys.ForbiddenTransmutation,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                "",
+                NarrativeTags.TransmutationAccessAllowed);
+
+            bool firstDiscovery = new CodexDiscoveryService().Discover(profile, candidate);
+            bool duplicateDiscovery = new CodexDiscoveryService().Discover(profile, candidate);
+
+            Assert(
+                firstDiscovery,
+                "First codex discovery should be applied.");
+
+            Assert(
+                !duplicateDiscovery,
+                "Duplicate codex discovery should be idempotent.");
+
+            Assert(
+                profile.DiscoveredEntries.Count == 1,
+                "Duplicate codex discovery should not add another entry record.");
+        }
+
+        private static void AssertCodexProfileDiscoversMultipleEntries()
+        {
+            var profile = new CodexProfile();
+            var candidates = new List<CodexEntryCandidate>();
+            candidates.Add(BuildCodexCandidate(
+                CodexEntryIds.NahualPath,
+                CodexEntryType.Concept,
+                CodexConceptKeys.NahualPath,
+                NarrativeHookIds.CodexNahualPath,
+                "",
+                NarrativeTags.NahualFirstTeachingAccepted));
+            candidates.Add(BuildCodexCandidate(
+                CodexEntryIds.TransmutationWarning,
+                CodexEntryType.Warning,
+                CodexConceptKeys.TransmutationWarning,
+                NarrativeHookIds.DialogueTransmutationBlocked,
+                MissionTriggerIds.NahualTransmutationBlockedWarning,
+                NarrativeTags.TransmutationAccessBlocked));
+
+            int discoveredCount = new CodexDiscoveryService().Discover(profile, candidates);
+
+            Assert(
+                discoveredCount == 2,
+                "Codex discovery should apply multiple new entry candidates.");
+
+            Assert(
+                profile.IsDiscovered(CodexEntryIds.NahualPath)
+                && profile.IsDiscovered(CodexEntryIds.TransmutationWarning),
+                "Codex profile should track multiple discovered entry ids.");
+        }
+
+        private static void AssertCodexProfilePreservesNarrativeTags()
+        {
+            var profile = new CodexProfile();
+            var candidate = BuildCodexCandidate(
+                CodexEntryIds.SharedWisdomFollowup,
+                CodexEntryType.FollowUp,
+                CodexConceptKeys.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                MissionTriggerIds.SharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected);
+
+            new CodexDiscoveryService().Discover(profile, candidate);
+            var record = profile.GetDiscoveredEntry(CodexEntryIds.SharedWisdomFollowup);
+
+            Assert(
+                record != null && ContainsTag(record.NarrativeTags, NarrativeTags.NahualFirstTeachingRejected),
+                "Codex profile should preserve narrative tags on discovery records.");
+
+            Assert(
+                record != null && record.FirstSourceTriggerId == MissionTriggerIds.SharedWisdomFollowup,
+                "Codex profile should preserve the first discovery source trigger.");
+        }
+
+        private static CodexEntryCandidate BuildCodexCandidate(
+            string entryId,
+            CodexEntryType entryType,
+            string conceptKey,
+            string sourceHookId,
+            string sourceTriggerId,
+            string narrativeTag)
+        {
+            var narrativeTags = new List<string>();
+            narrativeTags.Add(narrativeTag);
+
+            return new CodexEntryCandidate(
+                entryId,
+                entryType,
+                10,
+                sourceHookId,
+                sourceTriggerId,
+                conceptKey,
+                narrativeTags);
         }
 
         private static void AssertDefaultSharedWisdomFlow()
