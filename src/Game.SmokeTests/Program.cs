@@ -138,6 +138,16 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Mission journal assertions",
+                delegate
+                {
+                    AssertMissionJournalDiscoversOneLead();
+                    AssertMissionJournalDuplicateDiscoveryIsIdempotent();
+                    AssertMissionJournalDiscoversMultipleLeads();
+                    AssertMissionJournalPreservesNarrativeTagsAndFamily();
+                });
+
+            RunSection(
                 "V2 foundation flow assertions",
                 delegate
                 {
@@ -943,6 +953,128 @@ namespace Game.SmokeTests
                 sourceHookId,
                 sourceTriggerId,
                 conceptKey,
+                narrativeTags);
+        }
+
+        private static void AssertMissionJournalDiscoversOneLead()
+        {
+            var profile = new MissionJournalProfile();
+            var candidate = BuildMissionTriggerCandidate(
+                MissionTriggerIds.SharedWisdomFollowup,
+                MissionTriggerType.FollowUp,
+                MissionFamilies.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected);
+
+            bool discovered = new MissionDiscoveryService().Discover(profile, candidate);
+            var record = profile.GetAvailableLead(MissionTriggerIds.SharedWisdomFollowup);
+
+            Assert(
+                discovered,
+                "Mission discovery should report a new mission lead.");
+
+            Assert(
+                profile.IsLeadAvailable(MissionTriggerIds.SharedWisdomFollowup),
+                "Mission journal should track the available mission lead id.");
+
+            Assert(
+                record != null && record.TriggerType == MissionTriggerType.FollowUp,
+                "Mission journal should preserve the trigger type.");
+        }
+
+        private static void AssertMissionJournalDuplicateDiscoveryIsIdempotent()
+        {
+            var profile = new MissionJournalProfile();
+            var candidate = BuildMissionTriggerCandidate(
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                MissionTriggerType.Discovery,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                NarrativeTags.TransmutationAccessAllowed);
+
+            bool firstDiscovery = new MissionDiscoveryService().Discover(profile, candidate);
+            bool duplicateDiscovery = new MissionDiscoveryService().Discover(profile, candidate);
+
+            Assert(
+                firstDiscovery,
+                "First mission lead discovery should be applied.");
+
+            Assert(
+                !duplicateDiscovery,
+                "Duplicate mission lead discovery should be idempotent.");
+
+            Assert(
+                profile.AvailableLeads.Count == 1,
+                "Duplicate mission lead discovery should not add another lead record.");
+        }
+
+        private static void AssertMissionJournalDiscoversMultipleLeads()
+        {
+            var profile = new MissionJournalProfile();
+            var candidates = new List<MissionTriggerCandidate>();
+            candidates.Add(BuildMissionTriggerCandidate(
+                MissionTriggerIds.SharedWisdomFollowup,
+                MissionTriggerType.FollowUp,
+                MissionFamilies.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected));
+            candidates.Add(BuildMissionTriggerCandidate(
+                MissionTriggerIds.NahualTransmutationBlockedWarning,
+                MissionTriggerType.Warning,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.DialogueTransmutationBlocked,
+                NarrativeTags.TransmutationAccessBlocked));
+
+            int discoveredCount = new MissionDiscoveryService().Discover(profile, candidates);
+
+            Assert(
+                discoveredCount == 2,
+                "Mission discovery should apply multiple new trigger candidates.");
+
+            Assert(
+                profile.IsLeadAvailable(MissionTriggerIds.SharedWisdomFollowup)
+                && profile.IsLeadAvailable(MissionTriggerIds.NahualTransmutationBlockedWarning),
+                "Mission journal should track multiple available lead ids.");
+        }
+
+        private static void AssertMissionJournalPreservesNarrativeTagsAndFamily()
+        {
+            var profile = new MissionJournalProfile();
+            var candidate = BuildMissionTriggerCandidate(
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                MissionTriggerType.Discovery,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                NarrativeTags.TransmutationAccessAllowed);
+
+            new MissionDiscoveryService().Discover(profile, candidate);
+            var record = profile.GetAvailableLead(MissionTriggerIds.NahualTransmutationDiscovery);
+
+            Assert(
+                record != null && ContainsTag(record.NarrativeTags, NarrativeTags.TransmutationAccessAllowed),
+                "Mission journal should preserve narrative tags on lead records.");
+
+            Assert(
+                record != null && record.SuggestedMissionFamily == MissionFamilies.NahualPath,
+                "Mission journal should preserve the suggested mission family.");
+        }
+
+        private static MissionTriggerCandidate BuildMissionTriggerCandidate(
+            string triggerId,
+            MissionTriggerType triggerType,
+            string suggestedMissionFamily,
+            string sourceHookId,
+            string narrativeTag)
+        {
+            var narrativeTags = new List<string>();
+            narrativeTags.Add(narrativeTag);
+
+            return new MissionTriggerCandidate(
+                triggerId,
+                triggerType,
+                10,
+                suggestedMissionFamily,
+                sourceHookId,
                 narrativeTags);
         }
 
