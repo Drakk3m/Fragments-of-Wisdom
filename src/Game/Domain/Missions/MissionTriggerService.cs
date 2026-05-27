@@ -6,6 +6,23 @@ namespace Game.Domain.Missions
 {
     public class MissionTriggerService
     {
+        private readonly MissionTriggerCandidateDeduplicator deduplicator;
+
+        public MissionTriggerService()
+            : this(new MissionTriggerCandidateDeduplicator())
+        {
+        }
+
+        public MissionTriggerService(MissionTriggerCandidateDeduplicator deduplicator)
+        {
+            if (deduplicator == null)
+            {
+                throw new ArgumentNullException(nameof(deduplicator));
+            }
+
+            this.deduplicator = deduplicator;
+        }
+
         public IReadOnlyList<MissionTriggerCandidate> Resolve(IReadOnlyList<NarrativeHook> hooks)
         {
             if (hooks == null)
@@ -20,7 +37,7 @@ namespace Game.Domain.Missions
                 AddCandidate(hook, candidates);
             }
 
-            return candidates;
+            return deduplicator.Deduplicate(candidates);
         }
 
         public IReadOnlyList<MissionTriggerCandidate> Resolve(NarrativeHook hook)
