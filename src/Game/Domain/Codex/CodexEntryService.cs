@@ -7,6 +7,23 @@ namespace Game.Domain.Codex
 {
     public class CodexEntryService
     {
+        private readonly CodexEntryCandidateDeduplicator deduplicator;
+
+        public CodexEntryService()
+            : this(new CodexEntryCandidateDeduplicator())
+        {
+        }
+
+        public CodexEntryService(CodexEntryCandidateDeduplicator deduplicator)
+        {
+            if (deduplicator == null)
+            {
+                throw new ArgumentNullException(nameof(deduplicator));
+            }
+
+            this.deduplicator = deduplicator;
+        }
+
         public IReadOnlyList<CodexEntryCandidate> Resolve(
             IReadOnlyList<NarrativeHook> hooks,
             IReadOnlyList<MissionTriggerCandidate> missionTriggerCandidates)
@@ -26,7 +43,7 @@ namespace Game.Domain.Codex
             AddHookCandidates(hooks, candidates);
             AddMissionTriggerCandidates(missionTriggerCandidates, candidates);
 
-            return candidates;
+            return deduplicator.Deduplicate(candidates);
         }
 
         public IReadOnlyList<CodexEntryCandidate> ResolveHooks(
@@ -39,7 +56,7 @@ namespace Game.Domain.Codex
 
             var candidates = new List<CodexEntryCandidate>();
             AddHookCandidates(hooks, candidates);
-            return candidates;
+            return deduplicator.Deduplicate(candidates);
         }
 
         public IReadOnlyList<CodexEntryCandidate> ResolveMissionTriggers(
@@ -52,7 +69,7 @@ namespace Game.Domain.Codex
 
             var candidates = new List<CodexEntryCandidate>();
             AddMissionTriggerCandidates(missionTriggerCandidates, candidates);
-            return candidates;
+            return deduplicator.Deduplicate(candidates);
         }
 
         private static void AddHookCandidates(

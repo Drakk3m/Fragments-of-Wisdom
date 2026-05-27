@@ -119,6 +119,15 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Candidate deduplication assertions",
+                delegate
+                {
+                    AssertCodexEntryCandidateDeduplication();
+                    AssertMissionTriggerCandidateDeduplication();
+                    AssertIntegratedCodexEntryCandidateDeduplication();
+                });
+
+            RunSection(
                 "V2 foundation flow assertions",
                 delegate
                 {
@@ -295,6 +304,57 @@ namespace Game.SmokeTests
             }
 
             return false;
+        }
+
+        private static int CountEntries(
+            IReadOnlyList<CodexEntryCandidate> candidates,
+            string entryId)
+        {
+            int count = 0;
+
+            foreach (var candidate in candidates)
+            {
+                if (candidate.EntryId == entryId)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static int CountTriggers(
+            IReadOnlyList<MissionTriggerCandidate> candidates,
+            string triggerId)
+        {
+            int count = 0;
+
+            foreach (var candidate in candidates)
+            {
+                if (candidate.TriggerId == triggerId)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static int CountTags(
+            IReadOnlyList<string> narrativeTags,
+            string tag)
+        {
+            int count = 0;
+
+            foreach (var narrativeTag in narrativeTags)
+            {
+                if (narrativeTag == tag)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         private static void AssertDefaultTransmutationAccess(PlayerProfile profile)
@@ -640,6 +700,111 @@ namespace Game.SmokeTests
             Assert(
                 candidates[0].NarrativeTags.Count > 0,
                 "Codex entry candidates should preserve narrative tags.");
+        }
+
+        private static void AssertCodexEntryCandidateDeduplication()
+        {
+            var candidates = new List<CodexEntryCandidate>();
+            candidates.Add(new CodexEntryCandidate(
+                CodexEntryIds.ForbiddenTransmutation,
+                CodexEntryType.Practice,
+                10,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                "",
+                CodexConceptKeys.ForbiddenTransmutation,
+                new List<string>
+                {
+                    NarrativeTags.NahualFirstTeachingAccepted,
+                    NarrativeTags.TransmutationAccessAllowed
+                }));
+            candidates.Add(new CodexEntryCandidate(
+                CodexEntryIds.ForbiddenTransmutation,
+                CodexEntryType.Practice,
+                90,
+                "",
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                CodexConceptKeys.ForbiddenTransmutation,
+                new List<string>
+                {
+                    NarrativeTags.TransmutationAccessAllowed,
+                    NarrativeTags.NpcReactionWary
+                }));
+
+            var result = new CodexEntryCandidateDeduplicator().Deduplicate(candidates);
+
+            Assert(
+                result.Count == 1,
+                "Duplicate codex entry candidates should collapse into one result.");
+
+            Assert(
+                result[0].Priority == 90,
+                "Deduplicated codex entry candidate should preserve the highest priority.");
+
+            Assert(
+                result[0].SourceTriggerId == MissionTriggerIds.NahualTransmutationDiscovery,
+                "Deduplicated codex entry candidate should preserve fields from the highest-priority source.");
+
+            Assert(
+                CountTags(result[0].NarrativeTags, NarrativeTags.TransmutationAccessAllowed) == 1,
+                "Deduplicated codex entry candidate should merge narrative tags without duplicates.");
+        }
+
+        private static void AssertMissionTriggerCandidateDeduplication()
+        {
+            var candidates = new List<MissionTriggerCandidate>();
+            candidates.Add(new MissionTriggerCandidate(
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                MissionTriggerType.Discovery,
+                30,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                new List<string>
+                {
+                    NarrativeTags.TransmutationAccessAllowed,
+                    NarrativeTags.NahualFirstTeachingAccepted
+                }));
+            candidates.Add(new MissionTriggerCandidate(
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                MissionTriggerType.Discovery,
+                80,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                new List<string>
+                {
+                    NarrativeTags.TransmutationAccessAllowed,
+                    NarrativeTags.NpcReactionWary
+                }));
+
+            var result = new MissionTriggerCandidateDeduplicator().Deduplicate(candidates);
+
+            Assert(
+                result.Count == 1,
+                "Duplicate mission trigger candidates should collapse into one result.");
+
+            Assert(
+                result[0].Priority == 80,
+                "Deduplicated mission trigger candidate should preserve the highest priority.");
+
+            Assert(
+                CountTags(result[0].NarrativeTags, NarrativeTags.TransmutationAccessAllowed) == 1,
+                "Deduplicated mission trigger candidate should merge narrative tags without duplicates.");
+        }
+
+        private static void AssertIntegratedCodexEntryCandidateDeduplication()
+        {
+            var profile = new PlayerProfile();
+            var accessResult = new TransmutationAccessPolicy().Evaluate(profile);
+            var hooks = new NarrativeHookService().Resolve(accessResult);
+            var missionTriggerCandidates = new MissionTriggerService().Resolve(hooks);
+            var candidates = new CodexEntryService().Resolve(hooks, missionTriggerCandidates);
+
+            Assert(
+                CountEntries(candidates, CodexEntryIds.TransmutationWarning) == 1,
+                "Codex entry service should collapse duplicate transmutation warning candidates.");
+
+            Assert(
+                CountTriggers(missionTriggerCandidates, MissionTriggerIds.NahualTransmutationBlockedWarning) == 1,
+                "Mission trigger service should keep blocked transmutation trigger candidates stable.");
         }
 
         private static void AssertDefaultSharedWisdomFlow()
