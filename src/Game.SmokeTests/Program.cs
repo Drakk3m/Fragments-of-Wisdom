@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Game.Domain.Alignment;
 using Game.Domain.Codex;
+using Game.Domain.Discovery;
 using Game.Domain.Missions;
 using Game.Domain.Narrative;
 using Game.Domain.Player;
@@ -145,6 +146,15 @@ namespace Game.SmokeTests
                     AssertMissionJournalDuplicateDiscoveryIsIdempotent();
                     AssertMissionJournalDiscoversMultipleLeads();
                     AssertMissionJournalPreservesNarrativeTagsAndFamily();
+                });
+
+            RunSection(
+                "Discovery orchestration assertions",
+                delegate
+                {
+                    AssertDiscoveryOrchestrationAppliesCodexAndMissionTogether();
+                    AssertDiscoveryOrchestrationDuplicateReapplicationIsIdempotent();
+                    AssertDiscoveryOrchestrationReportsDiscoveredAndAlreadyKnown();
                 });
 
             RunSection(
@@ -375,6 +385,21 @@ namespace Game.SmokeTests
             }
 
             return count;
+        }
+
+        private static bool ContainsString(
+            IReadOnlyList<string> values,
+            string value)
+        {
+            foreach (var existingValue in values)
+            {
+                if (existingValue == value)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void AssertDefaultTransmutationAccess(PlayerProfile profile)
@@ -1076,6 +1101,164 @@ namespace Game.SmokeTests
                 suggestedMissionFamily,
                 sourceHookId,
                 narrativeTags);
+        }
+
+        private static void AssertDiscoveryOrchestrationAppliesCodexAndMissionTogether()
+        {
+            var codexProfile = new CodexProfile();
+            var missionJournalProfile = new MissionJournalProfile();
+            var codexCandidates = new List<CodexEntryCandidate>();
+            codexCandidates.Add(BuildCodexCandidate(
+                CodexEntryIds.NahualPath,
+                CodexEntryType.Concept,
+                CodexConceptKeys.NahualPath,
+                NarrativeHookIds.CodexNahualPath,
+                "",
+                NarrativeTags.NahualFirstTeachingAccepted));
+
+            var missionCandidates = new List<MissionTriggerCandidate>();
+            missionCandidates.Add(BuildMissionTriggerCandidate(
+                MissionTriggerIds.SharedWisdomFollowup,
+                MissionTriggerType.FollowUp,
+                MissionFamilies.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected));
+
+            var result = new DiscoveryOrchestrationService().Apply(
+                codexProfile,
+                missionJournalProfile,
+                codexCandidates,
+                missionCandidates);
+
+            Assert(
+                result.CodexEntriesDiscoveredCount == 1
+                && result.MissionLeadsDiscoveredCount == 1,
+                "Discovery orchestration should apply codex and mission discoveries together.");
+
+            Assert(
+                codexProfile.IsDiscovered(CodexEntryIds.NahualPath)
+                && missionJournalProfile.IsLeadAvailable(MissionTriggerIds.SharedWisdomFollowup),
+                "Discovery orchestration should mutate only the provided discovery profiles.");
+
+            Assert(
+                ContainsString(result.CodexEntryIdsDiscovered, CodexEntryIds.NahualPath)
+                && ContainsString(result.MissionLeadTriggerIdsDiscovered, MissionTriggerIds.SharedWisdomFollowup),
+                "Discovery orchestration summary should list discovered ids.");
+        }
+
+        private static void AssertDiscoveryOrchestrationDuplicateReapplicationIsIdempotent()
+        {
+            var codexProfile = new CodexProfile();
+            var missionJournalProfile = new MissionJournalProfile();
+            var codexCandidates = new List<CodexEntryCandidate>();
+            codexCandidates.Add(BuildCodexCandidate(
+                CodexEntryIds.ForbiddenTransmutation,
+                CodexEntryType.Practice,
+                CodexConceptKeys.ForbiddenTransmutation,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                "",
+                NarrativeTags.TransmutationAccessAllowed));
+
+            var missionCandidates = new List<MissionTriggerCandidate>();
+            missionCandidates.Add(BuildMissionTriggerCandidate(
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                MissionTriggerType.Discovery,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                NarrativeTags.TransmutationAccessAllowed));
+
+            var service = new DiscoveryOrchestrationService();
+            service.Apply(
+                codexProfile,
+                missionJournalProfile,
+                codexCandidates,
+                missionCandidates);
+
+            var result = service.Apply(
+                codexProfile,
+                missionJournalProfile,
+                codexCandidates,
+                missionCandidates);
+
+            Assert(
+                result.CodexEntriesDiscoveredCount == 0
+                && result.MissionLeadsDiscoveredCount == 0,
+                "Discovery orchestration duplicate re-application should not rediscover known facts.");
+
+            Assert(
+                result.CodexEntriesAlreadyKnownCount == 1
+                && result.MissionLeadsAlreadyKnownCount == 1,
+                "Discovery orchestration should count already-known duplicate facts.");
+
+            Assert(
+                codexProfile.DiscoveredEntries.Count == 1
+                && missionJournalProfile.AvailableLeads.Count == 1,
+                "Discovery orchestration duplicate re-application should preserve idempotent profile state.");
+        }
+
+        private static void AssertDiscoveryOrchestrationReportsDiscoveredAndAlreadyKnown()
+        {
+            var codexProfile = new CodexProfile();
+            var missionJournalProfile = new MissionJournalProfile();
+            var codexDiscoveryService = new CodexDiscoveryService();
+            var missionDiscoveryService = new MissionDiscoveryService();
+
+            var knownCodexCandidate = BuildCodexCandidate(
+                CodexEntryIds.NahualPath,
+                CodexEntryType.Concept,
+                CodexConceptKeys.NahualPath,
+                NarrativeHookIds.CodexNahualPath,
+                "",
+                NarrativeTags.NahualFirstTeachingAccepted);
+            var knownMissionCandidate = BuildMissionTriggerCandidate(
+                MissionTriggerIds.SharedWisdomFollowup,
+                MissionTriggerType.FollowUp,
+                MissionFamilies.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected);
+
+            codexDiscoveryService.Discover(codexProfile, knownCodexCandidate);
+            missionDiscoveryService.Discover(missionJournalProfile, knownMissionCandidate);
+
+            var codexCandidates = new List<CodexEntryCandidate>();
+            codexCandidates.Add(knownCodexCandidate);
+            codexCandidates.Add(BuildCodexCandidate(
+                CodexEntryIds.TransmutationWarning,
+                CodexEntryType.Warning,
+                CodexConceptKeys.TransmutationWarning,
+                NarrativeHookIds.DialogueTransmutationBlocked,
+                MissionTriggerIds.NahualTransmutationBlockedWarning,
+                NarrativeTags.TransmutationAccessBlocked));
+
+            var missionCandidates = new List<MissionTriggerCandidate>();
+            missionCandidates.Add(knownMissionCandidate);
+            missionCandidates.Add(BuildMissionTriggerCandidate(
+                MissionTriggerIds.NahualTransmutationBlockedWarning,
+                MissionTriggerType.Warning,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.DialogueTransmutationBlocked,
+                NarrativeTags.TransmutationAccessBlocked));
+
+            var result = new DiscoveryOrchestrationService().Apply(
+                codexProfile,
+                missionJournalProfile,
+                codexCandidates,
+                missionCandidates);
+
+            Assert(
+                result.CodexEntriesDiscoveredCount == 1
+                && result.CodexEntriesAlreadyKnownCount == 1,
+                "Discovery orchestration should report discovered and already-known codex entries.");
+
+            Assert(
+                result.MissionLeadsDiscoveredCount == 1
+                && result.MissionLeadsAlreadyKnownCount == 1,
+                "Discovery orchestration should report discovered and already-known mission leads.");
+
+            Assert(
+                ContainsString(result.CodexEntryIdsDiscovered, CodexEntryIds.TransmutationWarning)
+                && ContainsString(result.MissionLeadTriggerIdsDiscovered, MissionTriggerIds.NahualTransmutationBlockedWarning),
+                "Discovery orchestration should report newly discovered ids separately from known ids.");
         }
 
         private static void AssertDefaultSharedWisdomFlow()
