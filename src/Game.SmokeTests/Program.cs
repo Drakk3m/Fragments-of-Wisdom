@@ -162,6 +162,16 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Unlock profile assertions",
+                delegate
+                {
+                    AssertUnlockProfileRecordsUnlockedCandidate();
+                    AssertUnlockProfileIgnoresLockedCandidate();
+                    AssertUnlockProfileDuplicateApplicationIsIdempotent();
+                    AssertUnlockProfilePreservesMetadata();
+                });
+
+            RunSection(
                 "Mission journal assertions",
                 delegate
                 {
@@ -1290,6 +1300,130 @@ namespace Game.SmokeTests
             Assert(
                 unlockCandidate != null && unlockCandidate.IsUnlocked,
                 "Duplicate discoveries should not change the unlocked result.");
+        }
+
+        private static void AssertUnlockProfileRecordsUnlockedCandidate()
+        {
+            var profile = new UnlockProfile();
+            var candidate = BuildUnlockedCandidate(
+                CodexUnlockIds.ForbiddenPracticeCount,
+                CodexUnlockType.EntryTypeCount,
+                CodexEntryType.Practice,
+                "",
+                1,
+                0,
+                NarrativeTags.TransmutationAccessAllowed);
+
+            bool applied = new UnlockApplicationService().Apply(profile, candidate);
+
+            Assert(
+                applied,
+                "Unlock profile should record unlocked candidates.");
+
+            Assert(
+                profile.HasUnlock(CodexUnlockIds.ForbiddenPracticeCount),
+                "Unlock profile should track recorded unlock ids.");
+        }
+
+        private static void AssertUnlockProfileIgnoresLockedCandidate()
+        {
+            var profile = new UnlockProfile();
+            var candidate = new CodexUnlockCandidate(
+                CodexUnlockIds.ForbiddenPracticeCount,
+                CodexUnlockType.EntryTypeCount,
+                CodexEntryType.Practice,
+                "",
+                1,
+                0,
+                false,
+                new List<string>());
+
+            bool applied = new UnlockApplicationService().Apply(profile, candidate);
+
+            Assert(
+                !applied,
+                "Unlock profile should ignore locked candidates.");
+
+            Assert(
+                profile.Unlocks.Count == 0,
+                "Locked candidates should not create unlock records.");
+        }
+
+        private static void AssertUnlockProfileDuplicateApplicationIsIdempotent()
+        {
+            var profile = new UnlockProfile();
+            var candidate = BuildUnlockedCandidate(
+                CodexUnlockIds.NahualPathDiscovered,
+                CodexUnlockType.EntryDiscovery,
+                null,
+                CodexEntryIds.NahualPath,
+                0,
+                0,
+                NarrativeTags.NahualFirstTeachingAccepted);
+
+            bool firstApplication = new UnlockApplicationService().Apply(profile, candidate);
+            bool duplicateApplication = new UnlockApplicationService().Apply(profile, candidate);
+
+            Assert(
+                firstApplication,
+                "First unlock application should be recorded.");
+
+            Assert(
+                !duplicateApplication,
+                "Duplicate unlock application should be idempotent.");
+
+            Assert(
+                profile.Unlocks.Count == 1,
+                "Duplicate unlock application should not add another record.");
+        }
+
+        private static void AssertUnlockProfilePreservesMetadata()
+        {
+            var profile = new UnlockProfile();
+            var candidate = BuildUnlockedCandidate(
+                CodexUnlockIds.HalfCatalogueDiscovered,
+                CodexUnlockType.CompletionPercentage,
+                null,
+                "",
+                0,
+                50,
+                NarrativeTags.NahualFirstTeachingDiscovered);
+
+            new UnlockApplicationService().Apply(profile, candidate);
+            var record = profile.GetUnlock(CodexUnlockIds.HalfCatalogueDiscovered);
+
+            Assert(
+                record != null
+                && record.UnlockType == CodexUnlockType.CompletionPercentage
+                && record.RequiredPercentage == 50,
+                "Unlock profile should preserve unlock type and requirement metadata.");
+
+            Assert(
+                record != null && ContainsTag(record.NarrativeTags, NarrativeTags.NahualFirstTeachingDiscovered),
+                "Unlock profile should preserve unlock narrative tags.");
+        }
+
+        private static CodexUnlockCandidate BuildUnlockedCandidate(
+            string unlockId,
+            CodexUnlockType unlockType,
+            CodexEntryType? requiredEntryType,
+            string requiredEntryId,
+            int requiredCount,
+            int requiredPercentage,
+            string narrativeTag)
+        {
+            var narrativeTags = new List<string>();
+            narrativeTags.Add(narrativeTag);
+
+            return new CodexUnlockCandidate(
+                unlockId,
+                unlockType,
+                requiredEntryType,
+                requiredEntryId,
+                requiredCount,
+                requiredPercentage,
+                true,
+                narrativeTags);
         }
 
         private static void AssertMissionJournalDiscoversOneLead()
