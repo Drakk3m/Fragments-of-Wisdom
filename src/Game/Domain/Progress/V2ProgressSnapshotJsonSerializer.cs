@@ -67,6 +67,7 @@ namespace Game.Domain.Progress
             dto.SchemaVersion = snapshot.SchemaVersion;
             dto.CodexEntries = new List<CodexEntryDto>();
             dto.MissionLeads = new List<MissionLeadDto>();
+            dto.ActiveMissions = new List<ActiveMissionDto>();
 
             foreach (var entry in snapshot.CodexEntries)
             {
@@ -94,6 +95,20 @@ namespace Game.Domain.Progress
                 });
             }
 
+            foreach (var mission in snapshot.ActiveMissions)
+            {
+                dto.ActiveMissions.Add(new ActiveMissionDto
+                {
+                    TriggerId = mission.TriggerId,
+                    State = mission.State,
+                    TriggerType = mission.TriggerType,
+                    Priority = mission.Priority,
+                    SuggestedMissionFamily = mission.SuggestedMissionFamily,
+                    SourceHookId = mission.SourceHookId,
+                    NarrativeTags = CopyTags(mission.NarrativeTags)
+                });
+            }
+
             return dto;
         }
 
@@ -101,6 +116,7 @@ namespace Game.Domain.Progress
         {
             var codexEntries = new List<V2CodexEntrySnapshot>();
             var missionLeads = new List<V2MissionLeadSnapshot>();
+            var activeMissions = new List<V2ActiveMissionSnapshot>();
 
             if (dto.CodexEntries != null)
             {
@@ -130,10 +146,26 @@ namespace Game.Domain.Progress
                 }
             }
 
+            if (dto.ActiveMissions != null)
+            {
+                foreach (var mission in dto.ActiveMissions)
+                {
+                    activeMissions.Add(new V2ActiveMissionSnapshot(
+                        mission.TriggerId,
+                        mission.State,
+                        mission.TriggerType,
+                        mission.Priority,
+                        mission.SuggestedMissionFamily,
+                        mission.SourceHookId,
+                        CopyTags(mission.NarrativeTags)));
+                }
+            }
+
             return new V2ProgressSnapshot(
                 dto.SchemaVersion,
                 codexEntries,
-                missionLeads);
+                missionLeads,
+                activeMissions);
         }
 
         private static List<string> CopyTags(IReadOnlyList<string> sourceTags)
@@ -158,6 +190,7 @@ namespace Game.Domain.Progress
             public int SchemaVersion { get; set; }
             public List<CodexEntryDto> CodexEntries { get; set; }
             public List<MissionLeadDto> MissionLeads { get; set; }
+            public List<ActiveMissionDto> ActiveMissions { get; set; }
         }
 
         private class CodexEntryDto
@@ -173,6 +206,17 @@ namespace Game.Domain.Progress
         private class MissionLeadDto
         {
             public string TriggerId { get; set; }
+            public MissionTriggerType TriggerType { get; set; }
+            public int Priority { get; set; }
+            public string SuggestedMissionFamily { get; set; }
+            public string SourceHookId { get; set; }
+            public List<string> NarrativeTags { get; set; }
+        }
+
+        private class ActiveMissionDto
+        {
+            public string TriggerId { get; set; }
+            public MissionLifecycleState State { get; set; }
             public MissionTriggerType TriggerType { get; set; }
             public int Priority { get; set; }
             public string SuggestedMissionFamily { get; set; }

@@ -177,8 +177,13 @@ namespace Game.SmokeTests
                 {
                     AssertV2SnapshotCapturesCodexEntries();
                     AssertV2SnapshotCapturesMissionLeads();
+                    AssertV2SnapshotCapturesActiveMission();
+                    AssertV2SnapshotCapturesCompletedMission();
+                    AssertV2SnapshotCapturesFailedMission();
                     AssertV2SnapshotRestoreRecreatesEquivalentProfiles();
+                    AssertV2SnapshotRestoreRecreatesLifecycleStates();
                     AssertV2SnapshotRestoreIsIdempotent();
+                    AssertV2SnapshotLifecycleRestoreIsIdempotent();
                     AssertV2SnapshotUsesCurrentVersion();
                     AssertV2SnapshotCurrentVersionRestores();
                     AssertV2SnapshotUnsupportedVersionIsRejected();
@@ -1514,6 +1519,78 @@ namespace Game.SmokeTests
                 "V2 snapshot should preserve mission trigger ids and mission families.");
         }
 
+        private static void AssertV2SnapshotCapturesActiveMission()
+        {
+            var missionJournalProfile = BuildMissionJournalWithLead(
+                MissionTriggerIds.SharedWisdomFollowup,
+                MissionTriggerType.FollowUp,
+                MissionFamilies.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected);
+            missionJournalProfile.PromoteLeadToActiveMission(MissionTriggerIds.SharedWisdomFollowup);
+
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                missionJournalProfile);
+
+            Assert(
+                snapshot.ActiveMissions.Count == 1,
+                "V2 snapshot should capture active missions.");
+
+            Assert(
+                snapshot.ActiveMissions[0].State == MissionLifecycleState.Active
+                && snapshot.ActiveMissions[0].TriggerId == MissionTriggerIds.SharedWisdomFollowup,
+                "V2 snapshot should preserve active mission state and trigger id.");
+        }
+
+        private static void AssertV2SnapshotCapturesCompletedMission()
+        {
+            var missionJournalProfile = BuildMissionJournalWithLead(
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                MissionTriggerType.Discovery,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                NarrativeTags.TransmutationAccessAllowed);
+            missionJournalProfile.PromoteLeadToActiveMission(MissionTriggerIds.NahualTransmutationDiscovery);
+            missionJournalProfile.CompleteMission(MissionTriggerIds.NahualTransmutationDiscovery);
+
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                missionJournalProfile);
+
+            Assert(
+                snapshot.ActiveMissions.Count == 1,
+                "V2 snapshot should capture completed missions.");
+
+            Assert(
+                snapshot.ActiveMissions[0].State == MissionLifecycleState.Completed,
+                "V2 snapshot should preserve completed mission state.");
+        }
+
+        private static void AssertV2SnapshotCapturesFailedMission()
+        {
+            var missionJournalProfile = BuildMissionJournalWithLead(
+                MissionTriggerIds.NahualTransmutationBlockedWarning,
+                MissionTriggerType.Warning,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.DialogueTransmutationBlocked,
+                NarrativeTags.TransmutationAccessBlocked);
+            missionJournalProfile.PromoteLeadToActiveMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+            missionJournalProfile.FailMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                missionJournalProfile);
+
+            Assert(
+                snapshot.ActiveMissions.Count == 1,
+                "V2 snapshot should capture failed missions.");
+
+            Assert(
+                snapshot.ActiveMissions[0].State == MissionLifecycleState.Failed,
+                "V2 snapshot should preserve failed mission state.");
+        }
+
         private static void AssertV2SnapshotRestoreRecreatesEquivalentProfiles()
         {
             var sourceCodexProfile = new CodexProfile();
@@ -1569,6 +1646,46 @@ namespace Game.SmokeTests
                 "V2 snapshot restore should preserve mission lead type and priority.");
         }
 
+        private static void AssertV2SnapshotRestoreRecreatesLifecycleStates()
+        {
+            var sourceMissionJournalProfile = BuildMissionJournalWithLead(
+                MissionTriggerIds.NahualTransmutationBlockedWarning,
+                MissionTriggerType.Warning,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.DialogueTransmutationBlocked,
+                NarrativeTags.TransmutationAccessBlocked);
+            sourceMissionJournalProfile.PromoteLeadToActiveMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+            sourceMissionJournalProfile.FailMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                sourceMissionJournalProfile);
+
+            var restoredMissionJournalProfile = new MissionJournalProfile();
+            service.Restore(
+                snapshot,
+                new CodexProfile(),
+                restoredMissionJournalProfile);
+
+            var restoredMission = restoredMissionJournalProfile.GetActiveMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+
+            Assert(
+                restoredMission != null && restoredMission.State == MissionLifecycleState.Failed,
+                "V2 snapshot restore should recreate lifecycle state.");
+
+            Assert(
+                restoredMission != null
+                && restoredMission.TriggerType == MissionTriggerType.Warning
+                && restoredMission.Priority == 10
+                && restoredMission.SuggestedMissionFamily == MissionFamilies.NahualPath,
+                "V2 snapshot restore should preserve active mission facts.");
+
+            Assert(
+                restoredMission != null && ContainsTag(restoredMission.NarrativeTags, NarrativeTags.TransmutationAccessBlocked),
+                "V2 snapshot restore should preserve active mission narrative tags.");
+        }
+
         private static void AssertV2SnapshotRestoreIsIdempotent()
         {
             var sourceCodexProfile = new CodexProfile();
@@ -1618,6 +1735,41 @@ namespace Game.SmokeTests
             Assert(
                 ContainsTag(restoredMissionJournalProfile.AvailableLeads[0].NarrativeTags, NarrativeTags.TransmutationAccessBlocked),
                 "V2 snapshot restore should preserve mission lead narrative tags after repeated restore.");
+        }
+
+        private static void AssertV2SnapshotLifecycleRestoreIsIdempotent()
+        {
+            var sourceMissionJournalProfile = BuildMissionJournalWithLead(
+                MissionTriggerIds.SharedWisdomFollowup,
+                MissionTriggerType.FollowUp,
+                MissionFamilies.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected);
+            sourceMissionJournalProfile.PromoteLeadToActiveMission(MissionTriggerIds.SharedWisdomFollowup);
+            sourceMissionJournalProfile.CompleteMission(MissionTriggerIds.SharedWisdomFollowup);
+
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                sourceMissionJournalProfile);
+
+            var restoredMissionJournalProfile = new MissionJournalProfile();
+            service.Restore(
+                snapshot,
+                new CodexProfile(),
+                restoredMissionJournalProfile);
+            service.Restore(
+                snapshot,
+                new CodexProfile(),
+                restoredMissionJournalProfile);
+
+            Assert(
+                restoredMissionJournalProfile.ActiveMissions.Count == 1,
+                "V2 snapshot repeated restore should not duplicate active mission records.");
+
+            Assert(
+                restoredMissionJournalProfile.GetActiveMission(MissionTriggerIds.SharedWisdomFollowup).State == MissionLifecycleState.Completed,
+                "V2 snapshot repeated restore should preserve terminal lifecycle state.");
         }
 
         private static void AssertV2SnapshotUsesCurrentVersion()

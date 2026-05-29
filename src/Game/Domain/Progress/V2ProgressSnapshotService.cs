@@ -24,7 +24,8 @@ namespace Game.Domain.Progress
             return new V2ProgressSnapshot(
                 V2ProgressSnapshotVersions.CurrentSchemaVersion,
                 BuildCodexSnapshots(codexProfile.DiscoveredEntries),
-                BuildMissionLeadSnapshots(missionJournalProfile.AvailableLeads));
+                BuildMissionLeadSnapshots(missionJournalProfile.AvailableLeads),
+                BuildActiveMissionSnapshots(missionJournalProfile.ActiveMissions));
         }
 
         public bool CanRestore(V2ProgressSnapshot snapshot)
@@ -83,6 +84,18 @@ namespace Game.Domain.Progress
                     leadSnapshot.SourceHookId,
                     CopyTags(leadSnapshot.NarrativeTags)));
             }
+
+            foreach (var missionSnapshot in snapshot.ActiveMissions)
+            {
+                missionJournalProfile.RestoreMission(new ActiveMissionRecord(
+                    missionSnapshot.TriggerId,
+                    missionSnapshot.TriggerType,
+                    missionSnapshot.State,
+                    missionSnapshot.Priority,
+                    missionSnapshot.SuggestedMissionFamily,
+                    missionSnapshot.SourceHookId,
+                    CopyTags(missionSnapshot.NarrativeTags)));
+            }
         }
 
         private static IReadOnlyList<V2CodexEntrySnapshot> BuildCodexSnapshots(
@@ -118,6 +131,26 @@ namespace Game.Domain.Progress
                     lead.SuggestedMissionFamily,
                     lead.SourceHookId,
                     CopyTags(lead.NarrativeTags)));
+            }
+
+            return snapshots;
+        }
+
+        private static IReadOnlyList<V2ActiveMissionSnapshot> BuildActiveMissionSnapshots(
+            IReadOnlyList<ActiveMissionRecord> missions)
+        {
+            var snapshots = new List<V2ActiveMissionSnapshot>();
+
+            foreach (var mission in missions)
+            {
+                snapshots.Add(new V2ActiveMissionSnapshot(
+                    mission.TriggerId,
+                    mission.State,
+                    mission.TriggerType,
+                    mission.Priority,
+                    mission.SuggestedMissionFamily,
+                    mission.SourceHookId,
+                    CopyTags(mission.NarrativeTags)));
             }
 
             return snapshots;
