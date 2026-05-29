@@ -57,6 +57,19 @@ namespace Game.Unity.Persistence
                     missionJournalProfile));
         }
 
+        public void Save(
+            CodexProfile codexProfile,
+            MissionJournalProfile missionJournalProfile,
+            UnlockProfile unlockProfile)
+        {
+            repository.Save(
+                savePathProvider.GetV2ProgressSnapshotPath(),
+                snapshotService.CreateSnapshot(
+                    codexProfile,
+                    missionJournalProfile,
+                    unlockProfile));
+        }
+
         public void LoadInto(
             CodexProfile codexProfile,
             MissionJournalProfile missionJournalProfile)
@@ -65,6 +78,18 @@ namespace Game.Unity.Persistence
                 repository.Load(savePathProvider.GetV2ProgressSnapshotPath()),
                 codexProfile,
                 missionJournalProfile);
+        }
+
+        public void LoadInto(
+            CodexProfile codexProfile,
+            MissionJournalProfile missionJournalProfile,
+            UnlockProfile unlockProfile)
+        {
+            snapshotService.Restore(
+                repository.Load(savePathProvider.GetV2ProgressSnapshotPath()),
+                codexProfile,
+                missionJournalProfile,
+                unlockProfile);
         }
 
         public bool Exists()
