@@ -152,6 +152,16 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Codex unlock candidate assertions",
+                delegate
+                {
+                    AssertCodexUnlocksStayLockedForEmptyProgress();
+                    AssertCodexUnlockCandidateAppearsWhenRequiredCountIsMet();
+                    AssertCodexUnlockUnmetRequirementStaysLocked();
+                    AssertCodexUnlockDuplicateDiscoveriesDoNotAffectResult();
+                });
+
+            RunSection(
                 "Mission journal assertions",
                 delegate
                 {
@@ -397,6 +407,37 @@ namespace Game.SmokeTests
             }
 
             return false;
+        }
+
+        private static CodexUnlockCandidate FindUnlock(
+            IReadOnlyList<CodexUnlockCandidate> candidates,
+            string unlockId)
+        {
+            foreach (var candidate in candidates)
+            {
+                if (candidate.UnlockId == unlockId)
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
+        }
+
+        private static int CountUnlocked(
+            IReadOnlyList<CodexUnlockCandidate> candidates)
+        {
+            int count = 0;
+
+            foreach (var candidate in candidates)
+            {
+                if (candidate.IsUnlocked)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         private static int CountEntries(
@@ -1150,6 +1191,105 @@ namespace Game.SmokeTests
 
             new CodexDiscoveryService().Discover(profile, candidates);
             return profile;
+        }
+
+        private static void AssertCodexUnlocksStayLockedForEmptyProgress()
+        {
+            var summary = new CodexProgressService().Summarize(new CodexProfile());
+            var candidates = new CodexUnlockService().Resolve(summary);
+
+            Assert(
+                candidates.Count > 0,
+                "Codex unlock service should report candidate facts for empty progress.");
+
+            Assert(
+                CountUnlocked(candidates) == 0,
+                "Empty codex progress should not unlock any candidates.");
+        }
+
+        private static void AssertCodexUnlockCandidateAppearsWhenRequiredCountIsMet()
+        {
+            var profile = new CodexProfile();
+            new CodexDiscoveryService().Discover(
+                profile,
+                BuildCodexCandidate(
+                    CodexEntryIds.ForbiddenTransmutation,
+                    CodexEntryType.Practice,
+                    CodexConceptKeys.ForbiddenTransmutation,
+                    NarrativeHookIds.TransmutationForbiddenPractice,
+                    MissionTriggerIds.NahualTransmutationDiscovery,
+                    NarrativeTags.TransmutationAccessAllowed));
+
+            var summary = new CodexProgressService().Summarize(profile);
+            var candidate = FindUnlock(
+                new CodexUnlockService().Resolve(summary),
+                CodexUnlockIds.ForbiddenPracticeCount);
+
+            Assert(
+                candidate != null,
+                "Codex unlock service should return the practice-count unlock candidate.");
+
+            Assert(
+                candidate.IsUnlocked
+                && candidate.RequiredEntryType == CodexEntryType.Practice
+                && candidate.RequiredCount == 1,
+                "Codex unlock candidate should unlock when required type count is met.");
+        }
+
+        private static void AssertCodexUnlockUnmetRequirementStaysLocked()
+        {
+            var profile = new CodexProfile();
+            new CodexDiscoveryService().Discover(
+                profile,
+                BuildCodexCandidate(
+                    CodexEntryIds.NahualPath,
+                    CodexEntryType.Concept,
+                    CodexConceptKeys.NahualPath,
+                    NarrativeHookIds.CodexNahualPath,
+                    "",
+                    NarrativeTags.NahualFirstTeachingAccepted));
+
+            var summary = new CodexProgressService().Summarize(profile);
+            var candidate = FindUnlock(
+                new CodexUnlockService().Resolve(summary),
+                CodexUnlockIds.ForbiddenPracticeCount);
+
+            Assert(
+                candidate != null && !candidate.IsUnlocked,
+                "Codex unlock candidate should stay locked when its requirement is unmet.");
+
+            Assert(
+                candidate.RequiredEntryType == CodexEntryType.Practice
+                && candidate.RequiredCount == 1,
+                "Locked codex unlock candidate should describe its unmet requirement.");
+        }
+
+        private static void AssertCodexUnlockDuplicateDiscoveriesDoNotAffectResult()
+        {
+            var profile = new CodexProfile();
+            var candidate = BuildCodexCandidate(
+                CodexEntryIds.ForbiddenTransmutation,
+                CodexEntryType.Practice,
+                CodexConceptKeys.ForbiddenTransmutation,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                NarrativeTags.TransmutationAccessAllowed);
+
+            new CodexDiscoveryService().Discover(profile, candidate);
+            new CodexDiscoveryService().Discover(profile, candidate);
+
+            var summary = new CodexProgressService().Summarize(profile);
+            var unlockCandidate = FindUnlock(
+                new CodexUnlockService().Resolve(summary),
+                CodexUnlockIds.ForbiddenPracticeCount);
+
+            Assert(
+                summary.GetDiscoveredCount(CodexEntryType.Practice) == 1,
+                "Duplicate discoveries should not inflate unlock prerequisite progress.");
+
+            Assert(
+                unlockCandidate != null && unlockCandidate.IsUnlocked,
+                "Duplicate discoveries should not change the unlocked result.");
         }
 
         private static void AssertMissionJournalDiscoversOneLead()
