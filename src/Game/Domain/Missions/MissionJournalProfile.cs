@@ -110,6 +110,30 @@ namespace Game.Domain.Missions
             return mission.Fail();
         }
 
+        public bool RestoreMission(ActiveMissionRecord mission)
+        {
+            if (mission == null)
+            {
+                return false;
+            }
+
+            if (GetActiveMission(mission.TriggerId) != null)
+            {
+                return false;
+            }
+
+            activeMissions.Add(new ActiveMissionRecord(
+                mission.TriggerId,
+                mission.TriggerType,
+                mission.State,
+                mission.Priority,
+                mission.SuggestedMissionFamily,
+                mission.SourceHookId,
+                CopyTags(mission.NarrativeTags)));
+
+            return true;
+        }
+
         public ActiveMissionRecord GetActiveMission(string triggerId)
         {
             foreach (var mission in activeMissions)
