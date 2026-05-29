@@ -5,6 +5,7 @@ using System.Text.Json;
 using Game.Domain.Alignment;
 using Game.Domain.Common;
 using Game.Domain.Combat;
+using Game.Domain.Combat.Passives;
 using Game.Domain.Combat.Stats;
 using Game.Domain.Codex;
 using Game.Domain.Discovery;
@@ -12,6 +13,7 @@ using Game.Domain.Missions;
 using Game.Domain.Narrative;
 using Game.Domain.Player;
 using Game.Domain.Progress;
+using Game.Domain.Skills;
 using Game.Domain.Transmutation;
 using Game.Domain.World;
 using Game.Slice;
@@ -56,6 +58,16 @@ namespace Game.SmokeTests
                     AssertMissCausesNoDamage();
                     AssertCriticalHitIncreasesDamage();
                     AssertSkillCannotRunWhenCostCannotBePaid();
+                });
+
+            RunSection(
+                "Skill foundation assertions",
+                delegate
+                {
+                    AssertUnlockedSkillIsAvailable();
+                    AssertLockedSkillIsBlocked();
+                    AssertSkillDefinitionExposesFacts();
+                    AssertSkillUsesCanonicalTurnEnginePath();
                 });
 
             RunSection(
@@ -294,60 +306,65 @@ namespace Game.SmokeTests
 
         private static void AssertBasicAttackDamagesTarget()
         {
-            var attacker = BuildCombatant("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
-            var defender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender);
 
-            var result = new CombatResolver(new FixedRandomSource(0.0, 0.99)).Resolve(
-                attacker,
-                defender,
-                CombatAction.BasicAttack());
-
-            Assert(
-                result.ActionAccepted,
-                "Basic attack should be accepted.");
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.BasicAttack(attacker, defender));
 
             Assert(
-                result.Hit
-                && result.Damage > 0
+                ContainsEvent(runtime.EventLog, GameEventType.BasicAttackUsed),
+                "Basic attack should be accepted by the canonical turn engine.");
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.DamageDealt)
                 && defender.Stats.CurrentHealth < defender.Stats.MaxHealth,
                 "Basic attack should damage the target.");
         }
 
         private static void AssertDefeatedTargetIsDetected()
         {
-            var attacker = BuildCombatant("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
-            var defender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
             defender.Stats.CurrentHealth = 5;
+            var runtime = BuildCombatRuntime(attacker, defender);
 
-            var result = new CombatResolver(new FixedRandomSource(0.0, 0.99)).Resolve(
-                attacker,
-                defender,
-                CombatAction.BasicAttack());
-
-            Assert(
-                result.TargetDefeated,
-                "Combat turn result should report target defeat.");
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.BasicAttack(attacker, defender));
 
             Assert(
-                defender.IsDefeated,
-                "Combatant profile should report defeated state after lethal damage.");
+                ContainsEvent(runtime.EventLog, GameEventType.CombatEnded),
+                "Canonical turn engine should emit combat ended when the target is defeated.");
+
+            Assert(
+                !defender.IsAlive && runtime.CombatEnded,
+                "Combat entity and runtime should report defeated state after lethal damage.");
         }
 
         private static void AssertMissCausesNoDamage()
         {
-            var attacker = BuildCombatant("attacker", 30, 5, 0, 0, 0, 0, 2f, 10);
-            var defender = BuildCombatant("defender", 5, 5, 0, 100, 0, 0, 1f, 10);
+            var attacker = BuildCombatEntity("attacker", 30, 5, 0, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 100, 0, 0, 1f, 10);
             int startingHealth = defender.Stats.CurrentHealth;
+            var runtime = BuildCombatRuntime(attacker, defender);
 
-            var result = new CombatResolver(new FixedRandomSource(0.99)).Resolve(
-                attacker,
-                defender,
-                CombatAction.BasicAttack());
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.BasicAttack(attacker, defender));
 
             Assert(
-                !result.Hit
-                && result.Damage == 0,
-                "Missed attacks should report no damage.");
+                ContainsEvent(runtime.EventLog, GameEventType.DamageMissed)
+                && !ContainsEvent(runtime.EventLog, GameEventType.DamageDealt),
+                "Missed attacks should emit missed damage without dealt damage.");
 
             Assert(
                 defender.Stats.CurrentHealth == startingHealth,
@@ -356,53 +373,141 @@ namespace Game.SmokeTests
 
         private static void AssertCriticalHitIncreasesDamage()
         {
-            var normalAttacker = BuildCombatant("attacker", 30, 5, 100, 0, 100, 0, 2f, 10);
-            var normalDefender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
-            var criticalAttacker = BuildCombatant("attacker", 30, 5, 100, 0, 100, 0, 2f, 10);
-            var criticalDefender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var normalAttacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 100, 0, 2f, 10);
+            var normalDefender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var criticalAttacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 100, 0, 2f, 10);
+            var criticalDefender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var normalRuntime = BuildCombatRuntime(normalAttacker, normalDefender);
+            var criticalRuntime = BuildCombatRuntime(criticalAttacker, criticalDefender);
 
-            var normalResult = new CombatResolver(new FixedRandomSource(0.0, 0.99)).Resolve(
-                normalAttacker,
-                normalDefender,
-                CombatAction.BasicAttack());
-            var criticalResult = new CombatResolver(new FixedRandomSource(0.0, 0.0)).Resolve(
-                criticalAttacker,
-                criticalDefender,
-                CombatAction.BasicAttack());
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    normalRuntime,
+                    TurnRequest.BasicAttack(normalAttacker, normalDefender));
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.0),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    criticalRuntime,
+                    TurnRequest.BasicAttack(criticalAttacker, criticalDefender));
 
             Assert(
-                !normalResult.Critical
-                && criticalResult.Critical,
-                "Critical hit check should distinguish normal and critical hits deterministically.");
+                !ContainsEvent(normalRuntime.EventLog, GameEventType.CriticalHit)
+                && ContainsEvent(criticalRuntime.EventLog, GameEventType.CriticalHit),
+                "Critical hit check should distinguish normal and critical hits through the canonical turn engine.");
 
             Assert(
-                criticalResult.Damage > normalResult.Damage,
+                criticalDefender.Stats.CurrentHealth < normalDefender.Stats.CurrentHealth,
                 "Critical hit should increase damage.");
         }
 
         private static void AssertSkillCannotRunWhenCostCannotBePaid()
         {
-            var attacker = BuildCombatant("attacker", 30, 5, 100, 0, 0, 0, 2f, 0);
-            var defender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 0);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
             int startingHealth = defender.Stats.CurrentHealth;
+            var runtime = BuildCombatRuntime(attacker, defender);
+            var skill = new TestDamageSkill();
+            var progress = new SkillProgress(BuildHeavyStrikeDefinition());
 
-            var result = new CombatResolver(new FixedRandomSource(0.0, 0.0)).Resolve(
-                attacker,
-                defender,
-                CombatAction.SkillAction("skill.heavy_strike", "Heavy Strike", 1.5f, 5));
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.0),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(attacker, defender, skill, progress));
 
             Assert(
-                !result.ActionAccepted
-                && result.BlockReason == CombatResolver.NotEnoughResourceBlockReason,
+                ContainsEvent(runtime.EventLog, GameEventType.ResourceNotEnough)
+                && !ContainsEvent(runtime.EventLog, GameEventType.ResourceSpent),
                 "Skill action should be blocked when resource cost cannot be paid.");
 
             Assert(
                 defender.Stats.CurrentHealth == startingHealth
-                && result.Damage == 0,
+                && !ContainsEvent(runtime.EventLog, GameEventType.DamageDealt),
                 "Blocked skill action should not damage the target.");
         }
 
-        private static CombatantProfile BuildCombatant(
+        private static void AssertUnlockedSkillIsAvailable()
+        {
+            var unlockProfile = new UnlockProfile();
+            unlockProfile.RecordUnlock(new UnlockRecord(
+                CodexUnlockIds.ForbiddenPracticeCount,
+                CodexUnlockType.EntryTypeCount,
+                CodexEntryType.Practice,
+                "",
+                1,
+                0,
+                new List<string>()));
+
+            var result = new SkillAccessPolicy().Evaluate(
+                BuildHeavyStrikeDefinition(),
+                unlockProfile);
+
+            Assert(
+                result.IsAvailable,
+                "Unlocked skill should be available.");
+
+            Assert(
+                result.RequiredUnlockId == CodexUnlockIds.ForbiddenPracticeCount,
+                "Skill access result should preserve the required unlock id.");
+        }
+
+        private static void AssertLockedSkillIsBlocked()
+        {
+            var result = new SkillAccessPolicy().Evaluate(
+                BuildHeavyStrikeDefinition(),
+                new UnlockProfile());
+
+            Assert(
+                !result.IsAvailable,
+                "Locked skill should be blocked.");
+
+            Assert(
+                result.BlockReason == SkillAccessPolicy.MissingUnlockBlockReason,
+                "Locked skill should report missing unlock as the block reason.");
+        }
+
+        private static void AssertSkillDefinitionExposesFacts()
+        {
+            var skill = BuildHeavyStrikeDefinition();
+
+            Assert(
+                skill.Category == SkillCategory.Combat
+                && skill.Targeting == SkillTargeting.SingleEnemy
+                && skill.EffectType == SkillEffectType.Damage,
+                "Skill definition should expose category, targeting, and effect facts.");
+
+            Assert(
+                skill.Cost.GetCost(1) == 5
+                && skill.RequiredUnlockId == CodexUnlockIds.ForbiddenPracticeCount,
+                "Skill definition should expose cost and access requirement facts.");
+        }
+
+        private static void AssertSkillUsesCanonicalTurnEnginePath()
+        {
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender);
+            var progress = new SkillProgress(BuildHeavyStrikeDefinition());
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(attacker, defender, new TestDamageSkill(), progress));
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.ResourceSpent)
+                && ContainsEvent(runtime.EventLog, GameEventType.SkillUsed),
+                "Skill execution should go through TurnBasedCombatEngine resource and skill events.");
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.DamageDealt)
+                && defender.Stats.CurrentHealth < defender.Stats.MaxHealth,
+                "Skill execution should use the canonical turn engine damage path.");
+        }
+
+        private static CombatEntity BuildCombatEntity(
             string id,
             int attack,
             int defense,
@@ -413,7 +518,7 @@ namespace Game.SmokeTests
             float criticalDamageMultiplier,
             int maxResource)
         {
-            return new CombatantProfile(
+            return new CombatEntity(
                 id,
                 id,
                 new CombatStats
@@ -429,6 +534,50 @@ namespace Game.SmokeTests
                     CriticalDamageMultiplier = criticalDamageMultiplier
                 },
                 maxResource);
+        }
+
+        private static CombatRuntimeContext BuildCombatRuntime(
+            CombatEntity player,
+            CombatEntity enemy)
+        {
+            return new CombatRuntimeContext(
+                player,
+                enemy,
+                new GameEventLog(),
+                new PlayerProfile());
+        }
+
+        private static CombatPassivePipeline BuildEmptyPassivePipeline()
+        {
+            return new CombatPassivePipeline(new List<ICombatPassiveEffect>());
+        }
+
+        private static SkillDefinition BuildHeavyStrikeDefinition()
+        {
+            return new SkillDefinition(
+                "skill.heavy_strike",
+                "Heavy Strike",
+                1,
+                new SkillCost(5, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                CodexUnlockIds.ForbiddenPracticeCount);
+        }
+
+        private static bool ContainsEvent(
+            GameEventLog eventLog,
+            GameEventType eventType)
+        {
+            foreach (var gameEvent in eventLog.Events)
+            {
+                if (gameEvent.Type == eventType)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void AssertDefaultNahualTeachingState(PlayerProfile profile)
@@ -3257,6 +3406,27 @@ namespace Game.SmokeTests
             foreach (var hook in source)
             {
                 target.Add(hook);
+            }
+        }
+
+        private class TestDamageSkill : ICombatSkill
+        {
+            public string Id
+            {
+                get { return "skill.heavy_strike"; }
+            }
+
+            public string Name
+            {
+                get { return "Heavy Strike"; }
+            }
+
+            public void Apply(
+                CombatContext context,
+                SkillProgress progress)
+            {
+                context.DamageMultiplier = 1.5f;
+                context.EventLog.Add(GameEventType.SkillUsed, context.Attacker.Name + " uses Heavy Strike.");
             }
         }
 
