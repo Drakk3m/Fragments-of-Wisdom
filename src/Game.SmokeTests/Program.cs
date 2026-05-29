@@ -82,6 +82,16 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Resonance skill integration assertions",
+                delegate
+                {
+                    AssertSkillSpendsActiveResonance();
+                    AssertSkillBlockedWhenActiveResonanceIsInsufficient();
+                    AssertReserveIsNotConsumedAutomaticallyForSkillCost();
+                    AssertRefillThenSkillWorks();
+                });
+
+            RunSection(
                 "Alignment assertions",
                 delegate
                 {
@@ -605,6 +615,131 @@ namespace Game.SmokeTests
                 "Failed resonance refill should not refill active resonance or consume the turn.");
         }
 
+        private static void AssertSkillSpendsActiveResonance()
+        {
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender, resonance);
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        attacker,
+                        defender,
+                        new TestDamageSkill(),
+                        new SkillProgress(BuildResonanceStrikeDefinition())));
+
+            Assert(
+                resonance.Active.Current == 4,
+                "Accepted resonance skill should spend active resonance.");
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.SkillUsed)
+                && ContainsEvent(runtime.EventLog, GameEventType.DamageDealt),
+                "Accepted resonance skill should continue through the canonical combat engine.");
+        }
+
+        private static void AssertSkillBlockedWhenActiveResonanceIsInsufficient()
+        {
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(1),
+                new ResonanceReserve(10));
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            int startingHealth = defender.Stats.CurrentHealth;
+            var runtime = BuildCombatRuntime(attacker, defender, resonance);
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        attacker,
+                        defender,
+                        new TestDamageSkill(),
+                        new SkillProgress(BuildResonanceStrikeDefinition())));
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.ResourceNotEnough)
+                && !ContainsEvent(runtime.EventLog, GameEventType.SkillUsed),
+                "Insufficient active resonance should block skill execution.");
+
+            Assert(
+                defender.Stats.CurrentHealth == startingHealth
+                && !ContainsEvent(runtime.EventLog, GameEventType.DamageDealt),
+                "Resonance-blocked skill should not damage the target.");
+        }
+
+        private static void AssertReserveIsNotConsumedAutomaticallyForSkillCost()
+        {
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(1),
+                new ResonanceReserve(10));
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender, resonance);
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        attacker,
+                        defender,
+                        new TestDamageSkill(),
+                        new SkillProgress(BuildResonanceStrikeDefinition())));
+
+            Assert(
+                resonance.Active.Current == 1,
+                "Insufficient active resonance should remain unchanged when skill is blocked.");
+
+            Assert(
+                resonance.Reserve.Current == 10,
+                "Reserve resonance should not be consumed automatically for skill cost.");
+        }
+
+        private static void AssertRefillThenSkillWorks()
+        {
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            resonance.TrySpendActive(6);
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender, resonance);
+
+            bool refilled = new ResonanceRefillAction().Execute(
+                resonance,
+                runtime,
+                2);
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        attacker,
+                        defender,
+                        new TestDamageSkill(),
+                        new SkillProgress(BuildResonanceStrikeDefinition())));
+
+            Assert(
+                refilled
+                && resonance.Active.Current == 0
+                && resonance.Reserve.Current == 8,
+                "Refill should enable a later skill without auto-consuming reserve during the skill.");
+
+            Assert(
+                runtime.TurnNumber == 3
+                && ContainsEvent(runtime.EventLog, GameEventType.SkillUsed)
+                && ContainsEvent(runtime.EventLog, GameEventType.DamageDealt),
+                "Refill then skill should consume separate turns and execute through the canonical engine.");
+        }
+
         private static CombatEntity BuildCombatEntity(
             string id,
             int attack,
@@ -645,6 +780,19 @@ namespace Game.SmokeTests
                 new PlayerProfile());
         }
 
+        private static CombatRuntimeContext BuildCombatRuntime(
+            CombatEntity player,
+            CombatEntity enemy,
+            ResonanceProfile resonanceProfile)
+        {
+            return new CombatRuntimeContext(
+                player,
+                enemy,
+                new GameEventLog(),
+                new PlayerProfile(),
+                resonanceProfile);
+        }
+
         private static CombatPassivePipeline BuildEmptyPassivePipeline()
         {
             return new CombatPassivePipeline(new List<ICombatPassiveEffect>());
@@ -661,6 +809,20 @@ namespace Game.SmokeTests
                 SkillTargeting.SingleEnemy,
                 SkillEffectType.Damage,
                 CodexUnlockIds.ForbiddenPracticeCount);
+        }
+
+        private static SkillDefinition BuildResonanceStrikeDefinition()
+        {
+            return new SkillDefinition(
+                "skill.resonance_strike",
+                "Resonance Strike",
+                1,
+                new SkillCost(5, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                CodexUnlockIds.ForbiddenPracticeCount,
+                2);
         }
 
         private static bool ContainsEvent(
