@@ -36,6 +36,13 @@ namespace Game.Domain.Progress
                 throw new ArgumentNullException(nameof(snapshot));
             }
 
+            string directoryPath = Path.GetDirectoryName(filePath);
+
+            if (!string.IsNullOrEmpty(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+
             File.WriteAllText(filePath, serializer.Serialize(snapshot));
         }
 
