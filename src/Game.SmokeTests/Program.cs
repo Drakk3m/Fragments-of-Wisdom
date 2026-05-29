@@ -152,6 +152,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Mission lifecycle assertions",
+                delegate
+                {
+                    AssertMissionLeadCanBecomeActiveMission();
+                    AssertActiveMissionCanBeCompleted();
+                    AssertActiveMissionCanBeFailed();
+                    AssertDuplicateMissionPromotionIsSafe();
+                    AssertTerminalMissionCannotBeOverwritten();
+                });
+
+            RunSection(
                 "Discovery orchestration assertions",
                 delegate
                 {
@@ -1138,6 +1149,156 @@ namespace Game.SmokeTests
                 suggestedMissionFamily,
                 sourceHookId,
                 narrativeTags);
+        }
+
+        private static void AssertMissionLeadCanBecomeActiveMission()
+        {
+            var profile = BuildMissionJournalWithLead(
+                MissionTriggerIds.SharedWisdomFollowup,
+                MissionTriggerType.FollowUp,
+                MissionFamilies.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected);
+
+            bool promoted = profile.PromoteLeadToActiveMission(MissionTriggerIds.SharedWisdomFollowup);
+            var mission = profile.GetActiveMission(MissionTriggerIds.SharedWisdomFollowup);
+
+            Assert(
+                promoted,
+                "Discovered mission lead should promote to active mission.");
+
+            Assert(
+                mission != null && mission.State == MissionLifecycleState.Active,
+                "Promoted mission should be active.");
+
+            Assert(
+                mission != null
+                && mission.SuggestedMissionFamily == MissionFamilies.SharedWisdom
+                && ContainsTag(mission.NarrativeTags, NarrativeTags.NahualFirstTeachingRejected),
+                "Promoted mission should preserve lead facts.");
+        }
+
+        private static void AssertActiveMissionCanBeCompleted()
+        {
+            var profile = BuildMissionJournalWithLead(
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                MissionTriggerType.Discovery,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                NarrativeTags.TransmutationAccessAllowed);
+
+            profile.PromoteLeadToActiveMission(MissionTriggerIds.NahualTransmutationDiscovery);
+            bool completed = profile.CompleteMission(MissionTriggerIds.NahualTransmutationDiscovery);
+            var mission = profile.GetActiveMission(MissionTriggerIds.NahualTransmutationDiscovery);
+
+            Assert(
+                completed,
+                "Active mission should complete successfully.");
+
+            Assert(
+                mission != null && mission.State == MissionLifecycleState.Completed,
+                "Completed mission should record completed state.");
+        }
+
+        private static void AssertActiveMissionCanBeFailed()
+        {
+            var profile = BuildMissionJournalWithLead(
+                MissionTriggerIds.NahualTransmutationBlockedWarning,
+                MissionTriggerType.Warning,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.DialogueTransmutationBlocked,
+                NarrativeTags.TransmutationAccessBlocked);
+
+            profile.PromoteLeadToActiveMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+            bool failed = profile.FailMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+            var mission = profile.GetActiveMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+
+            Assert(
+                failed,
+                "Active mission should fail successfully.");
+
+            Assert(
+                mission != null && mission.State == MissionLifecycleState.Failed,
+                "Failed mission should record failed state.");
+        }
+
+        private static void AssertDuplicateMissionPromotionIsSafe()
+        {
+            var profile = BuildMissionJournalWithLead(
+                MissionTriggerIds.SharedWisdomFollowup,
+                MissionTriggerType.FollowUp,
+                MissionFamilies.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected);
+
+            bool firstPromotion = profile.PromoteLeadToActiveMission(MissionTriggerIds.SharedWisdomFollowup);
+            bool duplicatePromotion = profile.PromoteLeadToActiveMission(MissionTriggerIds.SharedWisdomFollowup);
+
+            Assert(
+                firstPromotion && duplicatePromotion,
+                "Duplicate promotion of an active mission should be safe.");
+
+            Assert(
+                profile.ActiveMissions.Count == 1,
+                "Duplicate promotion should not create another active mission record.");
+        }
+
+        private static void AssertTerminalMissionCannotBeOverwritten()
+        {
+            var completedProfile = BuildMissionJournalWithLead(
+                MissionTriggerIds.SharedWisdomFollowup,
+                MissionTriggerType.FollowUp,
+                MissionFamilies.SharedWisdom,
+                NarrativeHookIds.MissionSharedWisdomFollowup,
+                NarrativeTags.NahualFirstTeachingRejected);
+            completedProfile.PromoteLeadToActiveMission(MissionTriggerIds.SharedWisdomFollowup);
+            completedProfile.CompleteMission(MissionTriggerIds.SharedWisdomFollowup);
+
+            bool failedCompletedMission = completedProfile.FailMission(MissionTriggerIds.SharedWisdomFollowup);
+            bool promotedCompletedMission = completedProfile.PromoteLeadToActiveMission(MissionTriggerIds.SharedWisdomFollowup);
+
+            var failedProfile = BuildMissionJournalWithLead(
+                MissionTriggerIds.NahualTransmutationBlockedWarning,
+                MissionTriggerType.Warning,
+                MissionFamilies.NahualPath,
+                NarrativeHookIds.DialogueTransmutationBlocked,
+                NarrativeTags.TransmutationAccessBlocked);
+            failedProfile.PromoteLeadToActiveMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+            failedProfile.FailMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+
+            bool completedFailedMission = failedProfile.CompleteMission(MissionTriggerIds.NahualTransmutationBlockedWarning);
+
+            Assert(
+                !failedCompletedMission && !promotedCompletedMission,
+                "Completed mission should not be failed or re-promoted accidentally.");
+
+            Assert(
+                !completedFailedMission,
+                "Failed mission should not be completed accidentally.");
+
+            Assert(
+                completedProfile.GetActiveMission(MissionTriggerIds.SharedWisdomFollowup).State == MissionLifecycleState.Completed
+                && failedProfile.GetActiveMission(MissionTriggerIds.NahualTransmutationBlockedWarning).State == MissionLifecycleState.Failed,
+                "Terminal mission states should remain stable.");
+        }
+
+        private static MissionJournalProfile BuildMissionJournalWithLead(
+            string triggerId,
+            MissionTriggerType triggerType,
+            string suggestedMissionFamily,
+            string sourceHookId,
+            string narrativeTag)
+        {
+            var profile = new MissionJournalProfile();
+            new MissionDiscoveryService().Discover(
+                profile,
+                BuildMissionTriggerCandidate(
+                    triggerId,
+                    triggerType,
+                    suggestedMissionFamily,
+                    sourceHookId,
+                    narrativeTag));
+            return profile;
         }
 
         private static void AssertDiscoveryOrchestrationAppliesCodexAndMissionTogether()
