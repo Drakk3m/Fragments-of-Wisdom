@@ -22,8 +22,19 @@ namespace Game.Domain.Progress
             }
 
             return new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
                 BuildCodexSnapshots(codexProfile.DiscoveredEntries),
                 BuildMissionLeadSnapshots(missionJournalProfile.AvailableLeads));
+        }
+
+        public bool CanRestore(V2ProgressSnapshot snapshot)
+        {
+            if (snapshot == null)
+            {
+                return false;
+            }
+
+            return snapshot.IsCurrentVersion();
         }
 
         public void Restore(
@@ -44,6 +55,11 @@ namespace Game.Domain.Progress
             if (missionJournalProfile == null)
             {
                 throw new ArgumentNullException(nameof(missionJournalProfile));
+            }
+
+            if (!CanRestore(snapshot))
+            {
+                throw new InvalidOperationException("Unsupported V2 progress snapshot schema version.");
             }
 
             foreach (var entrySnapshot in snapshot.CodexEntries)

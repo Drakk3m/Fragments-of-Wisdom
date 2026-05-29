@@ -166,6 +166,9 @@ namespace Game.SmokeTests
                     AssertV2SnapshotCapturesMissionLeads();
                     AssertV2SnapshotRestoreRecreatesEquivalentProfiles();
                     AssertV2SnapshotRestoreIsIdempotent();
+                    AssertV2SnapshotUsesCurrentVersion();
+                    AssertV2SnapshotCurrentVersionRestores();
+                    AssertV2SnapshotUnsupportedVersionIsRejected();
                 });
 
             RunSection(
@@ -1431,6 +1434,79 @@ namespace Game.SmokeTests
             Assert(
                 ContainsTag(restoredMissionJournalProfile.AvailableLeads[0].NarrativeTags, NarrativeTags.TransmutationAccessBlocked),
                 "V2 snapshot restore should preserve mission lead narrative tags after repeated restore.");
+        }
+
+        private static void AssertV2SnapshotUsesCurrentVersion()
+        {
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile());
+
+            Assert(
+                snapshot.SchemaVersion == V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                "New V2 snapshots should use the current schema version.");
+
+            Assert(
+                snapshot.IsCurrentVersion(),
+                "New V2 snapshots should report themselves as current.");
+        }
+
+        private static void AssertV2SnapshotCurrentVersionRestores()
+        {
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile());
+
+            Assert(
+                service.CanRestore(snapshot),
+                "Current V2 snapshot versions should be restorable.");
+
+            service.Restore(
+                snapshot,
+                new CodexProfile(),
+                new MissionJournalProfile());
+
+            Assert(
+                true,
+                "Current V2 snapshot restore should complete without unsupported-version errors.");
+        }
+
+        private static void AssertV2SnapshotUnsupportedVersionIsRejected()
+        {
+            var unsupportedSnapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion + 1,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>());
+            var service = new V2ProgressSnapshotService();
+            var codexProfile = new CodexProfile();
+            var missionJournalProfile = new MissionJournalProfile();
+            bool rejected = false;
+
+            try
+            {
+                service.Restore(
+                    unsupportedSnapshot,
+                    codexProfile,
+                    missionJournalProfile);
+            }
+            catch (InvalidOperationException)
+            {
+                rejected = true;
+            }
+
+            Assert(
+                !service.CanRestore(unsupportedSnapshot),
+                "Unsupported V2 snapshot versions should not be restorable.");
+
+            Assert(
+                rejected,
+                "Unsupported V2 snapshot versions should be rejected explicitly.");
+
+            Assert(
+                codexProfile.DiscoveredEntries.Count == 0
+                && missionJournalProfile.AvailableLeads.Count == 0,
+                "Unsupported V2 snapshot restore should not mutate target profiles.");
         }
 
         private static void AssertDefaultSharedWisdomFlow()
