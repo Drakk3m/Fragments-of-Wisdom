@@ -6,6 +6,7 @@ using Game.Domain.Alignment;
 using Game.Domain.Common;
 using Game.Domain.Combat;
 using Game.Domain.Combat.Passives;
+using Game.Domain.Combat.Resources;
 using Game.Domain.Combat.Stats;
 using Game.Domain.Codex;
 using Game.Domain.Discovery;
@@ -68,6 +69,16 @@ namespace Game.SmokeTests
                     AssertLockedSkillIsBlocked();
                     AssertSkillDefinitionExposesFacts();
                     AssertSkillUsesCanonicalTurnEnginePath();
+                });
+
+            RunSection(
+                "Resonance foundation assertions",
+                delegate
+                {
+                    AssertSpendResonance();
+                    AssertRefillResonance();
+                    AssertRefillConsumesTurn();
+                    AssertCannotRefillWithEmptyReserve();
                 });
 
             RunSection(
@@ -505,6 +516,93 @@ namespace Game.SmokeTests
                 ContainsEvent(runtime.EventLog, GameEventType.DamageDealt)
                 && defender.Stats.CurrentHealth < defender.Stats.MaxHealth,
                 "Skill execution should use the canonical turn engine damage path.");
+        }
+
+        private static void AssertSpendResonance()
+        {
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+
+            bool spent = resonance.TrySpendActive(2);
+
+            Assert(
+                spent,
+                "Active resonance should be spendable.");
+
+            Assert(
+                resonance.Active.Current == 4,
+                "Spending active resonance should reduce active resonance.");
+        }
+
+        private static void AssertRefillResonance()
+        {
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            resonance.TrySpendActive(4);
+
+            bool refilled = resonance.TryRefillFromReserve(3);
+
+            Assert(
+                refilled,
+                "Reserve resonance should refill active resonance.");
+
+            Assert(
+                resonance.Active.Current == 5
+                && resonance.Reserve.Current == 7,
+                "Refill should move resonance from reserve to active.");
+        }
+
+        private static void AssertRefillConsumesTurn()
+        {
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            resonance.TrySpendActive(3);
+            var runtime = BuildCombatRuntime(
+                BuildCombatEntity("player", 10, 5, 100, 0, 0, 0, 2f, 10),
+                BuildCombatEntity("enemy", 5, 5, 0, 0, 0, 0, 1f, 10));
+
+            bool executed = new ResonanceRefillAction().Execute(
+                resonance,
+                runtime,
+                2);
+
+            Assert(
+                executed,
+                "Resonance refill action should execute when reserve is available.");
+
+            Assert(
+                runtime.TurnNumber == 2
+                && ContainsEvent(runtime.EventLog, GameEventType.TurnEnded),
+                "Resonance refill action should consume a combat turn.");
+        }
+
+        private static void AssertCannotRefillWithEmptyReserve()
+        {
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(0));
+            resonance.TrySpendActive(3);
+            var runtime = BuildCombatRuntime(
+                BuildCombatEntity("player", 10, 5, 100, 0, 0, 0, 2f, 10),
+                BuildCombatEntity("enemy", 5, 5, 0, 0, 0, 0, 1f, 10));
+
+            bool executed = new ResonanceRefillAction().Execute(
+                resonance,
+                runtime,
+                2);
+
+            Assert(
+                !executed,
+                "Resonance refill action should fail when reserve is empty.");
+
+            Assert(
+                resonance.Active.Current == 3
+                && runtime.TurnNumber == 1
+                && ContainsEvent(runtime.EventLog, GameEventType.ActionBlocked),
+                "Failed resonance refill should not refill active resonance or consume the turn.");
         }
 
         private static CombatEntity BuildCombatEntity(
