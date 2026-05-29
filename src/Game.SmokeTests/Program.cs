@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using Game.Domain.Alignment;
 using Game.Domain.Codex;
 using Game.Domain.Discovery;
@@ -169,6 +170,16 @@ namespace Game.SmokeTests
                     AssertV2SnapshotUsesCurrentVersion();
                     AssertV2SnapshotCurrentVersionRestores();
                     AssertV2SnapshotUnsupportedVersionIsRejected();
+                });
+
+            RunSection(
+                "V2 save JSON assertions",
+                delegate
+                {
+                    AssertV2SnapshotSerializesToJson();
+                    AssertV2SnapshotDeserializesEquivalentSnapshot();
+                    AssertV2SnapshotUnsupportedVersionJsonIsRejected();
+                    AssertV2SnapshotMalformedJsonFailsSafely();
                 });
 
             RunSection(
@@ -1507,6 +1518,117 @@ namespace Game.SmokeTests
                 codexProfile.DiscoveredEntries.Count == 0
                 && missionJournalProfile.AvailableLeads.Count == 0,
                 "Unsupported V2 snapshot restore should not mutate target profiles.");
+        }
+
+        private static void AssertV2SnapshotSerializesToJson()
+        {
+            var snapshot = BuildSnapshotWithCodexAndMissionLead();
+            string json = new V2ProgressSnapshotJsonSerializer().Serialize(snapshot);
+
+            Assert(
+                json.Length > 0,
+                "V2 snapshot JSON serialization should produce text.");
+
+            Assert(
+                json.Contains("SchemaVersion")
+                && json.Contains("CodexEntries")
+                && json.Contains("MissionLeads"),
+                "V2 snapshot JSON should include the snapshot root fields.");
+        }
+
+        private static void AssertV2SnapshotDeserializesEquivalentSnapshot()
+        {
+            var snapshot = BuildSnapshotWithCodexAndMissionLead();
+            var serializer = new V2ProgressSnapshotJsonSerializer();
+            string json = serializer.Serialize(snapshot);
+            var deserialized = serializer.Deserialize(json);
+
+            Assert(
+                deserialized.SchemaVersion == V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                "V2 snapshot JSON should preserve schema version.");
+
+            Assert(
+                deserialized.CodexEntries.Count == 1
+                && deserialized.CodexEntries[0].EntryId == CodexEntryIds.ForbiddenTransmutation
+                && deserialized.CodexEntries[0].ConceptKey == CodexConceptKeys.ForbiddenTransmutation,
+                "V2 snapshot JSON should preserve codex entry ids and concept keys.");
+
+            Assert(
+                deserialized.MissionLeads.Count == 1
+                && deserialized.MissionLeads[0].TriggerId == MissionTriggerIds.NahualTransmutationDiscovery
+                && deserialized.MissionLeads[0].Priority == 10
+                && deserialized.MissionLeads[0].SuggestedMissionFamily == MissionFamilies.NahualPath,
+                "V2 snapshot JSON should preserve mission lead ids, priorities, and families.");
+
+            Assert(
+                ContainsTag(deserialized.CodexEntries[0].NarrativeTags, NarrativeTags.TransmutationAccessAllowed)
+                && ContainsTag(deserialized.MissionLeads[0].NarrativeTags, NarrativeTags.TransmutationAccessAllowed),
+                "V2 snapshot JSON should preserve narrative tags.");
+        }
+
+        private static void AssertV2SnapshotUnsupportedVersionJsonIsRejected()
+        {
+            string json =
+                "{\"SchemaVersion\":999,\"CodexEntries\":[],\"MissionLeads\":[]}";
+            bool rejected = false;
+
+            try
+            {
+                new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+            }
+            catch (InvalidOperationException)
+            {
+                rejected = true;
+            }
+
+            Assert(
+                rejected,
+                "V2 snapshot JSON with unsupported schema version should be rejected.");
+        }
+
+        private static void AssertV2SnapshotMalformedJsonFailsSafely()
+        {
+            bool failedSafely = false;
+
+            try
+            {
+                new V2ProgressSnapshotJsonSerializer().Deserialize("{not valid json");
+            }
+            catch (JsonException)
+            {
+                failedSafely = true;
+            }
+
+            Assert(
+                failedSafely,
+                "Malformed V2 snapshot JSON should fail safely.");
+        }
+
+        private static V2ProgressSnapshot BuildSnapshotWithCodexAndMissionLead()
+        {
+            var codexProfile = new CodexProfile();
+            var missionJournalProfile = new MissionJournalProfile();
+            new CodexDiscoveryService().Discover(
+                codexProfile,
+                BuildCodexCandidate(
+                    CodexEntryIds.ForbiddenTransmutation,
+                    CodexEntryType.Practice,
+                    CodexConceptKeys.ForbiddenTransmutation,
+                    NarrativeHookIds.TransmutationForbiddenPractice,
+                    MissionTriggerIds.NahualTransmutationDiscovery,
+                    NarrativeTags.TransmutationAccessAllowed));
+            new MissionDiscoveryService().Discover(
+                missionJournalProfile,
+                BuildMissionTriggerCandidate(
+                    MissionTriggerIds.NahualTransmutationDiscovery,
+                    MissionTriggerType.Discovery,
+                    MissionFamilies.NahualPath,
+                    NarrativeHookIds.TransmutationForbiddenPractice,
+                    NarrativeTags.TransmutationAccessAllowed));
+
+            return new V2ProgressSnapshotService().CreateSnapshot(
+                codexProfile,
+                missionJournalProfile);
         }
 
         private static void AssertDefaultSharedWisdomFlow()
