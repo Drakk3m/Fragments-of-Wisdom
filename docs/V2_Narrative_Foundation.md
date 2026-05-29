@@ -2,6 +2,8 @@
 
 This document describes the current Vertical Slice V2 narrative foundation. It is meant to help future Codex branches and contributors extend the architecture without collapsing domain boundaries or changing the V1 gameplay loop by accident.
 
+For V2 profile persistence, snapshots, JSON, file IO, and Unity save adapters, see [V2_Save_Foundation.md](V2_Save_Foundation.md).
+
 ## Current Flow
 
 ```text
@@ -194,7 +196,13 @@ Current smoke expectations:
 - Mission trigger assertions still run.
 - Codex entry assertions still run.
 - Candidate deduplication assertions still run.
+- Codex profile assertions still run.
+- Mission journal assertions still run.
+- Discovery orchestration assertions still run.
+- V2 save snapshot assertions still run.
+- V2 save JSON assertions still run.
+- V2 save file repository assertions still run.
 - V2 foundation flow assertions still run.
-- Total smoke assertions remain `86` unless a branch intentionally adds or renames smoke coverage and explains why.
+- Total smoke assertions remain `149` unless a branch intentionally adds or renames smoke coverage and explains why.
 
 Documentation-only changes should not alter smoke counts, gameplay behavior, Unity assets, scenes, prefabs, or `.meta` files.
