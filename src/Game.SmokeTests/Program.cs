@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text.Json;
 using Game.Domain.Alignment;
 using Game.Domain.Codex;
@@ -180,6 +181,16 @@ namespace Game.SmokeTests
                     AssertV2SnapshotDeserializesEquivalentSnapshot();
                     AssertV2SnapshotUnsupportedVersionJsonIsRejected();
                     AssertV2SnapshotMalformedJsonFailsSafely();
+                });
+
+            RunSection(
+                "V2 save file repository assertions",
+                delegate
+                {
+                    AssertV2SnapshotFileRepositoryRoundtrip();
+                    AssertV2SnapshotFileRepositoryMissingFileFailsSafely();
+                    AssertV2SnapshotFileRepositoryMalformedFileFailsSafely();
+                    AssertV2SnapshotFileRepositoryUnsupportedVersionFileFailsSafely();
                 });
 
             RunSection(
@@ -1629,6 +1640,131 @@ namespace Game.SmokeTests
             return new V2ProgressSnapshotService().CreateSnapshot(
                 codexProfile,
                 missionJournalProfile);
+        }
+
+        private static void AssertV2SnapshotFileRepositoryRoundtrip()
+        {
+            string filePath = BuildTempSnapshotPath();
+
+            try
+            {
+                var snapshot = BuildSnapshotWithCodexAndMissionLead();
+                var repository = new V2ProgressSnapshotFileRepository();
+
+                repository.Save(filePath, snapshot);
+                var loaded = repository.Load(filePath);
+
+                Assert(
+                    File.Exists(filePath),
+                    "V2 snapshot file repository should create the requested file.");
+
+                Assert(
+                    loaded.SchemaVersion == V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                    "V2 snapshot file repository should preserve schema version.");
+
+                Assert(
+                    loaded.CodexEntries.Count == 1
+                    && loaded.CodexEntries[0].EntryId == CodexEntryIds.ForbiddenTransmutation,
+                    "V2 snapshot file repository should roundtrip codex entries.");
+
+                Assert(
+                    loaded.MissionLeads.Count == 1
+                    && loaded.MissionLeads[0].TriggerId == MissionTriggerIds.NahualTransmutationDiscovery,
+                    "V2 snapshot file repository should roundtrip mission leads.");
+            }
+            finally
+            {
+                DeleteTempSnapshotFile(filePath);
+            }
+        }
+
+        private static void AssertV2SnapshotFileRepositoryMissingFileFailsSafely()
+        {
+            string filePath = BuildTempSnapshotPath();
+            DeleteTempSnapshotFile(filePath);
+            bool failedSafely = false;
+
+            try
+            {
+                new V2ProgressSnapshotFileRepository().Load(filePath);
+            }
+            catch (FileNotFoundException)
+            {
+                failedSafely = true;
+            }
+            finally
+            {
+                DeleteTempSnapshotFile(filePath);
+            }
+
+            Assert(
+                failedSafely,
+                "Missing V2 snapshot files should fail safely.");
+        }
+
+        private static void AssertV2SnapshotFileRepositoryMalformedFileFailsSafely()
+        {
+            string filePath = BuildTempSnapshotPath();
+            bool failedSafely = false;
+
+            try
+            {
+                File.WriteAllText(filePath, "{not valid json");
+                new V2ProgressSnapshotFileRepository().Load(filePath);
+            }
+            catch (JsonException)
+            {
+                failedSafely = true;
+            }
+            finally
+            {
+                DeleteTempSnapshotFile(filePath);
+            }
+
+            Assert(
+                failedSafely,
+                "Malformed V2 snapshot files should fail safely.");
+        }
+
+        private static void AssertV2SnapshotFileRepositoryUnsupportedVersionFileFailsSafely()
+        {
+            string filePath = BuildTempSnapshotPath();
+            bool failedSafely = false;
+
+            try
+            {
+                File.WriteAllText(
+                    filePath,
+                    "{\"SchemaVersion\":999,\"CodexEntries\":[],\"MissionLeads\":[]}");
+                new V2ProgressSnapshotFileRepository().Load(filePath);
+            }
+            catch (InvalidOperationException)
+            {
+                failedSafely = true;
+            }
+            finally
+            {
+                DeleteTempSnapshotFile(filePath);
+            }
+
+            Assert(
+                failedSafely,
+                "Unsupported V2 snapshot file versions should fail safely.");
+        }
+
+        private static string BuildTempSnapshotPath()
+        {
+            return Path.Combine(
+                Path.GetTempPath(),
+                "fragments-v2-snapshot-" + Guid.NewGuid().ToString("N") + ".json");
+        }
+
+        private static void DeleteTempSnapshotFile(string filePath)
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
         }
 
         private static void AssertDefaultSharedWisdomFlow()
