@@ -210,10 +210,14 @@ namespace Game.SmokeTests
                     AssertV2SnapshotCapturesActiveMission();
                     AssertV2SnapshotCapturesCompletedMission();
                     AssertV2SnapshotCapturesFailedMission();
+                    AssertV2SnapshotCapturesUnlockProfile();
                     AssertV2SnapshotRestoreRecreatesEquivalentProfiles();
                     AssertV2SnapshotRestoreRecreatesLifecycleStates();
+                    AssertV2SnapshotRestoreRecreatesUnlockProfile();
                     AssertV2SnapshotRestoreIsIdempotent();
                     AssertV2SnapshotLifecycleRestoreIsIdempotent();
+                    AssertV2SnapshotUnlockRestoreIsIdempotent();
+                    AssertV2SnapshotOlderJsonWithoutUnlocksRestoresSafely();
                     AssertV2SnapshotUsesCurrentVersion();
                     AssertV2SnapshotCurrentVersionRestores();
                     AssertV2SnapshotUnsupportedVersionIsRejected();
@@ -1983,6 +1987,26 @@ namespace Game.SmokeTests
                 "V2 snapshot should preserve failed mission state.");
         }
 
+        private static void AssertV2SnapshotCapturesUnlockProfile()
+        {
+            var unlockProfile = BuildUnlockProfileWithForbiddenPracticeUnlock();
+
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                unlockProfile);
+
+            Assert(
+                snapshot.Unlocks.Count == 1,
+                "V2 snapshot should capture recorded unlocks.");
+
+            Assert(
+                snapshot.Unlocks[0].UnlockId == CodexUnlockIds.ForbiddenPracticeCount
+                && snapshot.Unlocks[0].RequiredEntryType == CodexEntryType.Practice
+                && ContainsTag(snapshot.Unlocks[0].NarrativeTags, NarrativeTags.TransmutationAccessAllowed),
+                "V2 snapshot should preserve unlock ids, requirements, and narrative tags.");
+        }
+
         private static void AssertV2SnapshotRestoreRecreatesEquivalentProfiles()
         {
             var sourceCodexProfile = new CodexProfile();
@@ -2078,6 +2102,36 @@ namespace Game.SmokeTests
                 "V2 snapshot restore should preserve active mission narrative tags.");
         }
 
+        private static void AssertV2SnapshotRestoreRecreatesUnlockProfile()
+        {
+            var sourceUnlockProfile = BuildUnlockProfileWithForbiddenPracticeUnlock();
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                sourceUnlockProfile);
+
+            var restoredUnlockProfile = new UnlockProfile();
+            service.Restore(
+                snapshot,
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                restoredUnlockProfile);
+
+            var restoredUnlock = restoredUnlockProfile.GetUnlock(CodexUnlockIds.ForbiddenPracticeCount);
+
+            Assert(
+                restoredUnlockProfile.HasUnlock(CodexUnlockIds.ForbiddenPracticeCount),
+                "V2 snapshot restore should recreate recorded unlocks.");
+
+            Assert(
+                restoredUnlock != null
+                && restoredUnlock.UnlockType == CodexUnlockType.EntryTypeCount
+                && restoredUnlock.RequiredCount == 1
+                && ContainsTag(restoredUnlock.NarrativeTags, NarrativeTags.TransmutationAccessAllowed),
+                "V2 snapshot restore should preserve unlock facts.");
+        }
+
         private static void AssertV2SnapshotRestoreIsIdempotent()
         {
             var sourceCodexProfile = new CodexProfile();
@@ -2162,6 +2216,60 @@ namespace Game.SmokeTests
             Assert(
                 restoredMissionJournalProfile.GetActiveMission(MissionTriggerIds.SharedWisdomFollowup).State == MissionLifecycleState.Completed,
                 "V2 snapshot repeated restore should preserve terminal lifecycle state.");
+        }
+
+        private static void AssertV2SnapshotUnlockRestoreIsIdempotent()
+        {
+            var sourceUnlockProfile = BuildUnlockProfileWithForbiddenPracticeUnlock();
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                sourceUnlockProfile);
+
+            var restoredUnlockProfile = new UnlockProfile();
+            service.Restore(
+                snapshot,
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                restoredUnlockProfile);
+            service.Restore(
+                snapshot,
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                restoredUnlockProfile);
+
+            Assert(
+                restoredUnlockProfile.Unlocks.Count == 1,
+                "V2 snapshot repeated restore should not duplicate unlock records.");
+
+            Assert(
+                restoredUnlockProfile.GetUnlock(CodexUnlockIds.ForbiddenPracticeCount).RequiredEntryType == CodexEntryType.Practice,
+                "V2 snapshot repeated restore should preserve unlock requirement metadata.");
+        }
+
+        private static void AssertV2SnapshotOlderJsonWithoutUnlocksRestoresSafely()
+        {
+            string json =
+                "{\"SchemaVersion\":1,\"CodexEntries\":[],\"MissionLeads\":[],\"ActiveMissions\":[]}";
+
+            var serializer = new V2ProgressSnapshotJsonSerializer();
+            var snapshot = serializer.Deserialize(json);
+            var unlockProfile = new UnlockProfile();
+
+            new V2ProgressSnapshotService().Restore(
+                snapshot,
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                unlockProfile);
+
+            Assert(
+                snapshot.Unlocks.Count == 0,
+                "Older V2 snapshot JSON without unlocks should deserialize with an empty unlock collection.");
+
+            Assert(
+                unlockProfile.Unlocks.Count == 0,
+                "Older V2 snapshot JSON without unlocks should restore safely without unlock records.");
         }
 
         private static void AssertV2SnapshotUsesCurrentVersion()
@@ -2249,7 +2357,8 @@ namespace Game.SmokeTests
             Assert(
                 json.Contains("SchemaVersion")
                 && json.Contains("CodexEntries")
-                && json.Contains("MissionLeads"),
+                && json.Contains("MissionLeads")
+                && json.Contains("Unlocks"),
                 "V2 snapshot JSON should include the snapshot root fields.");
         }
 
@@ -2279,8 +2388,15 @@ namespace Game.SmokeTests
 
             Assert(
                 ContainsTag(deserialized.CodexEntries[0].NarrativeTags, NarrativeTags.TransmutationAccessAllowed)
-                && ContainsTag(deserialized.MissionLeads[0].NarrativeTags, NarrativeTags.TransmutationAccessAllowed),
+                && ContainsTag(deserialized.MissionLeads[0].NarrativeTags, NarrativeTags.TransmutationAccessAllowed)
+                && ContainsTag(deserialized.Unlocks[0].NarrativeTags, NarrativeTags.TransmutationAccessAllowed),
                 "V2 snapshot JSON should preserve narrative tags.");
+
+            Assert(
+                deserialized.Unlocks.Count == 1
+                && deserialized.Unlocks[0].UnlockId == CodexUnlockIds.ForbiddenPracticeCount
+                && deserialized.Unlocks[0].RequiredEntryType == CodexEntryType.Practice,
+                "V2 snapshot JSON should preserve unlock ids and requirements.");
         }
 
         private static void AssertV2SnapshotUnsupportedVersionJsonIsRejected()
@@ -2325,6 +2441,7 @@ namespace Game.SmokeTests
         {
             var codexProfile = new CodexProfile();
             var missionJournalProfile = new MissionJournalProfile();
+            var unlockProfile = BuildUnlockProfileWithForbiddenPracticeUnlock();
             new CodexDiscoveryService().Discover(
                 codexProfile,
                 BuildCodexCandidate(
@@ -2345,7 +2462,25 @@ namespace Game.SmokeTests
 
             return new V2ProgressSnapshotService().CreateSnapshot(
                 codexProfile,
-                missionJournalProfile);
+                missionJournalProfile,
+                unlockProfile);
+        }
+
+        private static UnlockProfile BuildUnlockProfileWithForbiddenPracticeUnlock()
+        {
+            var unlockProfile = new UnlockProfile();
+            new UnlockApplicationService().Apply(
+                unlockProfile,
+                BuildUnlockedCandidate(
+                    CodexUnlockIds.ForbiddenPracticeCount,
+                    CodexUnlockType.EntryTypeCount,
+                    CodexEntryType.Practice,
+                    "",
+                    1,
+                    0,
+                    NarrativeTags.TransmutationAccessAllowed));
+
+            return unlockProfile;
         }
 
         private static void AssertV2SnapshotFileRepositoryRoundtrip()

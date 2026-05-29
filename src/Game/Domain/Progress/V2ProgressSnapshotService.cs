@@ -11,6 +11,17 @@ namespace Game.Domain.Progress
             CodexProfile codexProfile,
             MissionJournalProfile missionJournalProfile)
         {
+            return CreateSnapshot(
+                codexProfile,
+                missionJournalProfile,
+                new UnlockProfile());
+        }
+
+        public V2ProgressSnapshot CreateSnapshot(
+            CodexProfile codexProfile,
+            MissionJournalProfile missionJournalProfile,
+            UnlockProfile unlockProfile)
+        {
             if (codexProfile == null)
             {
                 throw new ArgumentNullException(nameof(codexProfile));
@@ -21,11 +32,17 @@ namespace Game.Domain.Progress
                 throw new ArgumentNullException(nameof(missionJournalProfile));
             }
 
+            if (unlockProfile == null)
+            {
+                throw new ArgumentNullException(nameof(unlockProfile));
+            }
+
             return new V2ProgressSnapshot(
                 V2ProgressSnapshotVersions.CurrentSchemaVersion,
                 BuildCodexSnapshots(codexProfile.DiscoveredEntries),
                 BuildMissionLeadSnapshots(missionJournalProfile.AvailableLeads),
-                BuildActiveMissionSnapshots(missionJournalProfile.ActiveMissions));
+                BuildActiveMissionSnapshots(missionJournalProfile.ActiveMissions),
+                BuildUnlockSnapshots(unlockProfile.Unlocks));
         }
 
         public bool CanRestore(V2ProgressSnapshot snapshot)
@@ -43,6 +60,19 @@ namespace Game.Domain.Progress
             CodexProfile codexProfile,
             MissionJournalProfile missionJournalProfile)
         {
+            Restore(
+                snapshot,
+                codexProfile,
+                missionJournalProfile,
+                new UnlockProfile());
+        }
+
+        public void Restore(
+            V2ProgressSnapshot snapshot,
+            CodexProfile codexProfile,
+            MissionJournalProfile missionJournalProfile,
+            UnlockProfile unlockProfile)
+        {
             if (snapshot == null)
             {
                 throw new ArgumentNullException(nameof(snapshot));
@@ -56,6 +86,11 @@ namespace Game.Domain.Progress
             if (missionJournalProfile == null)
             {
                 throw new ArgumentNullException(nameof(missionJournalProfile));
+            }
+
+            if (unlockProfile == null)
+            {
+                throw new ArgumentNullException(nameof(unlockProfile));
             }
 
             if (!CanRestore(snapshot))
@@ -95,6 +130,18 @@ namespace Game.Domain.Progress
                     missionSnapshot.SuggestedMissionFamily,
                     missionSnapshot.SourceHookId,
                     CopyTags(missionSnapshot.NarrativeTags)));
+            }
+
+            foreach (var unlockSnapshot in snapshot.Unlocks)
+            {
+                unlockProfile.RecordUnlock(new UnlockRecord(
+                    unlockSnapshot.UnlockId,
+                    unlockSnapshot.UnlockType,
+                    unlockSnapshot.RequiredEntryType,
+                    unlockSnapshot.RequiredEntryId,
+                    unlockSnapshot.RequiredCount,
+                    unlockSnapshot.RequiredPercentage,
+                    CopyTags(unlockSnapshot.NarrativeTags)));
             }
         }
 
@@ -151,6 +198,26 @@ namespace Game.Domain.Progress
                     mission.SuggestedMissionFamily,
                     mission.SourceHookId,
                     CopyTags(mission.NarrativeTags)));
+            }
+
+            return snapshots;
+        }
+
+        private static IReadOnlyList<V2UnlockSnapshot> BuildUnlockSnapshots(
+            IReadOnlyList<UnlockRecord> unlocks)
+        {
+            var snapshots = new List<V2UnlockSnapshot>();
+
+            foreach (var unlock in unlocks)
+            {
+                snapshots.Add(new V2UnlockSnapshot(
+                    unlock.UnlockId,
+                    unlock.UnlockType,
+                    unlock.RequiredEntryType,
+                    unlock.RequiredEntryId,
+                    unlock.RequiredCount,
+                    unlock.RequiredPercentage,
+                    CopyTags(unlock.NarrativeTags)));
             }
 
             return snapshots;

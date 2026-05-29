@@ -68,6 +68,7 @@ namespace Game.Domain.Progress
             dto.CodexEntries = new List<CodexEntryDto>();
             dto.MissionLeads = new List<MissionLeadDto>();
             dto.ActiveMissions = new List<ActiveMissionDto>();
+            dto.Unlocks = new List<UnlockDto>();
 
             foreach (var entry in snapshot.CodexEntries)
             {
@@ -109,6 +110,20 @@ namespace Game.Domain.Progress
                 });
             }
 
+            foreach (var unlock in snapshot.Unlocks)
+            {
+                dto.Unlocks.Add(new UnlockDto
+                {
+                    UnlockId = unlock.UnlockId,
+                    UnlockType = unlock.UnlockType,
+                    RequiredEntryType = unlock.RequiredEntryType,
+                    RequiredEntryId = unlock.RequiredEntryId,
+                    RequiredCount = unlock.RequiredCount,
+                    RequiredPercentage = unlock.RequiredPercentage,
+                    NarrativeTags = CopyTags(unlock.NarrativeTags)
+                });
+            }
+
             return dto;
         }
 
@@ -117,6 +132,7 @@ namespace Game.Domain.Progress
             var codexEntries = new List<V2CodexEntrySnapshot>();
             var missionLeads = new List<V2MissionLeadSnapshot>();
             var activeMissions = new List<V2ActiveMissionSnapshot>();
+            var unlocks = new List<V2UnlockSnapshot>();
 
             if (dto.CodexEntries != null)
             {
@@ -161,11 +177,27 @@ namespace Game.Domain.Progress
                 }
             }
 
+            if (dto.Unlocks != null)
+            {
+                foreach (var unlock in dto.Unlocks)
+                {
+                    unlocks.Add(new V2UnlockSnapshot(
+                        unlock.UnlockId,
+                        unlock.UnlockType,
+                        unlock.RequiredEntryType,
+                        unlock.RequiredEntryId,
+                        unlock.RequiredCount,
+                        unlock.RequiredPercentage,
+                        CopyTags(unlock.NarrativeTags)));
+                }
+            }
+
             return new V2ProgressSnapshot(
                 dto.SchemaVersion,
                 codexEntries,
                 missionLeads,
-                activeMissions);
+                activeMissions,
+                unlocks);
         }
 
         private static List<string> CopyTags(IReadOnlyList<string> sourceTags)
@@ -191,6 +223,7 @@ namespace Game.Domain.Progress
             public List<CodexEntryDto> CodexEntries { get; set; }
             public List<MissionLeadDto> MissionLeads { get; set; }
             public List<ActiveMissionDto> ActiveMissions { get; set; }
+            public List<UnlockDto> Unlocks { get; set; }
         }
 
         private class CodexEntryDto
@@ -221,6 +254,17 @@ namespace Game.Domain.Progress
             public int Priority { get; set; }
             public string SuggestedMissionFamily { get; set; }
             public string SourceHookId { get; set; }
+            public List<string> NarrativeTags { get; set; }
+        }
+
+        private class UnlockDto
+        {
+            public string UnlockId { get; set; }
+            public CodexUnlockType UnlockType { get; set; }
+            public CodexEntryType? RequiredEntryType { get; set; }
+            public string RequiredEntryId { get; set; }
+            public int RequiredCount { get; set; }
+            public int RequiredPercentage { get; set; }
             public List<string> NarrativeTags { get; set; }
         }
     }
