@@ -188,6 +188,7 @@ namespace Game.SmokeTests
                 delegate
                 {
                     AssertV2SnapshotFileRepositoryRoundtrip();
+                    AssertV2SnapshotFileRepositoryCreatesNestedDirectory();
                     AssertV2SnapshotFileRepositoryMissingFileFailsSafely();
                     AssertV2SnapshotFileRepositoryMalformedFileFailsSafely();
                     AssertV2SnapshotFileRepositoryUnsupportedVersionFileFailsSafely();
@@ -1702,6 +1703,34 @@ namespace Game.SmokeTests
                 "Missing V2 snapshot files should fail safely.");
         }
 
+        private static void AssertV2SnapshotFileRepositoryCreatesNestedDirectory()
+        {
+            string directoryPath = BuildTempSnapshotDirectoryPath();
+            string filePath = Path.Combine(
+                directoryPath,
+                "nested",
+                "snapshot.json");
+
+            try
+            {
+                new V2ProgressSnapshotFileRepository().Save(
+                    filePath,
+                    BuildSnapshotWithCodexAndMissionLead());
+
+                Assert(
+                    Directory.Exists(Path.GetDirectoryName(filePath)),
+                    "V2 snapshot file repository should create missing parent directories.");
+
+                Assert(
+                    File.Exists(filePath),
+                    "V2 snapshot file repository should save inside a newly created nested directory.");
+            }
+            finally
+            {
+                DeleteTempSnapshotDirectory(directoryPath);
+            }
+        }
+
         private static void AssertV2SnapshotFileRepositoryMalformedFileFailsSafely()
         {
             string filePath = BuildTempSnapshotPath();
@@ -1759,11 +1788,26 @@ namespace Game.SmokeTests
                 "fragments-v2-snapshot-" + Guid.NewGuid().ToString("N") + ".json");
         }
 
+        private static string BuildTempSnapshotDirectoryPath()
+        {
+            return Path.Combine(
+                Path.GetTempPath(),
+                "fragments-v2-snapshot-" + Guid.NewGuid().ToString("N"));
+        }
+
         private static void DeleteTempSnapshotFile(string filePath)
         {
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
+            }
+        }
+
+        private static void DeleteTempSnapshotDirectory(string directoryPath)
+        {
+            if (Directory.Exists(directoryPath))
+            {
+                Directory.Delete(directoryPath, true);
             }
         }
 
