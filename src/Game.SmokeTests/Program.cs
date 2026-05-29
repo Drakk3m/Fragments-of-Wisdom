@@ -253,6 +253,14 @@ namespace Game.SmokeTests
                     AssertRejectedBlockedTransmutationFlow();
                 });
 
+            RunSection(
+                "V2 backend E2E smoke assertions",
+                delegate
+                {
+                    AssertV2BackendE2ESmokeFlow();
+                    AssertV2BackendNonNahualE2ESmokeFlow();
+                });
+
             Console.WriteLine();
             Console.WriteLine("Total smoke assertions executed: " + assertionsExecuted);
             return 0;
@@ -2777,6 +2785,326 @@ namespace Game.SmokeTests
             Assert(
                 ContainsTrigger(candidates, MissionTriggerIds.SharedWisdomFollowup),
                 "Rejected flow should produce the Shared Wisdom follow-up trigger.");
+        }
+
+        private static void AssertV2BackendE2ESmokeFlow()
+        {
+            Console.WriteLine("  Flow scenario: accepted Nahual backend pipeline to restored profiles");
+
+            var playerProfile = new PlayerProfile();
+            playerProfile.SetAlignment(KnowledgeAlignment.NahualPath);
+            playerProfile.AddAlignmentProgress(KnowledgeAlignment.NahualPath, 1);
+            playerProfile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+            playerProfile.AddAlignmentFlag(AlignmentFlag.AcceptedFirstNahualTeaching);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(playerProfile);
+            var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
+            var reactionResult = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+
+            var hookService = new NarrativeHookService();
+            var hooks = new List<NarrativeHook>();
+            AddHooks(hooks, hookService.Resolve(teachingResult));
+            AddHooks(hooks, hookService.Resolve(accessResult));
+            AddHooks(hooks, hookService.Resolve(reactionResult));
+
+            var missionTriggerCandidates = new MissionTriggerService().Resolve(hooks);
+            var codexEntryCandidates = new CodexEntryService().Resolve(
+                hooks,
+                missionTriggerCandidates);
+
+            var codexProfile = new CodexProfile();
+            int codexEntriesDiscovered = new CodexDiscoveryService().Discover(
+                codexProfile,
+                codexEntryCandidates);
+
+            var progressSummary = new CodexProgressService().Summarize(codexProfile);
+            var unlockCandidates = new CodexUnlockService().Resolve(progressSummary);
+            var unlockProfile = new UnlockProfile();
+            int unlocksApplied = new UnlockApplicationService().Apply(
+                unlockProfile,
+                unlockCandidates);
+
+            var missionJournalProfile = new MissionJournalProfile();
+            int missionLeadsDiscovered = new MissionDiscoveryService().Discover(
+                missionJournalProfile,
+                missionTriggerCandidates);
+            bool promoted = missionJournalProfile.PromoteLeadToActiveMission(
+                MissionTriggerIds.NahualTransmutationDiscovery);
+            bool completed = missionJournalProfile.CompleteMission(
+                MissionTriggerIds.NahualTransmutationDiscovery);
+
+            var snapshotService = new V2ProgressSnapshotService();
+            var snapshot = snapshotService.CreateSnapshot(
+                codexProfile,
+                missionJournalProfile,
+                unlockProfile);
+            var serializer = new V2ProgressSnapshotJsonSerializer();
+            string json = serializer.Serialize(snapshot);
+            var restoredSnapshot = serializer.Deserialize(json);
+
+            var restoredCodexProfile = new CodexProfile();
+            var restoredMissionJournalProfile = new MissionJournalProfile();
+            var restoredUnlockProfile = new UnlockProfile();
+            snapshotService.Restore(
+                restoredSnapshot,
+                restoredCodexProfile,
+                restoredMissionJournalProfile,
+                restoredUnlockProfile);
+
+            var restoredMission = restoredMissionJournalProfile.GetActiveMission(
+                MissionTriggerIds.NahualTransmutationDiscovery);
+
+            Assert(
+                playerProfile.CurrentAlignment == KnowledgeAlignment.NahualPath
+                && teachingResult.AcceptedTeachingPath,
+                "V2 backend E2E should start from accepted Nahual alignment.");
+
+            Assert(
+                accessResult.CanAccessTransmutation
+                && reactionResult.ReactionTone == NpcReactionTone.Wary,
+                "V2 backend E2E should allow transmutation and produce wary NPC reaction.");
+
+            Assert(
+                ContainsHook(hooks, NarrativeHookIds.CodexNahualPath)
+                && ContainsHook(hooks, NarrativeHookIds.TransmutationForbiddenPractice)
+                && ContainsHook(hooks, NarrativeHookIds.DialogueNpcWaryForbiddenPractice),
+                "V2 backend E2E should produce teaching, transmutation, and NPC reaction hooks.");
+
+            Assert(
+                ContainsTrigger(missionTriggerCandidates, MissionTriggerIds.NahualTransmutationDiscovery),
+                "V2 backend E2E should produce the transmutation discovery mission trigger.");
+
+            Assert(
+                ContainsEntry(codexEntryCandidates, CodexEntryIds.NahualPath)
+                && ContainsEntry(codexEntryCandidates, CodexEntryIds.ForbiddenTransmutation),
+                "V2 backend E2E should produce Nahual and forbidden transmutation codex candidates.");
+
+            Assert(
+                codexEntriesDiscovered == 2
+                && codexProfile.IsDiscovered(CodexEntryIds.NahualPath)
+                && codexProfile.IsDiscovered(CodexEntryIds.ForbiddenTransmutation),
+                "V2 backend E2E should discover codex entries from generated candidates.");
+
+            Assert(
+                progressSummary.TotalDiscoveredEntries == 2
+                && progressSummary.GetDiscoveredCount(CodexEntryType.Practice) == 1,
+                "V2 backend E2E should summarize discovered codex progress.");
+
+            Assert(
+                FindUnlock(unlockCandidates, CodexUnlockIds.NahualPathDiscovered).IsUnlocked
+                && FindUnlock(unlockCandidates, CodexUnlockIds.ForbiddenPracticeCount).IsUnlocked,
+                "V2 backend E2E should produce unlocked codex unlock candidates.");
+
+            Assert(
+                unlocksApplied == 2
+                && unlockProfile.HasUnlock(CodexUnlockIds.NahualPathDiscovered)
+                && unlockProfile.HasUnlock(CodexUnlockIds.ForbiddenPracticeCount),
+                "V2 backend E2E should apply unlocked candidates to UnlockProfile.");
+
+            Assert(
+                missionLeadsDiscovered == 1
+                && missionJournalProfile.IsLeadAvailable(MissionTriggerIds.NahualTransmutationDiscovery),
+                "V2 backend E2E should discover the mission lead.");
+
+            Assert(
+                promoted
+                && completed
+                && missionJournalProfile.GetActiveMission(MissionTriggerIds.NahualTransmutationDiscovery).State == MissionLifecycleState.Completed,
+                "V2 backend E2E should promote and complete the discovered mission.");
+
+            Assert(
+                snapshot.CodexEntries.Count == 2
+                && snapshot.MissionLeads.Count == 1
+                && snapshot.ActiveMissions.Count == 1
+                && snapshot.Unlocks.Count == 2,
+                "V2 backend E2E snapshot should capture codex, mission, lifecycle, and unlock state.");
+
+            Assert(
+                json.Contains("CodexEntries")
+                && json.Contains("MissionLeads")
+                && json.Contains("ActiveMissions")
+                && json.Contains("Unlocks"),
+                "V2 backend E2E JSON should include every persisted backend profile collection.");
+
+            Assert(
+                restoredCodexProfile.IsDiscovered(CodexEntryIds.NahualPath)
+                && restoredCodexProfile.IsDiscovered(CodexEntryIds.ForbiddenTransmutation),
+                "V2 backend E2E restore should recreate codex discoveries.");
+
+            Assert(
+                restoredUnlockProfile.HasUnlock(CodexUnlockIds.NahualPathDiscovered)
+                && restoredUnlockProfile.HasUnlock(CodexUnlockIds.ForbiddenPracticeCount),
+                "V2 backend E2E restore should recreate unlock records.");
+
+            Assert(
+                restoredMissionJournalProfile.IsLeadAvailable(MissionTriggerIds.NahualTransmutationDiscovery)
+                && restoredMission != null
+                && restoredMission.State == MissionLifecycleState.Completed,
+                "V2 backend E2E restore should recreate mission lead and completed lifecycle state.");
+        }
+
+        private static void AssertV2BackendNonNahualE2ESmokeFlow()
+        {
+            Console.WriteLine("  Flow scenario: rejected Shared Wisdom backend pipeline to restored profiles");
+
+            var playerProfile = new PlayerProfile();
+            playerProfile.AddAlignmentProgress(KnowledgeAlignment.SharedWisdom, 1);
+            playerProfile.AddAlignmentFlag(AlignmentFlag.DiscoveredNahualPath);
+
+            var teachingResult = new FirstNahualTeachingEvaluator().Evaluate(playerProfile);
+            var accessResult = new TransmutationAccessPolicy().Evaluate(teachingResult);
+            var reactionResult = new NpcReactionService().Resolve(accessResult.NarrativeTags);
+
+            var hookService = new NarrativeHookService();
+            var hooks = new List<NarrativeHook>();
+            AddHooks(hooks, hookService.Resolve(teachingResult));
+            AddHooks(hooks, hookService.Resolve(accessResult));
+            AddHooks(hooks, hookService.Resolve(reactionResult));
+
+            var missionTriggerCandidates = new MissionTriggerService().Resolve(hooks);
+            var codexEntryCandidates = new CodexEntryService().Resolve(
+                hooks,
+                missionTriggerCandidates);
+
+            var codexProfile = new CodexProfile();
+            int codexEntriesDiscovered = new CodexDiscoveryService().Discover(
+                codexProfile,
+                codexEntryCandidates);
+
+            var progressSummary = new CodexProgressService().Summarize(codexProfile);
+            var unlockCandidates = new CodexUnlockService().Resolve(progressSummary);
+            var unlockProfile = new UnlockProfile();
+            int unlocksApplied = new UnlockApplicationService().Apply(
+                unlockProfile,
+                unlockCandidates);
+
+            var missionJournalProfile = new MissionJournalProfile();
+            int missionLeadsDiscovered = new MissionDiscoveryService().Discover(
+                missionJournalProfile,
+                missionTriggerCandidates);
+            bool promoted = missionJournalProfile.PromoteLeadToActiveMission(
+                MissionTriggerIds.SharedWisdomFollowup);
+            bool completed = missionJournalProfile.CompleteMission(
+                MissionTriggerIds.SharedWisdomFollowup);
+
+            var snapshotService = new V2ProgressSnapshotService();
+            var snapshot = snapshotService.CreateSnapshot(
+                codexProfile,
+                missionJournalProfile,
+                unlockProfile);
+            var serializer = new V2ProgressSnapshotJsonSerializer();
+            string json = serializer.Serialize(snapshot);
+            var restoredSnapshot = serializer.Deserialize(json);
+
+            var restoredCodexProfile = new CodexProfile();
+            var restoredMissionJournalProfile = new MissionJournalProfile();
+            var restoredUnlockProfile = new UnlockProfile();
+            snapshotService.Restore(
+                restoredSnapshot,
+                restoredCodexProfile,
+                restoredMissionJournalProfile,
+                restoredUnlockProfile);
+
+            var restoredMission = restoredMissionJournalProfile.GetActiveMission(
+                MissionTriggerIds.SharedWisdomFollowup);
+
+            Assert(
+                playerProfile.CurrentAlignment == KnowledgeAlignment.SharedWisdom
+                && teachingResult.RejectedTeachingPath,
+                "Non-Nahual E2E should stay on Shared Wisdom and reject the first Nahual teaching.");
+
+            Assert(
+                !accessResult.CanAccessTransmutation
+                && reactionResult.ReactionTone == NpcReactionTone.Reassured,
+                "Non-Nahual E2E should block transmutation and produce reassured NPC reaction.");
+
+            Assert(
+                ContainsHook(hooks, NarrativeHookIds.MissionSharedWisdomFollowup)
+                && ContainsHook(hooks, NarrativeHookIds.DialogueTransmutationBlocked),
+                "Non-Nahual E2E should produce follow-up and blocked-transmutation hooks.");
+
+            Assert(
+                ContainsTrigger(missionTriggerCandidates, MissionTriggerIds.SharedWisdomFollowup)
+                && ContainsTrigger(missionTriggerCandidates, MissionTriggerIds.NahualTransmutationBlockedWarning),
+                "Non-Nahual E2E should produce follow-up and blocked-transmutation triggers.");
+
+            Assert(
+                ContainsEntry(codexEntryCandidates, CodexEntryIds.SharedWisdomFollowup)
+                && ContainsEntry(codexEntryCandidates, CodexEntryIds.TransmutationWarning),
+                "Non-Nahual E2E should produce Shared Wisdom follow-up and warning codex candidates.");
+
+            Assert(
+                codexEntriesDiscovered == 2
+                && codexProfile.IsDiscovered(CodexEntryIds.SharedWisdomFollowup)
+                && codexProfile.IsDiscovered(CodexEntryIds.TransmutationWarning),
+                "Non-Nahual E2E should discover non-Nahual codex entries from generated candidates.");
+
+            Assert(
+                progressSummary.TotalDiscoveredEntries == 2
+                && progressSummary.GetDiscoveredCount(CodexEntryType.FollowUp) == 1
+                && progressSummary.GetDiscoveredCount(CodexEntryType.Warning) == 1,
+                "Non-Nahual E2E should summarize follow-up and warning codex progress.");
+
+            Assert(
+                CountUnlocked(unlockCandidates) == 0,
+                "Non-Nahual E2E should not produce accepted codex unlock candidates.");
+
+            Assert(
+                unlocksApplied == 0
+                && unlockProfile.Unlocks.Count == 0,
+                "Non-Nahual E2E should ignore locked unlock candidates.");
+
+            Assert(
+                missionLeadsDiscovered == 2
+                && missionJournalProfile.IsLeadAvailable(MissionTriggerIds.SharedWisdomFollowup)
+                && missionJournalProfile.IsLeadAvailable(MissionTriggerIds.NahualTransmutationBlockedWarning),
+                "Non-Nahual E2E should discover follow-up and warning mission leads.");
+
+            Assert(
+                promoted
+                && completed
+                && missionJournalProfile.GetActiveMission(MissionTriggerIds.SharedWisdomFollowup).State == MissionLifecycleState.Completed,
+                "Non-Nahual E2E should promote and complete the Shared Wisdom follow-up mission.");
+
+            Assert(
+                snapshot.CodexEntries.Count == 2
+                && snapshot.MissionLeads.Count == 2
+                && snapshot.ActiveMissions.Count == 1
+                && snapshot.Unlocks.Count == 0,
+                "Non-Nahual E2E snapshot should capture codex, mission, lifecycle, and empty unlock state.");
+
+            Assert(
+                json.Contains("CodexEntries")
+                && json.Contains("MissionLeads")
+                && json.Contains("ActiveMissions")
+                && json.Contains("Unlocks"),
+                "Non-Nahual E2E JSON should include every persisted backend profile collection.");
+
+            Assert(
+                restoredCodexProfile.IsDiscovered(CodexEntryIds.SharedWisdomFollowup)
+                && restoredCodexProfile.IsDiscovered(CodexEntryIds.TransmutationWarning),
+                "Non-Nahual E2E restore should recreate codex discoveries.");
+
+            Assert(
+                restoredUnlockProfile.Unlocks.Count == 0,
+                "Non-Nahual E2E restore should preserve empty unlock profile state.");
+
+            Assert(
+                restoredMissionJournalProfile.IsLeadAvailable(MissionTriggerIds.SharedWisdomFollowup)
+                && restoredMissionJournalProfile.IsLeadAvailable(MissionTriggerIds.NahualTransmutationBlockedWarning)
+                && restoredMission != null
+                && restoredMission.State == MissionLifecycleState.Completed,
+                "Non-Nahual E2E restore should recreate mission leads and completed lifecycle state.");
+        }
+
+        private static void AddHooks(
+            List<NarrativeHook> target,
+            IReadOnlyList<NarrativeHook> source)
+        {
+            foreach (var hook in source)
+            {
+                target.Add(hook);
+            }
         }
 
         private static void Assert(bool condition, string message)
