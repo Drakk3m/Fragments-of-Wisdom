@@ -6,6 +6,7 @@ namespace Game.Domain.Missions
     {
         private readonly HashSet<string> availableLeadIds = new HashSet<string>();
         private readonly List<MissionLeadRecord> availableLeads = new List<MissionLeadRecord>();
+        private readonly List<ActiveMissionRecord> activeMissions = new List<ActiveMissionRecord>();
 
         public IReadOnlyCollection<string> AvailableLeadIds
         {
@@ -15,6 +16,11 @@ namespace Game.Domain.Missions
         public IReadOnlyList<MissionLeadRecord> AvailableLeads
         {
             get { return availableLeads; }
+        }
+
+        public IReadOnlyList<ActiveMissionRecord> ActiveMissions
+        {
+            get { return activeMissions; }
         }
 
         public bool DiscoverLead(MissionLeadRecord lead)
@@ -50,6 +56,83 @@ namespace Game.Domain.Missions
             }
 
             return null;
+        }
+
+        public bool PromoteLeadToActiveMission(string triggerId)
+        {
+            var lead = GetAvailableLead(triggerId);
+
+            if (lead == null)
+            {
+                return false;
+            }
+
+            var mission = GetActiveMission(triggerId);
+
+            if (mission != null)
+            {
+                return mission.State == MissionLifecycleState.Active;
+            }
+
+            activeMissions.Add(new ActiveMissionRecord(
+                lead.TriggerId,
+                lead.TriggerType,
+                MissionLifecycleState.Active,
+                lead.Priority,
+                lead.SuggestedMissionFamily,
+                lead.SourceHookId,
+                CopyTags(lead.NarrativeTags)));
+
+            return true;
+        }
+
+        public bool CompleteMission(string triggerId)
+        {
+            var mission = GetActiveMission(triggerId);
+
+            if (mission == null)
+            {
+                return false;
+            }
+
+            return mission.Complete();
+        }
+
+        public bool FailMission(string triggerId)
+        {
+            var mission = GetActiveMission(triggerId);
+
+            if (mission == null)
+            {
+                return false;
+            }
+
+            return mission.Fail();
+        }
+
+        public ActiveMissionRecord GetActiveMission(string triggerId)
+        {
+            foreach (var mission in activeMissions)
+            {
+                if (mission.TriggerId == triggerId)
+                {
+                    return mission;
+                }
+            }
+
+            return null;
+        }
+
+        private static IReadOnlyList<string> CopyTags(IReadOnlyList<string> sourceTags)
+        {
+            var tags = new List<string>();
+
+            foreach (var sourceTag in sourceTags)
+            {
+                tags.Add(sourceTag);
+            }
+
+            return tags;
         }
     }
 }
