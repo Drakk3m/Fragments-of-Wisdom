@@ -6,6 +6,7 @@ using Game.Domain.Discovery;
 using Game.Domain.Missions;
 using Game.Domain.Narrative;
 using Game.Domain.Player;
+using Game.Domain.Progress;
 using Game.Domain.Transmutation;
 using Game.Domain.World;
 using Game.Slice;
@@ -155,6 +156,16 @@ namespace Game.SmokeTests
                     AssertDiscoveryOrchestrationAppliesCodexAndMissionTogether();
                     AssertDiscoveryOrchestrationDuplicateReapplicationIsIdempotent();
                     AssertDiscoveryOrchestrationReportsDiscoveredAndAlreadyKnown();
+                });
+
+            RunSection(
+                "V2 save snapshot assertions",
+                delegate
+                {
+                    AssertV2SnapshotCapturesCodexEntries();
+                    AssertV2SnapshotCapturesMissionLeads();
+                    AssertV2SnapshotRestoreRecreatesEquivalentProfiles();
+                    AssertV2SnapshotRestoreIsIdempotent();
                 });
 
             RunSection(
@@ -1259,6 +1270,167 @@ namespace Game.SmokeTests
                 ContainsString(result.CodexEntryIdsDiscovered, CodexEntryIds.TransmutationWarning)
                 && ContainsString(result.MissionLeadTriggerIdsDiscovered, MissionTriggerIds.NahualTransmutationBlockedWarning),
                 "Discovery orchestration should report newly discovered ids separately from known ids.");
+        }
+
+        private static void AssertV2SnapshotCapturesCodexEntries()
+        {
+            var codexProfile = new CodexProfile();
+            var missionJournalProfile = new MissionJournalProfile();
+            new CodexDiscoveryService().Discover(
+                codexProfile,
+                BuildCodexCandidate(
+                    CodexEntryIds.ForbiddenTransmutation,
+                    CodexEntryType.Practice,
+                    CodexConceptKeys.ForbiddenTransmutation,
+                    NarrativeHookIds.TransmutationForbiddenPractice,
+                    MissionTriggerIds.NahualTransmutationDiscovery,
+                    NarrativeTags.TransmutationAccessAllowed));
+
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                codexProfile,
+                missionJournalProfile);
+
+            Assert(
+                snapshot.CodexEntries.Count == 1,
+                "V2 snapshot should capture discovered codex entries.");
+
+            Assert(
+                snapshot.CodexEntries[0].EntryId == CodexEntryIds.ForbiddenTransmutation
+                && snapshot.CodexEntries[0].ConceptKey == CodexConceptKeys.ForbiddenTransmutation,
+                "V2 snapshot should preserve codex entry ids and concept keys.");
+        }
+
+        private static void AssertV2SnapshotCapturesMissionLeads()
+        {
+            var codexProfile = new CodexProfile();
+            var missionJournalProfile = new MissionJournalProfile();
+            new MissionDiscoveryService().Discover(
+                missionJournalProfile,
+                BuildMissionTriggerCandidate(
+                    MissionTriggerIds.NahualTransmutationBlockedWarning,
+                    MissionTriggerType.Warning,
+                    MissionFamilies.NahualPath,
+                    NarrativeHookIds.DialogueTransmutationBlocked,
+                    NarrativeTags.TransmutationAccessBlocked));
+
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                codexProfile,
+                missionJournalProfile);
+
+            Assert(
+                snapshot.MissionLeads.Count == 1,
+                "V2 snapshot should capture available mission leads.");
+
+            Assert(
+                snapshot.MissionLeads[0].TriggerId == MissionTriggerIds.NahualTransmutationBlockedWarning
+                && snapshot.MissionLeads[0].SuggestedMissionFamily == MissionFamilies.NahualPath,
+                "V2 snapshot should preserve mission trigger ids and mission families.");
+        }
+
+        private static void AssertV2SnapshotRestoreRecreatesEquivalentProfiles()
+        {
+            var sourceCodexProfile = new CodexProfile();
+            var sourceMissionJournalProfile = new MissionJournalProfile();
+            new CodexDiscoveryService().Discover(
+                sourceCodexProfile,
+                BuildCodexCandidate(
+                    CodexEntryIds.SharedWisdomFollowup,
+                    CodexEntryType.FollowUp,
+                    CodexConceptKeys.SharedWisdom,
+                    NarrativeHookIds.MissionSharedWisdomFollowup,
+                    MissionTriggerIds.SharedWisdomFollowup,
+                    NarrativeTags.NahualFirstTeachingRejected));
+            new MissionDiscoveryService().Discover(
+                sourceMissionJournalProfile,
+                BuildMissionTriggerCandidate(
+                    MissionTriggerIds.SharedWisdomFollowup,
+                    MissionTriggerType.FollowUp,
+                    MissionFamilies.SharedWisdom,
+                    NarrativeHookIds.MissionSharedWisdomFollowup,
+                    NarrativeTags.NahualFirstTeachingRejected));
+
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                sourceCodexProfile,
+                sourceMissionJournalProfile);
+
+            var restoredCodexProfile = new CodexProfile();
+            var restoredMissionJournalProfile = new MissionJournalProfile();
+            service.Restore(
+                snapshot,
+                restoredCodexProfile,
+                restoredMissionJournalProfile);
+
+            var restoredCodexRecord = restoredCodexProfile.GetDiscoveredEntry(CodexEntryIds.SharedWisdomFollowup);
+            var restoredMissionLead = restoredMissionJournalProfile.GetAvailableLead(MissionTriggerIds.SharedWisdomFollowup);
+
+            Assert(
+                restoredCodexProfile.IsDiscovered(CodexEntryIds.SharedWisdomFollowup)
+                && restoredMissionJournalProfile.IsLeadAvailable(MissionTriggerIds.SharedWisdomFollowup),
+                "V2 snapshot restore should recreate discovered codex entries and mission leads.");
+
+            Assert(
+                restoredCodexRecord != null
+                && restoredCodexRecord.FirstSourceTriggerId == MissionTriggerIds.SharedWisdomFollowup
+                && ContainsTag(restoredCodexRecord.NarrativeTags, NarrativeTags.NahualFirstTeachingRejected),
+                "V2 snapshot restore should preserve codex source ids and narrative tags.");
+
+            Assert(
+                restoredMissionLead != null
+                && restoredMissionLead.TriggerType == MissionTriggerType.FollowUp
+                && restoredMissionLead.Priority == 10,
+                "V2 snapshot restore should preserve mission lead type and priority.");
+        }
+
+        private static void AssertV2SnapshotRestoreIsIdempotent()
+        {
+            var sourceCodexProfile = new CodexProfile();
+            var sourceMissionJournalProfile = new MissionJournalProfile();
+            new CodexDiscoveryService().Discover(
+                sourceCodexProfile,
+                BuildCodexCandidate(
+                    CodexEntryIds.TransmutationWarning,
+                    CodexEntryType.Warning,
+                    CodexConceptKeys.TransmutationWarning,
+                    NarrativeHookIds.DialogueTransmutationBlocked,
+                    MissionTriggerIds.NahualTransmutationBlockedWarning,
+                    NarrativeTags.TransmutationAccessBlocked));
+            new MissionDiscoveryService().Discover(
+                sourceMissionJournalProfile,
+                BuildMissionTriggerCandidate(
+                    MissionTriggerIds.NahualTransmutationBlockedWarning,
+                    MissionTriggerType.Warning,
+                    MissionFamilies.NahualPath,
+                    NarrativeHookIds.DialogueTransmutationBlocked,
+                    NarrativeTags.TransmutationAccessBlocked));
+
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                sourceCodexProfile,
+                sourceMissionJournalProfile);
+
+            var restoredCodexProfile = new CodexProfile();
+            var restoredMissionJournalProfile = new MissionJournalProfile();
+            service.Restore(
+                snapshot,
+                restoredCodexProfile,
+                restoredMissionJournalProfile);
+            service.Restore(
+                snapshot,
+                restoredCodexProfile,
+                restoredMissionJournalProfile);
+
+            Assert(
+                restoredCodexProfile.DiscoveredEntries.Count == 1,
+                "V2 snapshot restore should not duplicate codex entries.");
+
+            Assert(
+                restoredMissionJournalProfile.AvailableLeads.Count == 1,
+                "V2 snapshot restore should not duplicate mission leads.");
+
+            Assert(
+                ContainsTag(restoredMissionJournalProfile.AvailableLeads[0].NarrativeTags, NarrativeTags.TransmutationAccessBlocked),
+                "V2 snapshot restore should preserve mission lead narrative tags after repeated restore.");
         }
 
         private static void AssertDefaultSharedWisdomFlow()
