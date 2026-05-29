@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Game.Domain.Alignment;
+using Game.Domain.Common;
+using Game.Domain.Combat;
+using Game.Domain.Combat.Stats;
 using Game.Domain.Codex;
 using Game.Domain.Discovery;
 using Game.Domain.Missions;
@@ -42,6 +45,17 @@ namespace Game.SmokeTests
 
                     Console.WriteLine("  Events emitted: " + log.Events.Count);
                     Console.WriteLine("  Expected events: 38");
+                });
+
+            RunSection(
+                "Combat core assertions",
+                delegate
+                {
+                    AssertBasicAttackDamagesTarget();
+                    AssertDefeatedTargetIsDetected();
+                    AssertMissCausesNoDamage();
+                    AssertCriticalHitIncreasesDamage();
+                    AssertSkillCannotRunWhenCostCannotBePaid();
                 });
 
             RunSection(
@@ -276,6 +290,145 @@ namespace Game.SmokeTests
             assertions();
             Console.WriteLine("  Assertions passed: " + (assertionsExecuted - before));
             Console.WriteLine();
+        }
+
+        private static void AssertBasicAttackDamagesTarget()
+        {
+            var attacker = BuildCombatant("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+
+            var result = new CombatResolver(new FixedRandomSource(0.0, 0.99)).Resolve(
+                attacker,
+                defender,
+                CombatAction.BasicAttack());
+
+            Assert(
+                result.ActionAccepted,
+                "Basic attack should be accepted.");
+
+            Assert(
+                result.Hit
+                && result.Damage > 0
+                && defender.Stats.CurrentHealth < defender.Stats.MaxHealth,
+                "Basic attack should damage the target.");
+        }
+
+        private static void AssertDefeatedTargetIsDetected()
+        {
+            var attacker = BuildCombatant("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            defender.Stats.CurrentHealth = 5;
+
+            var result = new CombatResolver(new FixedRandomSource(0.0, 0.99)).Resolve(
+                attacker,
+                defender,
+                CombatAction.BasicAttack());
+
+            Assert(
+                result.TargetDefeated,
+                "Combat turn result should report target defeat.");
+
+            Assert(
+                defender.IsDefeated,
+                "Combatant profile should report defeated state after lethal damage.");
+        }
+
+        private static void AssertMissCausesNoDamage()
+        {
+            var attacker = BuildCombatant("attacker", 30, 5, 0, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatant("defender", 5, 5, 0, 100, 0, 0, 1f, 10);
+            int startingHealth = defender.Stats.CurrentHealth;
+
+            var result = new CombatResolver(new FixedRandomSource(0.99)).Resolve(
+                attacker,
+                defender,
+                CombatAction.BasicAttack());
+
+            Assert(
+                !result.Hit
+                && result.Damage == 0,
+                "Missed attacks should report no damage.");
+
+            Assert(
+                defender.Stats.CurrentHealth == startingHealth,
+                "Missed attacks should not change target health.");
+        }
+
+        private static void AssertCriticalHitIncreasesDamage()
+        {
+            var normalAttacker = BuildCombatant("attacker", 30, 5, 100, 0, 100, 0, 2f, 10);
+            var normalDefender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var criticalAttacker = BuildCombatant("attacker", 30, 5, 100, 0, 100, 0, 2f, 10);
+            var criticalDefender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+
+            var normalResult = new CombatResolver(new FixedRandomSource(0.0, 0.99)).Resolve(
+                normalAttacker,
+                normalDefender,
+                CombatAction.BasicAttack());
+            var criticalResult = new CombatResolver(new FixedRandomSource(0.0, 0.0)).Resolve(
+                criticalAttacker,
+                criticalDefender,
+                CombatAction.BasicAttack());
+
+            Assert(
+                !normalResult.Critical
+                && criticalResult.Critical,
+                "Critical hit check should distinguish normal and critical hits deterministically.");
+
+            Assert(
+                criticalResult.Damage > normalResult.Damage,
+                "Critical hit should increase damage.");
+        }
+
+        private static void AssertSkillCannotRunWhenCostCannotBePaid()
+        {
+            var attacker = BuildCombatant("attacker", 30, 5, 100, 0, 0, 0, 2f, 0);
+            var defender = BuildCombatant("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            int startingHealth = defender.Stats.CurrentHealth;
+
+            var result = new CombatResolver(new FixedRandomSource(0.0, 0.0)).Resolve(
+                attacker,
+                defender,
+                CombatAction.SkillAction("skill.heavy_strike", "Heavy Strike", 1.5f, 5));
+
+            Assert(
+                !result.ActionAccepted
+                && result.BlockReason == CombatResolver.NotEnoughResourceBlockReason,
+                "Skill action should be blocked when resource cost cannot be paid.");
+
+            Assert(
+                defender.Stats.CurrentHealth == startingHealth
+                && result.Damage == 0,
+                "Blocked skill action should not damage the target.");
+        }
+
+        private static CombatantProfile BuildCombatant(
+            string id,
+            int attack,
+            int defense,
+            int precision,
+            int evasion,
+            int criticalChance,
+            int criticalResistance,
+            float criticalDamageMultiplier,
+            int maxResource)
+        {
+            return new CombatantProfile(
+                id,
+                id,
+                new CombatStats
+                {
+                    MaxHealth = 100,
+                    CurrentHealth = 100,
+                    Attack = attack,
+                    Defense = defense,
+                    Precision = precision,
+                    Evasion = evasion,
+                    CriticalChance = criticalChance,
+                    CriticalResistance = criticalResistance,
+                    CriticalDamageMultiplier = criticalDamageMultiplier
+                },
+                maxResource);
         }
 
         private static void AssertDefaultNahualTeachingState(PlayerProfile profile)
@@ -3104,6 +3257,41 @@ namespace Game.SmokeTests
             foreach (var hook in source)
             {
                 target.Add(hook);
+            }
+        }
+
+        private class FixedRandomSource : IRandomSource
+        {
+            private readonly double[] values;
+            private int index;
+
+            public FixedRandomSource(params double[] values)
+            {
+                this.values = values;
+            }
+
+            public double NextDouble()
+            {
+                if (values.Length == 0)
+                {
+                    return 0.0;
+                }
+
+                if (index >= values.Length)
+                {
+                    return values[values.Length - 1];
+                }
+
+                double value = values[index];
+                index++;
+                return value;
+            }
+
+            public int NextInt(
+                int minInclusive,
+                int maxExclusive)
+            {
+                return minInclusive;
             }
         }
 
