@@ -142,6 +142,16 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Codex progression assertions",
+                delegate
+                {
+                    AssertCodexProgressEmptyProfileSummary();
+                    AssertCodexProgressTotalDiscoveredCount();
+                    AssertCodexProgressCountByEntryType();
+                    AssertCodexProgressDuplicateDiscoveriesDoNotInflateProgress();
+                });
+
+            RunSection(
                 "Mission journal assertions",
                 delegate
                 {
@@ -1032,6 +1042,114 @@ namespace Game.SmokeTests
                 sourceTriggerId,
                 conceptKey,
                 narrativeTags);
+        }
+
+        private static void AssertCodexProgressEmptyProfileSummary()
+        {
+            var summary = new CodexProgressService().Summarize(new CodexProfile());
+
+            Assert(
+                summary.TotalDiscoveredEntries == 0,
+                "Empty codex profile should report zero discovered entries.");
+
+            Assert(
+                summary.GetDiscoveredCount(CodexEntryType.Concept) == 0,
+                "Empty codex profile should report zero discovered entries by type.");
+
+            Assert(
+                !summary.HasDiscoveredEntry(CodexEntryIds.NahualPath),
+                "Empty codex profile should not report discovered entry ids.");
+        }
+
+        private static void AssertCodexProgressTotalDiscoveredCount()
+        {
+            var profile = BuildCodexProfileWithThreeEntries();
+            var summary = new CodexProgressService().Summarize(profile, 6);
+
+            Assert(
+                summary.TotalDiscoveredEntries == 3,
+                "Codex progress should report total discovered entries.");
+
+            Assert(
+                summary.HasDiscoveredEntry(CodexEntryIds.NahualPath),
+                "Codex progress should report discovered entry ids.");
+
+            Assert(
+                summary.CompletionPercentage == 50,
+                "Codex progress should calculate completion percentage only from externally supplied totals.");
+        }
+
+        private static void AssertCodexProgressCountByEntryType()
+        {
+            var profile = BuildCodexProfileWithThreeEntries();
+            var summary = new CodexProgressService().Summarize(profile);
+
+            Assert(
+                summary.GetDiscoveredCount(CodexEntryType.Concept) == 1,
+                "Codex progress should count discovered concept entries.");
+
+            Assert(
+                summary.GetDiscoveredCount(CodexEntryType.Practice) == 1,
+                "Codex progress should count discovered practice entries.");
+
+            Assert(
+                summary.GetDiscoveredCount(CodexEntryType.Warning) == 1,
+                "Codex progress should count discovered warning entries.");
+        }
+
+        private static void AssertCodexProgressDuplicateDiscoveriesDoNotInflateProgress()
+        {
+            var profile = new CodexProfile();
+            var candidate = BuildCodexCandidate(
+                CodexEntryIds.ForbiddenTransmutation,
+                CodexEntryType.Practice,
+                CodexConceptKeys.ForbiddenTransmutation,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                "",
+                NarrativeTags.TransmutationAccessAllowed);
+
+            new CodexDiscoveryService().Discover(profile, candidate);
+            new CodexDiscoveryService().Discover(profile, candidate);
+
+            var summary = new CodexProgressService().Summarize(profile);
+
+            Assert(
+                summary.TotalDiscoveredEntries == 1,
+                "Duplicate codex discoveries should not inflate total progress.");
+
+            Assert(
+                summary.GetDiscoveredCount(CodexEntryType.Practice) == 1,
+                "Duplicate codex discoveries should not inflate type progress.");
+        }
+
+        private static CodexProfile BuildCodexProfileWithThreeEntries()
+        {
+            var profile = new CodexProfile();
+            var candidates = new List<CodexEntryCandidate>();
+            candidates.Add(BuildCodexCandidate(
+                CodexEntryIds.NahualPath,
+                CodexEntryType.Concept,
+                CodexConceptKeys.NahualPath,
+                NarrativeHookIds.CodexNahualPath,
+                "",
+                NarrativeTags.NahualFirstTeachingAccepted));
+            candidates.Add(BuildCodexCandidate(
+                CodexEntryIds.ForbiddenTransmutation,
+                CodexEntryType.Practice,
+                CodexConceptKeys.ForbiddenTransmutation,
+                NarrativeHookIds.TransmutationForbiddenPractice,
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                NarrativeTags.TransmutationAccessAllowed));
+            candidates.Add(BuildCodexCandidate(
+                CodexEntryIds.TransmutationWarning,
+                CodexEntryType.Warning,
+                CodexConceptKeys.TransmutationWarning,
+                NarrativeHookIds.DialogueTransmutationBlocked,
+                MissionTriggerIds.NahualTransmutationBlockedWarning,
+                NarrativeTags.TransmutationAccessBlocked));
+
+            new CodexDiscoveryService().Discover(profile, candidates);
+            return profile;
         }
 
         private static void AssertMissionJournalDiscoversOneLead()
