@@ -126,6 +126,18 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Damage-over-time status integration assertions",
+                delegate
+                {
+                    AssertPoisonDealsPotencyDamage();
+                    AssertBurnDealsPotencyDamage();
+                    AssertDotCannotReduceHpBelowZero();
+                    AssertDotCanDefeatTarget();
+                    AssertDotDurationTicksAndExpires();
+                    AssertDotResolvesBeforeRegen();
+                });
+
+            RunSection(
                 "Alignment assertions",
                 delegate
                 {
@@ -1132,6 +1144,123 @@ namespace Game.SmokeTests
             Assert(
                 !attacker.StatusEffects.HasActive(StatusEffectType.RegenBlock),
                 "RegenBlock should expire when duration reaches zero.");
+        }
+
+        private static void AssertPoisonDealsPotencyDamage()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 70;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Poison, 2, false, 12));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                attacker.Stats.CurrentHealth == 58,
+                "Poison should deal potency damage at the canonical turn boundary.");
+        }
+
+        private static void AssertBurnDealsPotencyDamage()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 70;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Burn, 2, false, 9));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                attacker.Stats.CurrentHealth == 61,
+                "Burn should deal potency damage at the canonical turn boundary.");
+        }
+
+        private static void AssertDotCannotReduceHpBelowZero()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 3;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Poison, 2, false, 10));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                attacker.Stats.CurrentHealth == 0,
+                "DOT damage should not reduce HP below zero.");
+        }
+
+        private static void AssertDotCanDefeatTarget()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender);
+            attacker.Stats.CurrentHealth = 5;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Burn, 2, false, 8));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.BasicAttack(attacker, defender));
+
+            Assert(
+                !attacker.IsAlive,
+                "DOT damage should be able to defeat the affected combatant.");
+
+            Assert(
+                runtime.CombatEnded && ContainsEvent(runtime.EventLog, GameEventType.CombatEnded),
+                "DOT defeat should end combat through the canonical engine.");
+        }
+
+        private static void AssertDotDurationTicksAndExpires()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 70;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Poison, 1, false, 6));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                !attacker.StatusEffects.HasActive(StatusEffectType.Poison),
+                "DOT status effect should expire when duration reaches zero.");
+
+            Assert(
+                attacker.Stats.CurrentHealth == 64,
+                "DOT should still apply on the boundary where its final duration tick expires.");
+        }
+
+        private static void AssertDotResolvesBeforeRegen()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 50;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Poison, 2, false, 15));
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Regen, 2, false, 10));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                attacker.Stats.CurrentHealth == 45,
+                "Explicit boundary order should apply DOT before Regen healing.");
+
+            Assert(
+                attacker.StatusEffects.HasActive(StatusEffectType.Poison)
+                && attacker.StatusEffects.HasActive(StatusEffectType.Regen),
+                "DOT and Regen should both tick normally after ordered boundary effects resolve.");
         }
 
         private static void ExecuteBasicAttackTurn(

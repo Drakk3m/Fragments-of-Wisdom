@@ -173,6 +173,13 @@ namespace Game.Domain.Combat
 
             context.Attacker.Debuffs.OnAfterAction(context.Attacker, context);
             statusEffectResolver.TickTurnBoundary(context.Attacker);
+            if (!context.Attacker.IsAlive)
+            {
+                runtime.EventLog.Add(GameEventType.CombatEnded, context.Attacker.Name + " is defeated by status effects.");
+                runtime.EndCombat();
+                return;
+            }
+
             runtime.EventLog.Add(GameEventType.TurnEnded, "Turn " + runtime.TurnNumber + " ends.");
             runtime.AdvanceTurn();
         }
