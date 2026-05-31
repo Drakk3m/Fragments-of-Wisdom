@@ -104,6 +104,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "SkillSeal integration assertions",
+                delegate
+                {
+                    AssertSkillSealBlocksSkillAction();
+                    AssertSkillSealDoesNotBlockBasicAttack();
+                    AssertBlockedSealedSkillDoesNotSpendEssence();
+                    AssertBlockedSealedSkillDoesNotSpendActiveResonance();
+                    AssertExpiredSkillSealNoLongerBlocksSkillAction();
+                });
+
+            RunSection(
                 "Alignment assertions",
                 delegate
                 {
@@ -853,6 +864,152 @@ namespace Game.SmokeTests
             Assert(
                 target.StatusEffects.GetFirst(StatusEffectType.SkillSeal).RemainingDuration == 2,
                 "SkillSeal status effect should preserve duration facts.");
+        }
+
+        private static void AssertSkillSealBlocksSkillAction()
+        {
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender);
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.SkillSeal, 2, false));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        attacker,
+                        defender,
+                        new TestDamageSkill(),
+                        new SkillProgress(BuildHeavyStrikeDefinition())));
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.ActionBlocked),
+                "SkillSeal should emit an action-blocked event for skill actions.");
+
+            Assert(
+                !ContainsEvent(runtime.EventLog, GameEventType.SkillUsed)
+                && !ContainsEvent(runtime.EventLog, GameEventType.DamageDealt),
+                "SkillSeal should block skill effects and damage.");
+        }
+
+        private static void AssertSkillSealDoesNotBlockBasicAttack()
+        {
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender);
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.SkillSeal, 2, false));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.BasicAttack(attacker, defender));
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.BasicAttackUsed),
+                "SkillSeal should not block basic attacks.");
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.DamageDealt)
+                && defender.Stats.CurrentHealth < defender.Stats.MaxHealth,
+                "Basic attack should still resolve damage while SkillSeal is active.");
+        }
+
+        private static void AssertBlockedSealedSkillDoesNotSpendEssence()
+        {
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender);
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.SkillSeal, 2, false));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        attacker,
+                        defender,
+                        new TestDamageSkill(),
+                        new SkillProgress(BuildHeavyStrikeDefinition())));
+
+            Assert(
+                attacker.Resource.Current == 10,
+                "SkillSeal should block before Essence is spent.");
+
+            Assert(
+                !ContainsEvent(runtime.EventLog, GameEventType.ResourceSpent),
+                "SkillSeal should not emit resource-spent events for blocked skills.");
+        }
+
+        private static void AssertBlockedSealedSkillDoesNotSpendActiveResonance()
+        {
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender, resonance);
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.SkillSeal, 2, false));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        attacker,
+                        defender,
+                        new TestDamageSkill(),
+                        new SkillProgress(BuildResonanceStrikeDefinition())));
+
+            Assert(
+                resonance.Active.Current == 6,
+                "SkillSeal should block before active resonance is spent.");
+
+            Assert(
+                resonance.Reserve.Current == 10,
+                "SkillSeal should not consume reserve resonance.");
+        }
+
+        private static void AssertExpiredSkillSealNoLongerBlocksSkillAction()
+        {
+            var attacker = BuildCombatEntity("attacker", 30, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender);
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.SkillSeal, 1, false));
+            var engine = new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99, 0.0, 0.99),
+                BuildEmptyPassivePipeline());
+
+            engine.ExecuteTurn(
+                runtime,
+                TurnRequest.BasicAttack(attacker, defender));
+            engine.ExecuteTurn(
+                runtime,
+                TurnRequest.SkillAction(
+                    attacker,
+                    defender,
+                    new TestDamageSkill(),
+                    new SkillProgress(BuildHeavyStrikeDefinition())));
+
+            Assert(
+                !attacker.StatusEffects.HasActive(StatusEffectType.SkillSeal),
+                "Expired SkillSeal should no longer be active.");
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.SkillUsed)
+                && ContainsEvent(runtime.EventLog, GameEventType.ResourceSpent),
+                "Expired SkillSeal should no longer block skill actions.");
         }
 
         private static CombatEntity BuildCombatEntity(
