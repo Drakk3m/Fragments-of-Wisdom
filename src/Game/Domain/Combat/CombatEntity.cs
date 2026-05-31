@@ -49,5 +49,13 @@ namespace Game.Domain.Combat
                 Stats.CurrentHealth = Math.Max(0, Stats.CurrentHealth - amount);
             }
         }
+
+        public void Heal(int amount)
+        {
+            if (amount > 0)
+            {
+                Stats.CurrentHealth = Math.Min(Stats.MaxHealth, Stats.CurrentHealth + amount);
+            }
+        }
     }
 }
