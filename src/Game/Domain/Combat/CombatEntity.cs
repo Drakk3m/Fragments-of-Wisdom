@@ -13,6 +13,7 @@ namespace Game.Domain.Combat
         public ResourcePool Resource { get; private set; }
         public DebuffContainer Debuffs { get; private set; }
         public BuffContainer Buffs { get; private set; }
+        public StatusEffectCollection StatusEffects { get; private set; }
         public CombatEntityFlags Flags { get; private set; }
 
         public bool IsAlive
@@ -32,6 +33,7 @@ namespace Game.Domain.Combat
             Resource = new ResourcePool(maxResource);
             Debuffs = new DebuffContainer();
             Buffs = new BuffContainer();
+            StatusEffects = new StatusEffectCollection();
             Flags = new CombatEntityFlags();
 
             if (Stats.CurrentHealth <= 0)

@@ -1,6 +1,7 @@
 using Game.Domain.Common;
 using Game.Domain.Combat.Passives;
 using Game.Domain.Combat.Resolvers;
+using Game.Domain.Combat.StatusEffects;
 
 namespace Game.Domain.Combat
 {
@@ -10,6 +11,7 @@ namespace Game.Domain.Combat
         private readonly CombatPassivePipeline pipeline;
         private readonly DamageResolver damageResolver;
         private readonly DebuffResolver debuffResolver;
+        private readonly StatusEffectResolver statusEffectResolver;
 
         public TurnBasedCombatEngine(
             IRandomSource random,
@@ -19,6 +21,7 @@ namespace Game.Domain.Combat
             this.pipeline = pipeline;
             damageResolver = new DamageResolver(random);
             debuffResolver = new DebuffResolver(random, pipeline);
+            statusEffectResolver = new StatusEffectResolver();
         }
 
         public void StartCombat(CombatRuntimeContext runtime)
@@ -162,6 +165,7 @@ namespace Game.Domain.Combat
             }
 
             context.Attacker.Debuffs.OnAfterAction(context.Attacker, context);
+            statusEffectResolver.TickTurnBoundary(context.Attacker);
             runtime.EventLog.Add(GameEventType.TurnEnded, "Turn " + runtime.TurnNumber + " ends.");
             runtime.AdvanceTurn();
         }
