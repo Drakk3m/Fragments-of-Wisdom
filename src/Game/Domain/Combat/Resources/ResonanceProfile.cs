@@ -30,6 +30,11 @@ namespace Game.Domain.Combat.Resources
             return Active.TrySpend(amount);
         }
 
+        public bool CanSpendActive(int amount)
+        {
+            return Active.CanSpend(amount);
+        }
+
         public bool TryRefillFromReserve(int amount)
         {
             if (amount <= 0)

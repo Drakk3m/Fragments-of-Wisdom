@@ -24,6 +24,11 @@ namespace Game.Domain.Combat.Resources
             return pool.TrySpend(amount);
         }
 
+        public bool CanSpend(int amount)
+        {
+            return amount <= 0 || pool.Current >= amount;
+        }
+
         public void Refill(int amount)
         {
             pool.Regenerate(amount);

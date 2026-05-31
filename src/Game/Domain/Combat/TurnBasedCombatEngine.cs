@@ -80,6 +80,15 @@ namespace Game.Domain.Combat
                 pipeline.OnBeforeSkillCostCalculated(context);
 
                 int finalCost = (int)System.Math.Ceiling(context.ResourceCost * context.ResourceCostMultiplier);
+                int resonanceCost = request.SkillProgress.Definition.ResonanceCost;
+
+                if (resonanceCost > 0
+                    && (runtime.ResonanceProfile == null || !runtime.ResonanceProfile.CanSpendActive(resonanceCost)))
+                {
+                    runtime.EventLog.Add(GameEventType.ResourceNotEnough, request.Attacker.Name + " lacks Resonance.");
+                    EndTurn(runtime, context);
+                    return;
+                }
 
                 if (!request.Attacker.Resource.TrySpend(finalCost))
                 {
@@ -89,6 +98,12 @@ namespace Game.Domain.Combat
                 }
 
                 runtime.EventLog.Add(GameEventType.ResourceSpent, request.Attacker.Name + " spends " + finalCost + " Essence.");
+                if (resonanceCost > 0)
+                {
+                    runtime.ResonanceProfile.TrySpendActive(resonanceCost);
+                    runtime.EventLog.Add(GameEventType.ResourceSpent, request.Attacker.Name + " spends " + resonanceCost + " Resonance.");
+                }
+
                 request.Skill.Apply(context, request.SkillProgress);
                 request.SkillProgress.GainExperience(10);
             }
