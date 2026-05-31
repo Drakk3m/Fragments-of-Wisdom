@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Game.Domain.Common;
 
 namespace Game.Domain.Codex
 {
@@ -8,6 +9,14 @@ namespace Game.Domain.Codex
         public bool Apply(
             UnlockProfile profile,
             CodexUnlockCandidate candidate)
+        {
+            return Apply(profile, candidate, null);
+        }
+
+        public bool Apply(
+            UnlockProfile profile,
+            CodexUnlockCandidate candidate,
+            DomainEventLog domainEvents)
         {
             if (profile == null)
             {
@@ -24,12 +33,38 @@ namespace Game.Domain.Codex
                 return false;
             }
 
-            return profile.RecordUnlock(BuildRecord(candidate));
+            bool recorded = profile.RecordUnlock(BuildRecord(candidate));
+
+            if (recorded && domainEvents != null)
+            {
+                domainEvents.Record(
+                    DomainEventType.UnlockRecorded,
+                    candidate.UnlockId,
+                    "Unlock recorded.",
+                    new Dictionary<string, string>
+                    {
+                        { "unlockType", candidate.UnlockType.ToString() },
+                        { "requiredEntryType", candidate.RequiredEntryType.HasValue ? candidate.RequiredEntryType.Value.ToString() : string.Empty },
+                        { "requiredEntryId", candidate.RequiredEntryId },
+                        { "requiredCount", candidate.RequiredCount.ToString() },
+                        { "requiredPercentage", candidate.RequiredPercentage.ToString() }
+                    });
+            }
+
+            return recorded;
         }
 
         public int Apply(
             UnlockProfile profile,
             IReadOnlyList<CodexUnlockCandidate> candidates)
+        {
+            return Apply(profile, candidates, null);
+        }
+
+        public int Apply(
+            UnlockProfile profile,
+            IReadOnlyList<CodexUnlockCandidate> candidates,
+            DomainEventLog domainEvents)
         {
             if (profile == null)
             {
@@ -45,7 +80,7 @@ namespace Game.Domain.Codex
 
             foreach (var candidate in candidates)
             {
-                if (Apply(profile, candidate))
+                if (Apply(profile, candidate, domainEvents))
                 {
                     appliedCount++;
                 }
