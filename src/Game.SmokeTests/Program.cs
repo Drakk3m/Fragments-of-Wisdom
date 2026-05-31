@@ -63,6 +63,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Stat modifier foundation assertions",
+                delegate
+                {
+                    AssertFlatAttackModifierIncreasesEffectiveAttack();
+                    AssertFlatDefenseModifierIncreasesEffectiveDefense();
+                    AssertMultipleStatModifiersStackAdditively();
+                    AssertBaseCombatStatsRemainUnchanged();
+                    AssertEffectiveStatsUseCanonicalCombatPath();
+                });
+
+            RunSection(
                 "Skill foundation assertions",
                 delegate
                 {
@@ -492,6 +503,109 @@ namespace Game.SmokeTests
                 defender.Stats.CurrentHealth == startingHealth
                 && !ContainsEvent(runtime.EventLog, GameEventType.DamageDealt),
                 "Blocked skill action should not damage the target.");
+        }
+
+        private static void AssertFlatAttackModifierIncreasesEffectiveAttack()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var effectiveStats = new CombatStatModifierResolver().Resolve(
+                baseStats,
+                new[]
+                {
+                    new CombatStatModifier(CombatStatType.Attack, 7)
+                });
+
+            Assert(
+                effectiveStats.Attack == 17,
+                "Flat attack modifier should increase effective attack.");
+        }
+
+        private static void AssertFlatDefenseModifierIncreasesEffectiveDefense()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var effectiveStats = new CombatStatModifierResolver().Resolve(
+                baseStats,
+                new[]
+                {
+                    new CombatStatModifier(CombatStatType.Defense, 4)
+                });
+
+            Assert(
+                effectiveStats.Defense == 9,
+                "Flat defense modifier should increase effective defense.");
+        }
+
+        private static void AssertMultipleStatModifiersStackAdditively()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var effectiveStats = new CombatStatModifierResolver().Resolve(
+                baseStats,
+                new[]
+                {
+                    new CombatStatModifier(CombatStatType.Attack, 3),
+                    new CombatStatModifier(CombatStatType.Attack, 4),
+                    new CombatStatModifier(CombatStatType.Defense, 2)
+                });
+
+            Assert(
+                effectiveStats.Attack == 17,
+                "Multiple flat modifiers for the same stat should stack additively.");
+
+            Assert(
+                effectiveStats.Defense == 7,
+                "Flat modifiers for different stats should apply independently.");
+        }
+
+        private static void AssertBaseCombatStatsRemainUnchanged()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+
+            new CombatStatModifierResolver().Resolve(
+                baseStats,
+                new[]
+                {
+                    new CombatStatModifier(CombatStatType.Attack, 8),
+                    new CombatStatModifier(CombatStatType.Defense, 6)
+                });
+
+            Assert(
+                baseStats.Attack == 10,
+                "Resolving modifiers should not mutate base attack.");
+
+            Assert(
+                baseStats.Defense == 5,
+                "Resolving modifiers should not mutate base defense.");
+        }
+
+        private static void AssertEffectiveStatsUseCanonicalCombatPath()
+        {
+            var baseAttackerStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var effectiveAttackerStats = new CombatStatModifierResolver().Resolve(
+                baseAttackerStats,
+                new[]
+                {
+                    new CombatStatModifier(CombatStatType.Attack, 20)
+                });
+            var attacker = new CombatEntity("attacker", "attacker", effectiveAttackerStats, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            var runtime = BuildCombatRuntime(attacker, defender);
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.BasicAttack(attacker, defender));
+
+            Assert(
+                ContainsEvent(runtime.EventLog, GameEventType.BasicAttackUsed)
+                && ContainsEvent(runtime.EventLog, GameEventType.DamageDealt),
+                "Effective stats should be usable by the canonical TurnBasedCombatEngine path.");
+
+            Assert(
+                baseAttackerStats.Attack == 10
+                && attacker.Stats.Attack == 30
+                && defender.Stats.CurrentHealth < defender.Stats.MaxHealth,
+                "Effective combat stats should feed canonical damage without mutating base stats or creating a parallel engine.");
         }
 
         private static void AssertUnlockedSkillIsAvailable()
@@ -1288,19 +1402,38 @@ namespace Game.SmokeTests
             return new CombatEntity(
                 id,
                 id,
-                new CombatStats
-                {
-                    MaxHealth = 100,
-                    CurrentHealth = 100,
-                    Attack = attack,
-                    Defense = defense,
-                    Precision = precision,
-                    Evasion = evasion,
-                    CriticalChance = criticalChance,
-                    CriticalResistance = criticalResistance,
-                    CriticalDamageMultiplier = criticalDamageMultiplier
-                },
+                BuildCombatStats(
+                    attack,
+                    defense,
+                    precision,
+                    evasion,
+                    criticalChance,
+                    criticalResistance,
+                    criticalDamageMultiplier),
                 maxResource);
+        }
+
+        private static CombatStats BuildCombatStats(
+            int attack,
+            int defense,
+            int precision,
+            int evasion,
+            int criticalChance,
+            int criticalResistance,
+            float criticalDamageMultiplier)
+        {
+            return new CombatStats
+            {
+                MaxHealth = 100,
+                CurrentHealth = 100,
+                Attack = attack,
+                Defense = defense,
+                Precision = precision,
+                Evasion = evasion,
+                CriticalChance = criticalChance,
+                CriticalResistance = criticalResistance,
+                CriticalDamageMultiplier = criticalDamageMultiplier
+            };
         }
 
         private static CombatRuntimeContext BuildCombatRuntime(
