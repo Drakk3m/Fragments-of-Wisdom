@@ -35,32 +35,41 @@ namespace Game.SmokeTests
 
             var log = FoundationVerticalSlice.Run();
 
-            RunSection(
-                "V1 slice emitted event count",
+            int v1Assertions = RunGroup(
+                "V1 Legacy Slice",
                 delegate
                 {
-                    Assert(
-                        log.Events.Count == 38,
-                        "Foundation V1 event count changed.");
+                    RunSection(
+                        "V1 slice emitted event count",
+                        delegate
+                        {
+                            Assert(
+                                log.Events.Count == 38,
+                                "Foundation V1 event count changed.");
 
-                    Assert(
-                        log.Events.Count != 0,
-                        "Foundation vertical slice produced no events.");
+                            Assert(
+                                log.Events.Count != 0,
+                                "Foundation vertical slice produced no events.");
 
-                    Console.WriteLine("  Events emitted: " + log.Events.Count);
-                    Console.WriteLine("  Expected events: 38");
+                            Console.WriteLine("  Events emitted: " + log.Events.Count);
+                            Console.WriteLine("  Expected events: 38");
+                        });
                 });
 
-            RunSection(
-                "Combat core assertions",
+            int v3Assertions = RunGroup(
+                "V3 Combat / Skills / Resonance / Status / Stats",
                 delegate
                 {
-                    AssertBasicAttackDamagesTarget();
-                    AssertDefeatedTargetIsDetected();
-                    AssertMissCausesNoDamage();
-                    AssertCriticalHitIncreasesDamage();
-                    AssertSkillCannotRunWhenCostCannotBePaid();
-                });
+                    RunSection(
+                        "Combat core assertions",
+                        delegate
+                        {
+                            AssertBasicAttackDamagesTarget();
+                            AssertDefeatedTargetIsDetected();
+                            AssertMissCausesNoDamage();
+                            AssertCriticalHitIncreasesDamage();
+                            AssertSkillCannotRunWhenCostCannotBePaid();
+                        });
 
             RunSection(
                 "Stat modifier foundation assertions",
@@ -148,26 +157,32 @@ namespace Game.SmokeTests
                     AssertDotResolvesBeforeRegen();
                 });
 
-            RunSection(
-                "Alignment assertions",
+                });
+
+            int v2Assertions = RunGroup(
+                "V2 Narrative / Progression / Persistence",
                 delegate
                 {
-                    Assert(
-                        profile.CurrentAlignment == KnowledgeAlignment.SharedWisdom,
-                        "Default alignment should be SharedWisdom.");
+                    RunSection(
+                        "Alignment assertions",
+                        delegate
+                        {
+                            Assert(
+                                profile.CurrentAlignment == KnowledgeAlignment.SharedWisdom,
+                                "Default alignment should be SharedWisdom.");
 
-                    Assert(
-                        profile.AlignmentProgression.GetProgress(KnowledgeAlignment.SharedWisdom) == 0,
-                        "Default SharedWisdom progress should be zero.");
+                            Assert(
+                                profile.AlignmentProgression.GetProgress(KnowledgeAlignment.SharedWisdom) == 0,
+                                "Default SharedWisdom progress should be zero.");
 
-                    Assert(
-                        profile.AlignmentProgression.GetProgress(KnowledgeAlignment.NahualPath) == 0,
-                        "Default NahualPath progress should be zero.");
+                            Assert(
+                                profile.AlignmentProgression.GetProgress(KnowledgeAlignment.NahualPath) == 0,
+                                "Default NahualPath progress should be zero.");
 
-                    Assert(
-                        profile.AlignmentFlags.Count == 0,
-                        "Default alignment flags should be empty.");
-                });
+                            Assert(
+                                profile.AlignmentFlags.Count == 0,
+                                "Default alignment flags should be empty.");
+                        });
 
             RunSection(
                 "Nahual evaluator assertions",
@@ -365,9 +380,31 @@ namespace Game.SmokeTests
                     AssertV2BackendNonNahualE2ESmokeFlow();
                 });
 
+                });
+
             Console.WriteLine();
+            Console.WriteLine("Smoke assertion summary");
+            Console.WriteLine("  V1 Legacy Slice assertions: " + v1Assertions);
+            Console.WriteLine("  V2 Narrative / Progression / Persistence assertions: " + v2Assertions);
+            Console.WriteLine("  V3 Combat / Skills / Resonance / Status / Stats assertions: " + v3Assertions);
             Console.WriteLine("Total smoke assertions executed: " + assertionsExecuted);
             return 0;
+        }
+
+        private static int RunGroup(
+            string name,
+            Action sections)
+        {
+            int before = assertionsExecuted;
+
+            Console.WriteLine(name);
+            Console.WriteLine(new string('-', name.Length));
+            sections();
+
+            int groupAssertions = assertionsExecuted - before;
+            Console.WriteLine(name + " assertions: " + groupAssertions);
+            Console.WriteLine();
+            return groupAssertions;
         }
 
         private static void RunSection(
