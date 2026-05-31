@@ -115,6 +115,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Regen status integration assertions",
+                delegate
+                {
+                    AssertRegenHealsAtTurnBoundary();
+                    AssertRegenDoesNotExceedMaxHp();
+                    AssertRegenBlockPreventsRegenHealing();
+                    AssertExpiredRegenBlockAllowsRegenAgain();
+                    AssertRegenAndRegenBlockDurationsTickAndExpire();
+                });
+
+            RunSection(
                 "Alignment assertions",
                 delegate
                 {
@@ -1010,6 +1021,128 @@ namespace Game.SmokeTests
                 ContainsEvent(runtime.EventLog, GameEventType.SkillUsed)
                 && ContainsEvent(runtime.EventLog, GameEventType.ResourceSpent),
                 "Expired SkillSeal should no longer block skill actions.");
+        }
+
+        private static void AssertRegenHealsAtTurnBoundary()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 50;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Regen, 2, false, 10));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                attacker.Stats.CurrentHealth == 60,
+                "Regen should heal at the canonical turn boundary.");
+
+            Assert(
+                attacker.StatusEffects.HasActive(StatusEffectType.Regen),
+                "Regen should remain active before duration reaches zero.");
+        }
+
+        private static void AssertRegenDoesNotExceedMaxHp()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 95;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Regen, 2, false, 20));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                attacker.Stats.CurrentHealth == attacker.Stats.MaxHealth,
+                "Regen should not heal above max HP.");
+
+            Assert(
+                attacker.Stats.CurrentHealth == 100,
+                "Regen should cap healing at the combatant's max HP value.");
+        }
+
+        private static void AssertRegenBlockPreventsRegenHealing()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 50;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Regen, 3, false, 10));
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.RegenBlock, 2, false));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                attacker.Stats.CurrentHealth == 50,
+                "RegenBlock should prevent Regen healing while active.");
+
+            Assert(
+                attacker.StatusEffects.HasActive(StatusEffectType.Regen)
+                && attacker.StatusEffects.HasActive(StatusEffectType.RegenBlock),
+                "Regen and RegenBlock should both tick normally while active.");
+        }
+
+        private static void AssertExpiredRegenBlockAllowsRegenAgain()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 50;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Regen, 3, false, 10));
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.RegenBlock, 1, false));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                !attacker.StatusEffects.HasActive(StatusEffectType.RegenBlock),
+                "Expired RegenBlock should be removed.");
+
+            Assert(
+                attacker.Stats.CurrentHealth == 60,
+                "Regen should heal again once RegenBlock has expired.");
+        }
+
+        private static void AssertRegenAndRegenBlockDurationsTickAndExpire()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            attacker.Stats.CurrentHealth = 50;
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Regen, 1, false, 10));
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.RegenBlock, 1, false));
+
+            ExecuteBasicAttackTurn(attacker, defender);
+
+            Assert(
+                !attacker.StatusEffects.HasActive(StatusEffectType.Regen),
+                "Regen should expire when duration reaches zero.");
+
+            Assert(
+                !attacker.StatusEffects.HasActive(StatusEffectType.RegenBlock),
+                "RegenBlock should expire when duration reaches zero.");
+        }
+
+        private static void ExecuteBasicAttackTurn(
+            CombatEntity attacker,
+            CombatEntity defender)
+        {
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    BuildCombatRuntime(attacker, defender),
+                    TurnRequest.BasicAttack(attacker, defender));
         }
 
         private static CombatEntity BuildCombatEntity(

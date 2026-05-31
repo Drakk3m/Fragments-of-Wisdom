@@ -23,7 +23,20 @@ namespace Game.Domain.Combat.StatusEffects
                 throw new ArgumentNullException(nameof(target));
             }
 
+            ApplyTurnBoundaryEffects(target);
             target.StatusEffects.TickDurations();
+        }
+
+        private static void ApplyTurnBoundaryEffects(CombatEntity target)
+        {
+            foreach (var statusEffect in target.StatusEffects.Active)
+            {
+                if (statusEffect.Type == StatusEffectType.Regen
+                    && !target.StatusEffects.HasActive(StatusEffectType.RegenBlock))
+                {
+                    target.Heal(statusEffect.Potency);
+                }
+            }
         }
     }
 }

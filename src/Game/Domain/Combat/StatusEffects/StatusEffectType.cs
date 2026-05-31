@@ -5,6 +5,7 @@ namespace Game.Domain.Combat.StatusEffects
         Poison,
         Burn,
         SkillSeal,
-        RegenBlock
+        RegenBlock,
+        Regen
     }
 }
