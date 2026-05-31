@@ -8,6 +8,7 @@ using Game.Domain.Combat;
 using Game.Domain.Combat.Passives;
 using Game.Domain.Combat.Resources;
 using Game.Domain.Combat.Stats;
+using Game.Domain.Combat.StatusEffects;
 using Game.Domain.Codex;
 using Game.Domain.Discovery;
 using Game.Domain.Missions;
@@ -89,6 +90,17 @@ namespace Game.SmokeTests
                     AssertSkillBlockedWhenActiveResonanceIsInsufficient();
                     AssertReserveIsNotConsumedAutomaticallyForSkillCost();
                     AssertRefillThenSkillWorks();
+                });
+
+            RunSection(
+                "Status effects foundation assertions",
+                delegate
+                {
+                    AssertStatusEffectCanBeApplied();
+                    AssertDuplicateNonStackingStatusEffectDoesNotDuplicate();
+                    AssertStatusEffectDurationTicksDown();
+                    AssertExpiredStatusEffectIsRemoved();
+                    AssertSkillSealCanBeDetectedAsActive();
                 });
 
             RunSection(
@@ -738,6 +750,109 @@ namespace Game.SmokeTests
                 && ContainsEvent(runtime.EventLog, GameEventType.SkillUsed)
                 && ContainsEvent(runtime.EventLog, GameEventType.DamageDealt),
                 "Refill then skill should consume separate turns and execute through the canonical engine.");
+        }
+
+        private static void AssertStatusEffectCanBeApplied()
+        {
+            var target = BuildCombatEntity("target", 10, 5, 100, 0, 0, 0, 2f, 10);
+
+            bool applied = new StatusEffectResolver().Apply(
+                target,
+                new StatusEffectInstance(StatusEffectType.Poison, 2, false));
+
+            Assert(
+                applied,
+                "Status effect should be applicable.");
+
+            Assert(
+                target.StatusEffects.HasActive(StatusEffectType.Poison),
+                "Applied status effect should be detectable as active.");
+        }
+
+        private static void AssertDuplicateNonStackingStatusEffectDoesNotDuplicate()
+        {
+            var target = BuildCombatEntity("target", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var resolver = new StatusEffectResolver();
+
+            bool firstApply = resolver.Apply(
+                target,
+                new StatusEffectInstance(StatusEffectType.Burn, 2, false));
+            bool duplicateApply = resolver.Apply(
+                target,
+                new StatusEffectInstance(StatusEffectType.Burn, 2, false));
+
+            Assert(
+                firstApply && !duplicateApply,
+                "Duplicate non-stacking status effect should be rejected.");
+
+            Assert(
+                target.StatusEffects.Active.Count == 1,
+                "Duplicate non-stacking status effect should not add another instance.");
+        }
+
+        private static void AssertStatusEffectDurationTicksDown()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.RegenBlock, 2, false));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    BuildCombatRuntime(attacker, defender),
+                    TurnRequest.BasicAttack(attacker, defender));
+
+            var statusEffect = attacker.StatusEffects.GetFirst(StatusEffectType.RegenBlock);
+
+            Assert(
+                statusEffect != null,
+                "Status effect should remain active before duration reaches zero.");
+
+            Assert(
+                statusEffect.RemainingDuration == 1,
+                "Status effect duration should tick down at the canonical turn boundary.");
+        }
+
+        private static void AssertExpiredStatusEffectIsRemoved()
+        {
+            var attacker = BuildCombatEntity("attacker", 10, 5, 100, 0, 0, 0, 2f, 10);
+            var defender = BuildCombatEntity("defender", 5, 5, 0, 0, 0, 0, 1f, 10);
+            new StatusEffectResolver().Apply(
+                attacker,
+                new StatusEffectInstance(StatusEffectType.Poison, 1, false));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    BuildCombatRuntime(attacker, defender),
+                    TurnRequest.BasicAttack(attacker, defender));
+
+            Assert(
+                !attacker.StatusEffects.HasActive(StatusEffectType.Poison),
+                "Expired status effect should be removed.");
+
+            Assert(
+                attacker.StatusEffects.Active.Count == 0,
+                "Expired status effect should leave no active instance.");
+        }
+
+        private static void AssertSkillSealCanBeDetectedAsActive()
+        {
+            var target = BuildCombatEntity("target", 10, 5, 100, 0, 0, 0, 2f, 10);
+
+            new StatusEffectResolver().Apply(
+                target,
+                new StatusEffectInstance(StatusEffectType.SkillSeal, 2, false));
+
+            Assert(
+                target.StatusEffects.HasActive(StatusEffectType.SkillSeal),
+                "SkillSeal status effect should be detectable as active.");
+
+            Assert(
+                target.StatusEffects.GetFirst(StatusEffectType.SkillSeal).RemainingDuration == 2,
+                "SkillSeal status effect should preserve duration facts.");
         }
 
         private static CombatEntity BuildCombatEntity(
