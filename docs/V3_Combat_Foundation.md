@@ -59,6 +59,16 @@ Future V3 combat work should extend this path incrementally instead of adding an
 
 `CombatRuntimeContext.ResonanceProfile` is optional. When present, `TurnBasedCombatEngine` uses it to validate and spend active resonance during skill execution.
 
+`CombatEntity.StatusEffects` is the runtime status-effect collection for a combatant. Status effects are pure domain state and are resolved by the canonical turn engine.
+
+`StatusEffectType` defines the current status identifiers: `Poison`, `Burn`, `SkillSeal`, `RegenBlock`, and `Regen`.
+
+`StatusEffectInstance` carries the status type, remaining duration, stacking behavior, and optional `Potency` value used by effect rules such as Regen, Poison, and Burn.
+
+`StatusEffectCollection` owns active status instances. It applies non-stacking rules, exposes active-effect lookup, ticks durations, and removes expired effects.
+
+`StatusEffectResolver` applies status instances and resolves the explicit status boundary used by `TurnBasedCombatEngine`.
+
 `DamageResolver` is the current damage calculation service. It owns hit/miss checks, critical checks, and final damage math using `CombatContext`.
 
 `IRandomSource` is the randomness boundary. Tests should inject deterministic implementations so combat smoke coverage remains stable.
@@ -124,6 +134,41 @@ Rules:
 
 The resonance foundation does not currently include buffs, status effects, equipment, inventory, classes, saves, Unity integration, or any parallel combat resolver.
 
+## Status Effect Foundation
+
+Status effects are part of the canonical V3 combat path. They are stored on `CombatEntity.StatusEffects` and resolved through `StatusEffectResolver`, which is called by `TurnBasedCombatEngine` at the acting combatant's turn boundary.
+
+Current status timing:
+
+- status effects resolve for the acting combatant
+- resolution happens during the engine's turn boundary after the action and resource regeneration flow
+- durations tick after status effects apply
+- expired status effects are removed during duration ticking
+
+Current effects:
+
+- `SkillSeal` blocks skill actions before Essence or active Resonance is spent.
+- `SkillSeal` does not block basic attacks.
+- `Regen` heals the affected combatant by `StatusEffectInstance.Potency`.
+- `Regen` healing cannot exceed max HP.
+- `RegenBlock` prevents `Regen` healing while active.
+- `Poison` deals damage-over-time by `StatusEffectInstance.Potency`.
+- `Burn` deals damage-over-time by `StatusEffectInstance.Potency`.
+- Poison/Burn DOT damage cannot reduce HP below `0`.
+- Poison/Burn DOT can defeat the affected combatant through the canonical engine path.
+
+Explicit status boundary order:
+
+```text
+Poison/Burn DOT
+  -> Regen
+  -> duration tick / expire
+```
+
+This ordering is intentional and covered by smoke tests. Future effects should document whether they run before DOT, between DOT and Regen, after Regen, or during duration ticking.
+
+The current status foundation does not include stat modifiers, cleanse rules, resistance/chance application, UI, Unity adapters, equipment, classes, inventory, save changes, or a parallel combat resolver.
+
 ## Boundaries
 
 Allowed:
@@ -156,6 +201,6 @@ git diff --check
 Expected smoke output:
 
 - V1 slice emitted event count: `38`
-- total smoke assertions executed: `275`
+- total smoke assertions executed: `314`
 
 The V1 event count is a guardrail. If it changes, treat that as a behavior change unless the user explicitly requested a V1 loop update.
