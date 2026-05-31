@@ -56,6 +56,20 @@ namespace Game.SmokeTests
                         });
                 });
 
+            int sharedAssertions = RunGroup(
+                "Shared Domain Foundations",
+                delegate
+                {
+                    RunSection(
+                        "Domain event foundation assertions",
+                        delegate
+                        {
+                            AssertDomainEventsCanBeRecordedAndRead();
+                            AssertDomainEventsDoNotMutateStatefulProfiles();
+                            AssertDomainEventsCanCarryMetadataFacts();
+                        });
+                });
+
             int v3Assertions = RunGroup(
                 "V3 Combat / Skills / Resonance / Status / Stats",
                 delegate
@@ -385,6 +399,7 @@ namespace Game.SmokeTests
             Console.WriteLine();
             Console.WriteLine("Smoke assertion summary");
             Console.WriteLine("  V1 Legacy Slice assertions: " + v1Assertions);
+            Console.WriteLine("  Shared Domain Foundations assertions: " + sharedAssertions);
             Console.WriteLine("  V2 Narrative / Progression / Persistence assertions: " + v2Assertions);
             Console.WriteLine("  V3 Combat / Skills / Resonance / Status / Stats assertions: " + v3Assertions);
             Console.WriteLine("Total smoke assertions executed: " + assertionsExecuted);
@@ -417,6 +432,93 @@ namespace Game.SmokeTests
             assertions();
             Console.WriteLine("  Assertions passed: " + (assertionsExecuted - before));
             Console.WriteLine();
+        }
+
+        private static void AssertDomainEventsCanBeRecordedAndRead()
+        {
+            var eventLog = new DomainEventLog();
+
+            eventLog.Record(
+                DomainEventType.CodexEntryDiscovered,
+                CodexEntryIds.NahualPath,
+                "Codex entry discovered.");
+            eventLog.Record(
+                DomainEventType.MissionLeadDiscovered,
+                MissionTriggerIds.SharedWisdomFollowup,
+                "Mission lead discovered.");
+
+            Assert(
+                eventLog.Events.Count == 2,
+                "Domain event log should record lightweight facts.");
+
+            Assert(
+                eventLog.Events[0].Type == DomainEventType.CodexEntryDiscovered
+                && eventLog.Events[1].SubjectId == MissionTriggerIds.SharedWisdomFollowup,
+                "Domain events should preserve type and subject facts for readers.");
+        }
+
+        private static void AssertDomainEventsDoNotMutateStatefulProfiles()
+        {
+            var eventLog = new DomainEventLog();
+            var codexProfile = new CodexProfile();
+            var missionJournal = new MissionJournalProfile();
+            var unlockProfile = new UnlockProfile();
+
+            eventLog.Record(
+                DomainEventType.CodexEntryDiscovered,
+                CodexEntryIds.ForbiddenTransmutation,
+                "Codex discovery event recorded.");
+            eventLog.Record(
+                DomainEventType.MissionLeadDiscovered,
+                MissionTriggerIds.NahualTransmutationDiscovery,
+                "Mission lead event recorded.");
+            eventLog.Record(
+                DomainEventType.UnlockRecorded,
+                CodexUnlockIds.ForbiddenPracticeCount,
+                "Unlock event recorded.");
+
+            Assert(
+                eventLog.Events.Count == 3,
+                "Domain events should be recorded independently of stateful profiles.");
+
+            Assert(
+                codexProfile.DiscoveredEntries.Count == 0
+                && missionJournal.AvailableLeads.Count == 0
+                && unlockProfile.Unlocks.Count == 0,
+                "Recording domain events should not mutate canonical stateful profiles.");
+        }
+
+        private static void AssertDomainEventsCanCarryMetadataFacts()
+        {
+            var eventLog = new DomainEventLog();
+
+            eventLog.Record(
+                DomainEventType.CombatantDamaged,
+                "combatant.player",
+                "Combatant damaged.",
+                new Dictionary<string, string>
+                {
+                    { "amount", "12" },
+                    { "source", "poison" }
+                });
+            eventLog.Record(
+                DomainEventType.StatusApplied,
+                "combatant.player",
+                "Status applied.",
+                new Dictionary<string, string>
+                {
+                    { "status", StatusEffectType.Poison.ToString() }
+                });
+
+            Assert(
+                eventLog.Events[0].Metadata["amount"] == "12"
+                && eventLog.Events[0].Metadata["source"] == "poison",
+                "Domain events should preserve optional metadata facts.");
+
+            Assert(
+                eventLog.Events[1].Type == DomainEventType.StatusApplied
+                && eventLog.Events[1].Metadata["status"] == "Poison",
+                "Domain events should support status-applied facts without applying gameplay state.");
         }
 
         private static void AssertBasicAttackDamagesTarget()
