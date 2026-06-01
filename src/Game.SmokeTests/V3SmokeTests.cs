@@ -45,6 +45,10 @@ namespace Game.SmokeTests
                     AssertMultipleStatModifiersStackAdditively();
                     AssertBaseCombatStatsRemainUnchanged();
                     AssertEffectiveStatsUseCanonicalCombatPath();
+                    AssertNegativeModifierCannotInvalidateMaxHealth();
+                    AssertCurrentHealthClampsToEffectiveMaxHealth();
+                    AssertNegativeAttackAndDefenseModifiersClampToZero();
+                    AssertStatModifierInvariantClampingDoesNotMutateBaseStats();
                 });
 
             RunSection(
@@ -346,6 +350,87 @@ namespace Game.SmokeTests
                 && attacker.Stats.Attack == 30
                 && defender.Stats.CurrentHealth < defender.Stats.MaxHealth,
                 "Effective combat stats should feed canonical damage without mutating base stats or creating a parallel engine.");
+        }
+
+        private static void AssertNegativeModifierCannotInvalidateMaxHealth()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var effectiveStats = new CombatStatModifierResolver().Resolve(
+                baseStats,
+                new[]
+                {
+                    new CombatStatModifier(CombatStatType.MaxHealth, -500)
+                });
+
+            Assert(
+                effectiveStats.MaxHealth == 1,
+                "Negative MaxHealth modifier should clamp effective MaxHealth to at least one.");
+        }
+
+        private static void AssertCurrentHealthClampsToEffectiveMaxHealth()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var effectiveStats = new CombatStatModifierResolver().Resolve(
+                baseStats,
+                new[]
+                {
+                    new CombatStatModifier(CombatStatType.MaxHealth, -40)
+                });
+
+            Assert(
+                effectiveStats.MaxHealth == 60,
+                "Effective MaxHealth should apply flat modifiers before health clamping.");
+
+            Assert(
+                effectiveStats.CurrentHealth == 60,
+                "CurrentHealth should clamp to effective MaxHealth.");
+        }
+
+        private static void AssertNegativeAttackAndDefenseModifiersClampToZero()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var effectiveStats = new CombatStatModifierResolver().Resolve(
+                baseStats,
+                new[]
+                {
+                    new CombatStatModifier(CombatStatType.Attack, -50),
+                    new CombatStatModifier(CombatStatType.Defense, -50),
+                    new CombatStatModifier(CombatStatType.Precision, -150),
+                    new CombatStatModifier(CombatStatType.CriticalChance, -50)
+                });
+
+            Assert(
+                effectiveStats.Attack == 0 && effectiveStats.Defense == 0,
+                "Negative attack and defense modifiers should clamp to zero.");
+
+            Assert(
+                effectiveStats.Precision == 0 && effectiveStats.CriticalChance == 0,
+                "Negative combat chance stats should clamp to zero.");
+        }
+
+        private static void AssertStatModifierInvariantClampingDoesNotMutateBaseStats()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+
+            new CombatStatModifierResolver().Resolve(
+                baseStats,
+                new[]
+                {
+                    new CombatStatModifier(CombatStatType.MaxHealth, -500),
+                    new CombatStatModifier(CombatStatType.CurrentHealth, -500),
+                    new CombatStatModifier(CombatStatType.Attack, -500),
+                    new CombatStatModifier(CombatStatType.Defense, -500)
+                });
+
+            Assert(
+                baseStats.MaxHealth == 100
+                && baseStats.CurrentHealth == 100,
+                "Invariant clamping should not mutate base health stats.");
+
+            Assert(
+                baseStats.Attack == 10
+                && baseStats.Defense == 5,
+                "Invariant clamping should not mutate base attack or defense stats.");
         }
 
         private static void AssertUnlockedSkillIsAvailable()
