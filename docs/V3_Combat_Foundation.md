@@ -169,6 +169,27 @@ This ordering is intentional and covered by smoke tests. Future effects should d
 
 The current status foundation does not include stat modifiers, cleanse rules, resistance/chance application, UI, Unity adapters, equipment, classes, inventory, save changes, or a parallel combat resolver.
 
+## Stat Modifier Foundation
+
+The current stat modifier foundation is a pure domain layer around `CombatStats`.
+
+Current types:
+
+- `CombatStatModifier`
+- `CombatStatModifierResolver`
+- `CombatStatType`
+- `StatModifierSourceType`
+
+Rules:
+
+- Flat modifiers only.
+- Multiple flat modifiers stack additively.
+- Resolving modifiers returns effective cloned `CombatStats`.
+- Base `CombatStats` remains unchanged.
+- Effective stats can be passed into `CombatEntity` and consumed by the canonical `TurnBasedCombatEngine` / `DamageResolver` path.
+
+The stat modifier foundation does not currently include equipment, inventory, classes, save changes, Unity, UI, percentage modifiers, buff integration, status-effect integration, or a parallel combat resolver.
+
 ## Boundaries
 
 Allowed:
@@ -201,6 +222,11 @@ git diff --check
 Expected smoke output:
 
 - V1 slice emitted event count: `38`
-- total smoke assertions executed: `314`
+- Smoke output is grouped into `V1 Legacy Slice`, `Shared Domain Foundations`, `V3 Combat / Skills / Resonance / Status / Stats`, and `V2 Narrative / Progression / Persistence`.
+- V1 Legacy Slice assertions: `2`
+- Shared Domain Foundations assertions: `16`
+- V2 Narrative / Progression / Persistence assertions: `239`
+- V3 Combat / Skills / Resonance / Status / Stats assertions: `81`
+- total smoke assertions executed: `338`
 
 The V1 event count is a guardrail. If it changes, treat that as a behavior change unless the user explicitly requested a V1 loop update.
