@@ -188,6 +188,10 @@ dotnet run --project src\Game.SmokeTests\Game.SmokeTests.csproj --no-build
 Current smoke expectations:
 
 - V1 slice emitted event count remains `38`.
+- Smoke output is grouped into `V1 Legacy Slice`, `Shared Domain Foundations`, `V3 Combat / Skills / Resonance / Status / Stats`, and `V2 Narrative / Progression / Persistence`.
+- V1 Legacy Slice assertions: `2`.
+- Shared Domain Foundations assertions: `16`.
+- V3 Combat / Skills / Resonance / Status / Stats assertions: `81`.
 - Alignment assertions still run.
 - Nahual evaluator assertions still run.
 - Transmutation policy assertions still run.
@@ -203,6 +207,7 @@ Current smoke expectations:
 - V2 save JSON assertions still run.
 - V2 save file repository assertions still run.
 - V2 foundation flow assertions still run.
-- Total smoke assertions remain `149` unless a branch intentionally adds or renames smoke coverage and explains why.
+- V2 Narrative / Progression / Persistence assertions: `239`.
+- Total smoke assertions remain `338` unless a branch intentionally adds or renames smoke coverage and explains why.
 
 Documentation-only changes should not alter smoke counts, gameplay behavior, Unity assets, scenes, prefabs, or `.meta` files.
