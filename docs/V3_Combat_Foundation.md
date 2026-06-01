@@ -188,7 +188,53 @@ Rules:
 - Base `CombatStats` remains unchanged.
 - Effective stats can be passed into `CombatEntity` and consumed by the canonical `TurnBasedCombatEngine` / `DamageResolver` path.
 
-The stat modifier foundation does not currently include equipment, inventory, classes, save changes, Unity, UI, percentage modifiers, buff integration, status-effect integration, or a parallel combat resolver.
+The stat modifier foundation does not currently include inventory, classes, save changes, Unity, UI, percentage modifiers, buff integration, status-effect integration, or a parallel combat resolver.
+
+## Equipment Foundation
+
+Equipment is a small pure-domain layer on top of the stat modifier system.
+
+Current types:
+
+- `EquipmentProfile`
+- `EquipmentDefinition`
+- `EquipmentLoadout`
+- `EquipmentStatModifierService`
+- `EquipmentStatAggregator`
+- `EquipmentSlot`
+
+Responsibilities:
+
+- `EquipmentProfile` owns equipped items by slot.
+- `EquipmentDefinition` describes one equippable item and exposes flat `CombatStatModifier` values.
+- `EquipmentLoadout` is a compatibility wrapper over `EquipmentProfile` for older V1 slice code.
+- `EquipmentStatModifierService` gathers flat modifiers from currently equipped items.
+- `EquipmentStatModifierService.ResolveEffectiveStats` delegates final effective stat calculation to `CombatStatModifierResolver`.
+- `EquipmentStatAggregator` remains as a compatibility adapter and delegates to `EquipmentStatModifierService`.
+
+Rules:
+
+- Equipment is equipped by `EquipmentSlot`.
+- Equipping another item in the same slot replaces the previous item.
+- Unequip removes the item in the requested slot and reports whether anything was removed.
+- Null items are rejected safely.
+- Equipped items expose flat `CombatStatModifier` values only.
+- Base `CombatStats` is not mutated when resolving equipment stats.
+- Effective equipment stats are produced through `CombatStatModifierResolver`, so stat invariant clamping still applies.
+
+Current non-goals:
+
+- no inventory
+- no item quantities
+- no rarity
+- no durability
+- no skill providers
+- no class restrictions
+- no save integration
+- no UI
+- no Unity adapters
+- no percentage modifiers
+- no rewards
 
 ## Boundaries
 
@@ -226,7 +272,7 @@ Expected smoke output:
 - V1 Legacy Slice assertions: `2`
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `239`
-- V3 Combat / Skills / Resonance / Status / Stats assertions: `81`
-- total smoke assertions executed: `338`
+- V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
+- total smoke assertions executed: `357`
 
 The V1 event count is a guardrail. If it changes, treat that as a behavior change unless the user explicitly requested a V1 loop update.
