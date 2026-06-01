@@ -11,6 +11,7 @@ using Game.Domain.Combat.Stats;
 using Game.Domain.Combat.StatusEffects;
 using Game.Domain.Codex;
 using Game.Domain.Discovery;
+using Game.Domain.Equipment;
 using Game.Domain.Missions;
 using Game.Domain.Narrative;
 using Game.Domain.Player;
@@ -49,6 +50,18 @@ namespace Game.SmokeTests
                     AssertCurrentHealthClampsToEffectiveMaxHealth();
                     AssertNegativeAttackAndDefenseModifiersClampToZero();
                     AssertStatModifierInvariantClampingDoesNotMutateBaseStats();
+                });
+
+            RunSection(
+                "Equipment foundation assertions",
+                delegate
+                {
+                    AssertEquipmentItemCanBeEquippedInSlot();
+                    AssertEquipmentReplacesItemInSameSlot();
+                    AssertEquipmentUnequipClearsSlot();
+                    AssertEquippedItemModifiersAffectEffectiveStats();
+                    AssertEquipmentEffectiveStatsDoNotMutateBaseStats();
+                    AssertInvalidEquipmentIsHandledSafely();
                 });
 
             RunSection(
@@ -431,6 +444,175 @@ namespace Game.SmokeTests
                 baseStats.Attack == 10
                 && baseStats.Defense == 5,
                 "Invariant clamping should not mutate base attack or defense stats.");
+        }
+
+        private static void AssertEquipmentItemCanBeEquippedInSlot()
+        {
+            var profile = new EquipmentProfile();
+            var item = BuildEquipmentItem(
+                "weapon.training_blade",
+                "Training Blade",
+                EquipmentSlot.Weapon,
+                CombatStatType.Attack,
+                3);
+
+            bool equipped = profile.Equip(item);
+
+            Assert(
+                equipped,
+                "Valid equipment item should be accepted.");
+
+            Assert(
+                profile.GetEquipped(EquipmentSlot.Weapon) == item,
+                "Equipment profile should track the item by slot.");
+        }
+
+        private static void AssertEquipmentReplacesItemInSameSlot()
+        {
+            var profile = new EquipmentProfile();
+            var firstItem = BuildEquipmentItem(
+                "weapon.training_blade",
+                "Training Blade",
+                EquipmentSlot.Weapon,
+                CombatStatType.Attack,
+                3);
+            var secondItem = BuildEquipmentItem(
+                "weapon.iron_blade",
+                "Iron Blade",
+                EquipmentSlot.Weapon,
+                CombatStatType.Attack,
+                5);
+
+            profile.Equip(firstItem);
+            bool replaced = profile.Equip(secondItem);
+
+            Assert(
+                replaced,
+                "Equipping a valid item into an occupied slot should be accepted.");
+
+            Assert(
+                profile.Equipped.Count == 1
+                && profile.GetEquipped(EquipmentSlot.Weapon) == secondItem,
+                "Equipping another item in the same slot should replace the previous item.");
+        }
+
+        private static void AssertEquipmentUnequipClearsSlot()
+        {
+            var profile = new EquipmentProfile();
+            var item = BuildEquipmentItem(
+                "armor.training_vest",
+                "Training Vest",
+                EquipmentSlot.Armor,
+                CombatStatType.Defense,
+                4);
+
+            profile.Equip(item);
+            bool unequipped = profile.Unequip(EquipmentSlot.Armor);
+
+            Assert(
+                unequipped,
+                "Unequip should report success when a slot was occupied.");
+
+            Assert(
+                profile.GetEquipped(EquipmentSlot.Armor) == null
+                && profile.Equipped.Count == 0,
+                "Unequip should clear the equipped slot.");
+        }
+
+        private static void AssertEquippedItemModifiersAffectEffectiveStats()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var profile = new EquipmentProfile();
+            profile.Equip(BuildEquipmentItem(
+                "weapon.training_blade",
+                "Training Blade",
+                EquipmentSlot.Weapon,
+                CombatStatType.Attack,
+                3));
+            profile.Equip(BuildEquipmentItem(
+                "armor.training_vest",
+                "Training Vest",
+                EquipmentSlot.Armor,
+                CombatStatType.Defense,
+                4));
+
+            var effectiveStats = new EquipmentStatModifierService().ResolveEffectiveStats(
+                baseStats,
+                profile);
+
+            Assert(
+                effectiveStats.Attack == 13,
+                "Equipped weapon modifier should increase effective attack.");
+
+            Assert(
+                effectiveStats.Defense == 9,
+                "Equipped armor modifier should increase effective defense.");
+        }
+
+        private static void AssertEquipmentEffectiveStatsDoNotMutateBaseStats()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var profile = new EquipmentProfile();
+            profile.Equip(BuildEquipmentItem(
+                "weapon.training_blade",
+                "Training Blade",
+                EquipmentSlot.Weapon,
+                CombatStatType.Attack,
+                3));
+
+            new EquipmentStatModifierService().ResolveEffectiveStats(
+                baseStats,
+                profile);
+
+            Assert(
+                baseStats.Attack == 10,
+                "Equipment effective stats should not mutate base attack.");
+
+            Assert(
+                baseStats.Defense == 5,
+                "Equipment effective stats should not mutate base defense.");
+        }
+
+        private static void AssertInvalidEquipmentIsHandledSafely()
+        {
+            var baseStats = BuildCombatStats(10, 5, 100, 0, 0, 0, 2f);
+            var profile = new EquipmentProfile();
+
+            bool equipped = profile.Equip(null);
+            bool unequipped = profile.Unequip(EquipmentSlot.Accessory1);
+            var effectiveStats = new EquipmentStatModifierService().ResolveEffectiveStats(
+                baseStats,
+                null);
+
+            Assert(
+                !equipped && !unequipped,
+                "Null equipment and empty-slot unequip should fail safely.");
+
+            Assert(
+                effectiveStats.Attack == baseStats.Attack
+                && effectiveStats.Defense == baseStats.Defense,
+                "Null equipment profile should resolve to unchanged effective stats.");
+        }
+
+        private static EquipmentDefinition BuildEquipmentItem(
+            string id,
+            string name,
+            EquipmentSlot slot,
+            CombatStatType statType,
+            int amount)
+        {
+            return new EquipmentDefinition(
+                id,
+                name,
+                slot,
+                new List<CombatStatModifier>
+                {
+                    new CombatStatModifier(
+                        statType,
+                        amount,
+                        StatModifierSourceType.Equipment,
+                        id)
+                });
         }
 
         private static void AssertUnlockedSkillIsAvailable()
