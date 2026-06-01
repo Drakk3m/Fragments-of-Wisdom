@@ -29,6 +29,7 @@ namespace Game.Domain.Combat.Stats
                 }
             }
 
+            ClampEffectiveStats(effectiveStats);
             return effectiveStats;
         }
 
@@ -80,6 +81,27 @@ namespace Game.Domain.Combat.Stats
                 default:
                     throw new ArgumentOutOfRangeException(nameof(modifier.StatType));
             }
+        }
+
+        private static void ClampEffectiveStats(CombatStats stats)
+        {
+            stats.MaxHealth = Math.Max(1, stats.MaxHealth);
+            stats.CurrentHealth = Math.Min(
+                stats.MaxHealth,
+                Math.Max(0, stats.CurrentHealth));
+
+            stats.Attack = Math.Max(0, stats.Attack);
+            stats.Defense = Math.Max(0, stats.Defense);
+            stats.Precision = Math.Max(0, stats.Precision);
+            stats.Evasion = Math.Max(0, stats.Evasion);
+            stats.CriticalChance = Math.Max(0, stats.CriticalChance);
+            stats.CriticalResistance = Math.Max(0, stats.CriticalResistance);
+            stats.CriticalDamageMultiplier = Math.Max(1f, stats.CriticalDamageMultiplier);
+            stats.DebuffChance = Math.Max(0, stats.DebuffChance);
+            stats.DebuffResistance = Math.Max(0, stats.DebuffResistance);
+            stats.BuffPotency = Math.Max(0, stats.BuffPotency);
+            stats.BuffResistance = Math.Max(0, stats.BuffResistance);
+            stats.ControlResistance = Math.Max(0, stats.ControlResistance);
         }
     }
 }
