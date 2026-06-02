@@ -15,6 +15,9 @@ namespace Game.SmokeTests
                     AssertClassCanBeAssigned();
                     AssertClassCanBeChanged();
                     AssertClassExposesAllowedSkillFacts();
+                    AssertCurrentClassDefinitionResolvesFromRegistry();
+                    AssertClassChangeStoresOnlyClassId();
+                    AssertUnknownClassIdFailsSafely();
                     AssertClassChangeDoesNotEraseUnlockProfileState();
                     AssertInvalidClassIsRejectedSafely();
                 });
@@ -33,8 +36,8 @@ namespace Game.SmokeTests
 
             Assert(
                 profile.CurrentClassId == ClassId.Tlamatini
-                && profile.CurrentClass == classDefinition,
-                "Class profile should expose the assigned current class.");
+                && profile.ResolveCurrentClass(ClassBootstrap.BuildDefinitionRegistry()).Id == ClassId.Tlamatini,
+                "Class profile should store the assigned current class id.");
         }
 
         private static void AssertClassCanBeChanged()
@@ -52,14 +55,15 @@ namespace Game.SmokeTests
 
             Assert(
                 profile.CurrentClassId == ClassId.Wanderer
-                && profile.CurrentClass == secondClass,
-                "Class profile should replace current class on change.");
+                && profile.ResolveCurrentClass(BuildTestClassRegistry()).Id == secondClass.Id,
+                "Class profile should replace current class id on change.");
         }
 
         private static void AssertClassExposesAllowedSkillFacts()
         {
             var classDefinition = ClassBootstrap.BuildTlamatini();
             var profile = new ClassProfile();
+            var registry = ClassBootstrap.BuildDefinitionRegistry();
 
             profile.AssignClass(classDefinition);
 
@@ -69,9 +73,56 @@ namespace Game.SmokeTests
                 "Class definition should expose allowed skill ids.");
 
             Assert(
-                profile.CurrentClassAllowsSkill("skill_balance_ritual")
-                && !profile.CurrentClassAllowsSkill("skill_unknown"),
+                profile.CurrentClassAllowsSkill("skill_balance_ritual", registry)
+                && !profile.CurrentClassAllowsSkill("skill_unknown", registry),
                 "Class profile should expose current class skill access facts.");
+        }
+
+        private static void AssertCurrentClassDefinitionResolvesFromRegistry()
+        {
+            var profile = new ClassProfile();
+            var registry = ClassBootstrap.BuildDefinitionRegistry();
+
+            profile.AssignClassId(ClassId.Tlamatini, registry);
+            var currentClass = profile.ResolveCurrentClass(registry);
+
+            Assert(
+                currentClass != null && currentClass.Id == ClassId.Tlamatini,
+                "Current class definition should resolve from profile id and registry.");
+        }
+
+        private static void AssertClassChangeStoresOnlyClassId()
+        {
+            var profile = new ClassProfile();
+            var registry = BuildTestClassRegistry();
+
+            profile.AssignClassId(ClassId.Tlamatini, registry);
+            bool changed = profile.ChangeClassId(ClassId.Wanderer, registry);
+
+            Assert(
+                changed && profile.CurrentClassId == ClassId.Wanderer,
+                "Class change by registry should store only the stable class id.");
+
+            Assert(
+                profile.ResolveCurrentClass(registry).Name == "Wanderer",
+                "Current class facts should be resolved from the registry after class change.");
+        }
+
+        private static void AssertUnknownClassIdFailsSafely()
+        {
+            var profile = new ClassProfile();
+            var registry = ClassBootstrap.BuildDefinitionRegistry();
+
+            bool assigned = profile.AssignClassId("class_unknown", registry);
+
+            Assert(
+                !assigned,
+                "Unknown class id should fail safely.");
+
+            Assert(
+                profile.CurrentClassId == string.Empty
+                && profile.ResolveCurrentClass(registry) == null,
+                "Unknown class id should not mutate current class state.");
         }
 
         private static void AssertClassChangeDoesNotEraseUnlockProfileState()
@@ -127,6 +178,13 @@ namespace Game.SmokeTests
                 {
                     "skill_minor_cleanse"
                 });
+        }
+
+        private static ClassDefinitionRegistry BuildTestClassRegistry()
+        {
+            var registry = ClassBootstrap.BuildDefinitionRegistry();
+            registry.Register(BuildWandererClass());
+            return registry;
         }
     }
 }

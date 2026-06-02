@@ -1,14 +1,12 @@
-using System;
-
 namespace Game.Domain.Classes
 {
     public class ClassProfile
     {
-        public ClassDefinition CurrentClass { get; private set; }
+        private string currentClassId = string.Empty;
 
         public string CurrentClassId
         {
-            get { return CurrentClass == null ? string.Empty : CurrentClass.Id; }
+            get { return currentClassId; }
         }
 
         public bool AssignClass(ClassDefinition classDefinition)
@@ -18,7 +16,7 @@ namespace Game.Domain.Classes
                 return false;
             }
 
-            CurrentClass = classDefinition;
+            currentClassId = classDefinition.Id;
             return true;
         }
 
@@ -27,9 +25,37 @@ namespace Game.Domain.Classes
             return AssignClass(classDefinition);
         }
 
-        public bool CurrentClassAllowsSkill(string skillId)
+        public bool AssignClassId(
+            string classId,
+            ClassDefinitionRegistry registry)
         {
-            return CurrentClass != null && CurrentClass.AllowsSkill(skillId);
+            if (registry == null || !registry.Contains(classId))
+            {
+                return false;
+            }
+
+            currentClassId = classId;
+            return true;
+        }
+
+        public bool ChangeClassId(
+            string classId,
+            ClassDefinitionRegistry registry)
+        {
+            return AssignClassId(classId, registry);
+        }
+
+        public ClassDefinition ResolveCurrentClass(ClassDefinitionRegistry registry)
+        {
+            return registry == null ? null : registry.ResolveCurrentClass(this);
+        }
+
+        public bool CurrentClassAllowsSkill(
+            string skillId,
+            ClassDefinitionRegistry registry)
+        {
+            var classDefinition = ResolveCurrentClass(registry);
+            return classDefinition != null && classDefinition.AllowsSkill(skillId);
         }
 
         private static bool IsValidClass(ClassDefinition classDefinition)

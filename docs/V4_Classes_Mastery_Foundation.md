@@ -8,8 +8,9 @@ The current scope is intentionally small: class identity, current class state, c
 
 ```text
 ClassDefinition
-  -> ClassProfile
-  -> current class facts
+  -> ClassDefinitionRegistry
+  -> ClassProfile current class id
+  -> registry lookup
   -> allowed skill id facts
 ```
 
@@ -32,13 +33,22 @@ Current ids:
 - `AllowedSkillIds`
 - `AllowsSkill(skillId)`
 
-`ClassProfile` owns current class state:
+`ClassDefinitionRegistry` owns class definition lookup:
 
-- `CurrentClass`
+- `Register(classDefinition)`
+- `Contains(classId)`
+- `Get(classId)`
+- `ResolveCurrentClass(profile)`
+
+`ClassProfile` owns only current class id state:
+
 - `CurrentClassId`
 - `AssignClass(classDefinition)`
 - `ChangeClass(classDefinition)`
-- `CurrentClassAllowsSkill(skillId)`
+- `AssignClassId(classId, registry)`
+- `ChangeClassId(classId, registry)`
+- `ResolveCurrentClass(registry)`
+- `CurrentClassAllowsSkill(skillId, registry)`
 
 `ClassBootstrap` still provides the current Tlamatini definition used by the V1 slice.
 
@@ -46,6 +56,9 @@ Current ids:
 
 - A valid class can be assigned.
 - A valid class can replace the current class.
+- `ClassProfile` stores only the stable current class id.
+- Class definitions are resolved through `ClassDefinitionRegistry`.
+- Unknown class ids are rejected safely.
 - Null classes are rejected safely.
 - Classes with empty ids or names are rejected safely.
 - Rejected class changes preserve the current class.
@@ -81,8 +94,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `239`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `9`
-- Total smoke assertions executed: `366`
+- V4 Classes / Mentors / Mastery assertions: `14`
+- Total smoke assertions executed: `371`
 
 The V1 slice emitted event count remains `38`.
 

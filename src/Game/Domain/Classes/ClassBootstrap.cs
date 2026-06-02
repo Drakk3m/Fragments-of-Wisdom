@@ -17,6 +17,13 @@ namespace Game.Domain.Classes
                 });
         }
 
+        public static ClassDefinitionRegistry BuildDefinitionRegistry()
+        {
+            var registry = new ClassDefinitionRegistry();
+            registry.Register(BuildTlamatini());
+            return registry;
+        }
+
         public static IReadOnlyDictionary<string, SkillTreeNodeDefinition> BuildTlamatiniSkillTree()
         {
             return new Dictionary<string, SkillTreeNodeDefinition>
