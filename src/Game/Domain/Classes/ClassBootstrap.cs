@@ -7,7 +7,7 @@ namespace Game.Domain.Classes
         public static ClassDefinition BuildTlamatini()
         {
             return new ClassDefinition(
-                "class_tlamatini",
+                ClassId.Tlamatini,
                 "Tlamatini",
                 new[]
                 {
