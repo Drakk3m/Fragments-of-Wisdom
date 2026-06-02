@@ -69,6 +69,12 @@ namespace Game.Domain.Progress
             dto.MissionLeads = new List<MissionLeadDto>();
             dto.ActiveMissions = new List<ActiveMissionDto>();
             dto.Unlocks = new List<UnlockDto>();
+            dto.ClassProfile = snapshot.ClassProfile == null
+                ? null
+                : new ClassProfileDto
+                {
+                    CurrentClassId = snapshot.ClassProfile.CurrentClassId
+                };
 
             foreach (var entry in snapshot.CodexEntries)
             {
@@ -197,7 +203,10 @@ namespace Game.Domain.Progress
                 codexEntries,
                 missionLeads,
                 activeMissions,
-                unlocks);
+                unlocks,
+                dto.ClassProfile == null
+                    ? null
+                    : new V2ClassProfileSnapshot(dto.ClassProfile.CurrentClassId));
         }
 
         private static List<string> CopyTags(IReadOnlyList<string> sourceTags)
@@ -224,6 +233,7 @@ namespace Game.Domain.Progress
             public List<MissionLeadDto> MissionLeads { get; set; }
             public List<ActiveMissionDto> ActiveMissions { get; set; }
             public List<UnlockDto> Unlocks { get; set; }
+            public ClassProfileDto ClassProfile { get; set; }
         }
 
         private class CodexEntryDto
@@ -266,6 +276,11 @@ namespace Game.Domain.Progress
             public int RequiredCount { get; set; }
             public int RequiredPercentage { get; set; }
             public List<string> NarrativeTags { get; set; }
+        }
+
+        private class ClassProfileDto
+        {
+            public string CurrentClassId { get; set; }
         }
     }
 }
