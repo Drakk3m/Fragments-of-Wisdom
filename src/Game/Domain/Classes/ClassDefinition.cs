@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Game.Domain.Skills;
 
 namespace Game.Domain.Classes
 {
@@ -38,6 +39,37 @@ namespace Game.Domain.Classes
             }
 
             return false;
+        }
+
+        public bool AllowsSkill(
+            string skillId,
+            SkillDefinitionRegistry skillRegistry)
+        {
+            return skillRegistry != null
+                && skillRegistry.Contains(skillId)
+                && AllowsSkill(skillId);
+        }
+
+        public IReadOnlyList<SkillDefinition> ResolveAllowedSkills(SkillDefinitionRegistry skillRegistry)
+        {
+            var skillDefinitions = new List<SkillDefinition>();
+
+            if (skillRegistry == null)
+            {
+                return skillDefinitions;
+            }
+
+            foreach (var skillId in AllowedSkillIds)
+            {
+                var skillDefinition = skillRegistry.Get(skillId);
+
+                if (skillDefinition != null)
+                {
+                    skillDefinitions.Add(skillDefinition);
+                }
+            }
+
+            return skillDefinitions;
         }
 
         private static IReadOnlyList<string> CopySkillIds(IReadOnlyList<string> sourceSkillIds)

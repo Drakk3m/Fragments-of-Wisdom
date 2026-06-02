@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Game.Domain.Skills;
 
 namespace Game.Domain.Classes
 {
@@ -14,9 +15,9 @@ namespace Game.Domain.Classes
         public bool IncreaseProgress(
             string skillId,
             int amount,
-            IReadOnlyList<string> knownSkillIds)
+            SkillDefinitionRegistry skillRegistry)
         {
-            if (!IsKnownSkill(skillId, knownSkillIds))
+            if (skillRegistry == null || !skillRegistry.Contains(skillId))
             {
                 return false;
             }
@@ -54,26 +55,6 @@ namespace Game.Domain.Classes
         {
             var record = GetRecord(skillId);
             return record != null && record.IsMastered;
-        }
-
-        private static bool IsKnownSkill(
-            string skillId,
-            IReadOnlyList<string> knownSkillIds)
-        {
-            if (string.IsNullOrWhiteSpace(skillId) || knownSkillIds == null)
-            {
-                return false;
-            }
-
-            foreach (var knownSkillId in knownSkillIds)
-            {
-                if (knownSkillId == skillId)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
     }
 }
