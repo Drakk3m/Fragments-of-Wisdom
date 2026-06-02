@@ -10,6 +10,7 @@ namespace Game.Domain.Progress
         public IReadOnlyList<V2ActiveMissionSnapshot> ActiveMissions { get; private set; }
         public IReadOnlyList<V2UnlockSnapshot> Unlocks { get; private set; }
         public V2ClassProfileSnapshot ClassProfile { get; private set; }
+        public IReadOnlyList<V2MasterySnapshot> MasteryRecords { get; private set; }
 
         public V2ProgressSnapshot(
             int schemaVersion,
@@ -36,7 +37,8 @@ namespace Game.Domain.Progress
                 missionLeads,
                 activeMissions,
                 new List<V2UnlockSnapshot>(),
-                null)
+                null,
+                new List<V2MasterySnapshot>())
         {
         }
 
@@ -52,7 +54,8 @@ namespace Game.Domain.Progress
                 missionLeads,
                 activeMissions,
                 unlocks,
-                null)
+                null,
+                new List<V2MasterySnapshot>())
         {
         }
 
@@ -63,6 +66,25 @@ namespace Game.Domain.Progress
             IReadOnlyList<V2ActiveMissionSnapshot> activeMissions,
             IReadOnlyList<V2UnlockSnapshot> unlocks,
             V2ClassProfileSnapshot classProfile)
+            : this(
+                schemaVersion,
+                codexEntries,
+                missionLeads,
+                activeMissions,
+                unlocks,
+                classProfile,
+                new List<V2MasterySnapshot>())
+        {
+        }
+
+        public V2ProgressSnapshot(
+            int schemaVersion,
+            IReadOnlyList<V2CodexEntrySnapshot> codexEntries,
+            IReadOnlyList<V2MissionLeadSnapshot> missionLeads,
+            IReadOnlyList<V2ActiveMissionSnapshot> activeMissions,
+            IReadOnlyList<V2UnlockSnapshot> unlocks,
+            V2ClassProfileSnapshot classProfile,
+            IReadOnlyList<V2MasterySnapshot> masteryRecords)
         {
             SchemaVersion = schemaVersion;
             CodexEntries = codexEntries;
@@ -70,6 +92,9 @@ namespace Game.Domain.Progress
             ActiveMissions = activeMissions;
             Unlocks = unlocks;
             ClassProfile = classProfile;
+            MasteryRecords = masteryRecords == null
+                ? new List<V2MasterySnapshot>()
+                : masteryRecords;
         }
 
         public bool IsCurrentVersion()

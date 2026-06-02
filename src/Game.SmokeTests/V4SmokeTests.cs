@@ -51,6 +51,17 @@ namespace Game.SmokeTests
                     AssertMasteryProgressValidatesThroughRegistry();
                     AssertUnknownSkillMasteryFailsSafely();
                 });
+
+            RunSection(
+                "Mastery save snapshot assertions",
+                delegate
+                {
+                    AssertMasterySnapshotCapturesRecords();
+                    AssertMasterySnapshotRestoreRecreatesState();
+                    AssertMasterySnapshotRestoreValidatesSkillIdsThroughRegistry();
+                    AssertUnknownSkillMasterySnapshotDoesNotCorruptProfile();
+                    AssertOlderJsonWithoutMasteryDataRestoresSafely();
+                });
         }
 
         private static void AssertClassCanBeAssigned()
@@ -457,6 +468,154 @@ namespace Game.SmokeTests
                 "Unknown skill mastery should not create records or mastered facts.");
         }
 
+        private static void AssertMasterySnapshotCapturesRecords()
+        {
+            var masteryProfile = BuildMasteryProfileWithProgress();
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                new ClassProfile(),
+                masteryProfile);
+
+            Assert(
+                snapshot.MasteryRecords.Count == 2,
+                "Snapshot should capture mastery records.");
+
+            Assert(
+                snapshot.MasteryRecords[0].SkillId == "skill_deep_sight"
+                && snapshot.MasteryRecords[0].Progress == 25
+                && snapshot.MasteryRecords[0].Rank == MasteryRank.Practiced,
+                "Snapshot should preserve mastery skill id, progress, and rank.");
+        }
+
+        private static void AssertMasterySnapshotRestoreRecreatesState()
+        {
+            var sourceProfile = BuildMasteryProfileWithProgress();
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                new ClassProfile(),
+                sourceProfile);
+            var restoredProfile = new MasteryProfile();
+
+            bool restored = service.RestoreMasteryProfile(
+                snapshot,
+                restoredProfile,
+                BuildTestSkillRegistry());
+
+            Assert(
+                restored,
+                "Known mastery records should restore successfully.");
+
+            Assert(
+                restoredProfile.GetRecord("skill_deep_sight").Progress == 25
+                && restoredProfile.IsMastered("skill_balance_ritual"),
+                "Restore should recreate mastery progress and mastered facts.");
+        }
+
+        private static void AssertMasterySnapshotRestoreValidatesSkillIdsThroughRegistry()
+        {
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new[]
+                {
+                    new V2MasterySnapshot(
+                        "skill_unknown",
+                        MasteryRecord.MasteredProgress,
+                        MasteryRank.Mastered)
+                });
+            var restoredProfile = new MasteryProfile();
+
+            bool restored = new V2ProgressSnapshotService().RestoreMasteryProfile(
+                snapshot,
+                restoredProfile,
+                BuildTestSkillRegistry());
+
+            Assert(
+                !restored,
+                "Unknown mastery snapshot skill ids should be reported as not fully restored.");
+
+            Assert(
+                restoredProfile.Records.Count == 0,
+                "Unknown mastery snapshot skill ids should not create mastery records.");
+        }
+
+        private static void AssertUnknownSkillMasterySnapshotDoesNotCorruptProfile()
+        {
+            var profile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
+            profile.IncreaseProgress("skill_deep_sight", 25, skillRegistry);
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new[]
+                {
+                    new V2MasterySnapshot(
+                        "skill_unknown",
+                        MasteryRecord.MasteredProgress,
+                        MasteryRank.Mastered)
+                });
+
+            bool restored = new V2ProgressSnapshotService().RestoreMasteryProfile(
+                snapshot,
+                profile,
+                skillRegistry);
+
+            Assert(
+                !restored,
+                "Unknown mastery snapshot skill ids should fail safely without corrupting existing state.");
+
+            Assert(
+                profile.Records.Count == 1
+                && profile.GetRecord("skill_deep_sight").Progress == 25
+                && !profile.IsMastered("skill_unknown"),
+                "Unknown mastery snapshot skill ids should preserve existing mastery records.");
+        }
+
+        private static void AssertOlderJsonWithoutMasteryDataRestoresSafely()
+        {
+            string json = JsonSerializer.Serialize(new
+            {
+                SchemaVersion = V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                CodexEntries = new object[0],
+                MissionLeads = new object[0],
+                ActiveMissions = new object[0],
+                Unlocks = new object[0],
+                ClassProfile = new
+                {
+                    CurrentClassId = ""
+                }
+            });
+            var snapshot = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+            var profile = new MasteryProfile();
+
+            bool restored = new V2ProgressSnapshotService().RestoreMasteryProfile(
+                snapshot,
+                profile,
+                BuildTestSkillRegistry());
+
+            Assert(
+                restored,
+                "Older JSON without mastery data should restore safely.");
+
+            Assert(
+                snapshot.MasteryRecords.Count == 0
+                && profile.Records.Count == 0,
+                "Older JSON without mastery data should leave mastery state unchanged.");
+        }
+
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
         {
             var registry = new SkillDefinitionRegistry();
@@ -546,6 +705,17 @@ namespace Game.SmokeTests
             registry.Register(BuildTestSkillDefinition("skill_minor_cleanse", "Minor Cleanse"));
 
             return registry;
+        }
+
+        private static MasteryProfile BuildMasteryProfileWithProgress()
+        {
+            var profile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
+
+            profile.IncreaseProgress("skill_deep_sight", 25, skillRegistry);
+            profile.IncreaseProgress("skill_balance_ritual", MasteryRecord.MasteredProgress, skillRegistry);
+
+            return profile;
         }
 
         private static SkillDefinition BuildTestSkillDefinition(

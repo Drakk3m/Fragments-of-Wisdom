@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json;
+using Game.Domain.Classes;
 using Game.Domain.Codex;
 using Game.Domain.Missions;
 
@@ -69,6 +70,7 @@ namespace Game.Domain.Progress
             dto.MissionLeads = new List<MissionLeadDto>();
             dto.ActiveMissions = new List<ActiveMissionDto>();
             dto.Unlocks = new List<UnlockDto>();
+            dto.MasteryRecords = new List<MasteryDto>();
             dto.ClassProfile = snapshot.ClassProfile == null
                 ? null
                 : new ClassProfileDto
@@ -130,6 +132,16 @@ namespace Game.Domain.Progress
                 });
             }
 
+            foreach (var masteryRecord in snapshot.MasteryRecords)
+            {
+                dto.MasteryRecords.Add(new MasteryDto
+                {
+                    SkillId = masteryRecord.SkillId,
+                    Progress = masteryRecord.Progress,
+                    Rank = masteryRecord.Rank
+                });
+            }
+
             return dto;
         }
 
@@ -139,6 +151,7 @@ namespace Game.Domain.Progress
             var missionLeads = new List<V2MissionLeadSnapshot>();
             var activeMissions = new List<V2ActiveMissionSnapshot>();
             var unlocks = new List<V2UnlockSnapshot>();
+            var masteryRecords = new List<V2MasterySnapshot>();
 
             if (dto.CodexEntries != null)
             {
@@ -198,6 +211,17 @@ namespace Game.Domain.Progress
                 }
             }
 
+            if (dto.MasteryRecords != null)
+            {
+                foreach (var masteryRecord in dto.MasteryRecords)
+                {
+                    masteryRecords.Add(new V2MasterySnapshot(
+                        masteryRecord.SkillId,
+                        masteryRecord.Progress,
+                        masteryRecord.Rank));
+                }
+            }
+
             return new V2ProgressSnapshot(
                 dto.SchemaVersion,
                 codexEntries,
@@ -206,7 +230,8 @@ namespace Game.Domain.Progress
                 unlocks,
                 dto.ClassProfile == null
                     ? null
-                    : new V2ClassProfileSnapshot(dto.ClassProfile.CurrentClassId));
+                    : new V2ClassProfileSnapshot(dto.ClassProfile.CurrentClassId),
+                masteryRecords);
         }
 
         private static List<string> CopyTags(IReadOnlyList<string> sourceTags)
@@ -234,6 +259,7 @@ namespace Game.Domain.Progress
             public List<ActiveMissionDto> ActiveMissions { get; set; }
             public List<UnlockDto> Unlocks { get; set; }
             public ClassProfileDto ClassProfile { get; set; }
+            public List<MasteryDto> MasteryRecords { get; set; }
         }
 
         private class CodexEntryDto
@@ -281,6 +307,13 @@ namespace Game.Domain.Progress
         private class ClassProfileDto
         {
             public string CurrentClassId { get; set; }
+        }
+
+        private class MasteryDto
+        {
+            public string SkillId { get; set; }
+            public int Progress { get; set; }
+            public MasteryRank Rank { get; set; }
         }
     }
 }

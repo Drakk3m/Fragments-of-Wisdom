@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Game.Domain.Classes;
 using Game.Domain.Codex;
 using Game.Domain.Missions;
+using Game.Domain.Skills;
 
 namespace Game.Domain.Progress
 {
@@ -69,6 +70,34 @@ namespace Game.Domain.Progress
                 snapshot.ActiveMissions,
                 snapshot.Unlocks,
                 BuildClassProfileSnapshot(classProfile));
+        }
+
+        public V2ProgressSnapshot CreateSnapshot(
+            CodexProfile codexProfile,
+            MissionJournalProfile missionJournalProfile,
+            UnlockProfile unlockProfile,
+            ClassProfile classProfile,
+            MasteryProfile masteryProfile)
+        {
+            if (masteryProfile == null)
+            {
+                throw new ArgumentNullException(nameof(masteryProfile));
+            }
+
+            var snapshot = CreateSnapshot(
+                codexProfile,
+                missionJournalProfile,
+                unlockProfile,
+                classProfile);
+
+            return new V2ProgressSnapshot(
+                snapshot.SchemaVersion,
+                snapshot.CodexEntries,
+                snapshot.MissionLeads,
+                snapshot.ActiveMissions,
+                snapshot.Unlocks,
+                snapshot.ClassProfile,
+                BuildMasterySnapshots(masteryProfile.Records));
         }
 
         public bool CanRestore(V2ProgressSnapshot snapshot)
@@ -207,6 +236,49 @@ namespace Game.Domain.Progress
                 registry);
         }
 
+        public bool RestoreMasteryProfile(
+            V2ProgressSnapshot snapshot,
+            MasteryProfile masteryProfile,
+            SkillDefinitionRegistry skillRegistry)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (masteryProfile == null)
+            {
+                throw new ArgumentNullException(nameof(masteryProfile));
+            }
+
+            if (skillRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(skillRegistry));
+            }
+
+            if (!CanRestore(snapshot))
+            {
+                throw new InvalidOperationException("Unsupported V2 progress snapshot schema version.");
+            }
+
+            bool allRestored = true;
+
+            foreach (var masterySnapshot in snapshot.MasteryRecords)
+            {
+                bool restored = masteryProfile.RestoreRecord(
+                    masterySnapshot.SkillId,
+                    masterySnapshot.Progress,
+                    skillRegistry);
+
+                if (!restored)
+                {
+                    allRestored = false;
+                }
+            }
+
+            return allRestored;
+        }
+
         private static IReadOnlyList<V2CodexEntrySnapshot> BuildCodexSnapshots(
             IReadOnlyList<CodexEntryRecord> entries)
         {
@@ -288,6 +360,22 @@ namespace Game.Domain.Progress
         private static V2ClassProfileSnapshot BuildClassProfileSnapshot(ClassProfile classProfile)
         {
             return new V2ClassProfileSnapshot(classProfile.CurrentClassId);
+        }
+
+        private static IReadOnlyList<V2MasterySnapshot> BuildMasterySnapshots(
+            IReadOnlyList<MasteryRecord> records)
+        {
+            var snapshots = new List<V2MasterySnapshot>();
+
+            foreach (var record in records)
+            {
+                snapshots.Add(new V2MasterySnapshot(
+                    record.SkillId,
+                    record.Progress,
+                    record.Rank));
+            }
+
+            return snapshots;
         }
 
         private static IReadOnlyList<string> CopyTags(IReadOnlyList<string> sourceTags)
