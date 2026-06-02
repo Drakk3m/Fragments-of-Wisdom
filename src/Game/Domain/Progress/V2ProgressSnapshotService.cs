@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Game.Domain.Classes;
 using Game.Domain.Codex;
 using Game.Domain.Missions;
 
@@ -43,6 +44,31 @@ namespace Game.Domain.Progress
                 BuildMissionLeadSnapshots(missionJournalProfile.AvailableLeads),
                 BuildActiveMissionSnapshots(missionJournalProfile.ActiveMissions),
                 BuildUnlockSnapshots(unlockProfile.Unlocks));
+        }
+
+        public V2ProgressSnapshot CreateSnapshot(
+            CodexProfile codexProfile,
+            MissionJournalProfile missionJournalProfile,
+            UnlockProfile unlockProfile,
+            ClassProfile classProfile)
+        {
+            if (classProfile == null)
+            {
+                throw new ArgumentNullException(nameof(classProfile));
+            }
+
+            var snapshot = CreateSnapshot(
+                codexProfile,
+                missionJournalProfile,
+                unlockProfile);
+
+            return new V2ProgressSnapshot(
+                snapshot.SchemaVersion,
+                snapshot.CodexEntries,
+                snapshot.MissionLeads,
+                snapshot.ActiveMissions,
+                snapshot.Unlocks,
+                BuildClassProfileSnapshot(classProfile));
         }
 
         public bool CanRestore(V2ProgressSnapshot snapshot)
@@ -145,6 +171,42 @@ namespace Game.Domain.Progress
             }
         }
 
+        public bool RestoreClassProfile(
+            V2ProgressSnapshot snapshot,
+            ClassProfile classProfile,
+            ClassDefinitionRegistry registry)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (classProfile == null)
+            {
+                throw new ArgumentNullException(nameof(classProfile));
+            }
+
+            if (registry == null)
+            {
+                throw new ArgumentNullException(nameof(registry));
+            }
+
+            if (!CanRestore(snapshot))
+            {
+                throw new InvalidOperationException("Unsupported V2 progress snapshot schema version.");
+            }
+
+            if (snapshot.ClassProfile == null
+                || string.IsNullOrWhiteSpace(snapshot.ClassProfile.CurrentClassId))
+            {
+                return true;
+            }
+
+            return classProfile.AssignClassId(
+                snapshot.ClassProfile.CurrentClassId,
+                registry);
+        }
+
         private static IReadOnlyList<V2CodexEntrySnapshot> BuildCodexSnapshots(
             IReadOnlyList<CodexEntryRecord> entries)
         {
@@ -221,6 +283,11 @@ namespace Game.Domain.Progress
             }
 
             return snapshots;
+        }
+
+        private static V2ClassProfileSnapshot BuildClassProfileSnapshot(ClassProfile classProfile)
+        {
+            return new V2ClassProfileSnapshot(classProfile.CurrentClassId);
         }
 
         private static IReadOnlyList<string> CopyTags(IReadOnlyList<string> sourceTags)

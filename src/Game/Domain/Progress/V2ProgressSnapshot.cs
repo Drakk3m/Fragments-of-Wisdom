@@ -9,6 +9,7 @@ namespace Game.Domain.Progress
         public IReadOnlyList<V2MissionLeadSnapshot> MissionLeads { get; private set; }
         public IReadOnlyList<V2ActiveMissionSnapshot> ActiveMissions { get; private set; }
         public IReadOnlyList<V2UnlockSnapshot> Unlocks { get; private set; }
+        public V2ClassProfileSnapshot ClassProfile { get; private set; }
 
         public V2ProgressSnapshot(
             int schemaVersion,
@@ -19,7 +20,8 @@ namespace Game.Domain.Progress
                 codexEntries,
                 missionLeads,
                 new List<V2ActiveMissionSnapshot>(),
-                new List<V2UnlockSnapshot>())
+                new List<V2UnlockSnapshot>(),
+                null)
         {
         }
 
@@ -33,7 +35,8 @@ namespace Game.Domain.Progress
                 codexEntries,
                 missionLeads,
                 activeMissions,
-                new List<V2UnlockSnapshot>())
+                new List<V2UnlockSnapshot>(),
+                null)
         {
         }
 
@@ -43,12 +46,30 @@ namespace Game.Domain.Progress
             IReadOnlyList<V2MissionLeadSnapshot> missionLeads,
             IReadOnlyList<V2ActiveMissionSnapshot> activeMissions,
             IReadOnlyList<V2UnlockSnapshot> unlocks)
+            : this(
+                schemaVersion,
+                codexEntries,
+                missionLeads,
+                activeMissions,
+                unlocks,
+                null)
+        {
+        }
+
+        public V2ProgressSnapshot(
+            int schemaVersion,
+            IReadOnlyList<V2CodexEntrySnapshot> codexEntries,
+            IReadOnlyList<V2MissionLeadSnapshot> missionLeads,
+            IReadOnlyList<V2ActiveMissionSnapshot> activeMissions,
+            IReadOnlyList<V2UnlockSnapshot> unlocks,
+            V2ClassProfileSnapshot classProfile)
         {
             SchemaVersion = schemaVersion;
             CodexEntries = codexEntries;
             MissionLeads = missionLeads;
             ActiveMissions = activeMissions;
             Unlocks = unlocks;
+            ClassProfile = classProfile;
         }
 
         public bool IsCurrentVersion()

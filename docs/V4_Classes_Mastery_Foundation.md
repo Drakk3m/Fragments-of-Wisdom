@@ -52,6 +52,20 @@ Current ids:
 
 `ClassBootstrap` still provides the current Tlamatini definition used by the V1 slice.
 
+## Snapshot Boundary
+
+Class profile persistence extends the existing progress snapshot in a backward-compatible way.
+
+Rules:
+
+- Snapshot stores only `CurrentClassId`.
+- Snapshot does not store `ClassDefinition` objects.
+- Restore validates the stored id through `ClassDefinitionRegistry`.
+- Known class ids restore into `ClassProfile.CurrentClassId`.
+- Unknown class ids fail safely and preserve existing class profile state.
+- Older JSON without class profile data restores safely and leaves class state unchanged.
+- Schema version remains unchanged because missing class data is treated as an empty optional section.
+
 ## Rules
 
 - A valid class can be assigned.
@@ -94,8 +108,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `239`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `14`
-- Total smoke assertions executed: `371`
+- V4 Classes / Mentors / Mastery assertions: `23`
+- Total smoke assertions executed: `380`
 
 The V1 slice emitted event count remains `38`.
 

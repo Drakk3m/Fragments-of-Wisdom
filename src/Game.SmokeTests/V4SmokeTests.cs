@@ -1,6 +1,9 @@
 using System.Collections.Generic;
+using System.Text.Json;
 using Game.Domain.Classes;
 using Game.Domain.Codex;
+using Game.Domain.Missions;
+using Game.Domain.Progress;
 
 namespace Game.SmokeTests
 {
@@ -20,6 +23,11 @@ namespace Game.SmokeTests
                     AssertUnknownClassIdFailsSafely();
                     AssertClassChangeDoesNotEraseUnlockProfileState();
                     AssertInvalidClassIsRejectedSafely();
+                    AssertClassSnapshotCapturesCurrentClassId();
+                    AssertClassSnapshotRestoreRecreatesClassProfileState();
+                    AssertClassSnapshotRestoreUsesRegistryValidation();
+                    AssertUnknownClassSnapshotFailsSafelyWithoutCorruptingProfile();
+                    AssertOlderJsonWithoutClassDataRestoresSafely();
                 });
         }
 
@@ -185,6 +193,127 @@ namespace Game.SmokeTests
             var registry = ClassBootstrap.BuildDefinitionRegistry();
             registry.Register(BuildWandererClass());
             return registry;
+        }
+
+        private static void AssertClassSnapshotCapturesCurrentClassId()
+        {
+            var classProfile = new ClassProfile();
+            classProfile.AssignClass(ClassBootstrap.BuildTlamatini());
+
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                classProfile);
+
+            Assert(
+                snapshot.ClassProfile != null
+                && snapshot.ClassProfile.CurrentClassId == ClassId.Tlamatini,
+                "Snapshot should capture current class id only.");
+        }
+
+        private static void AssertClassSnapshotRestoreRecreatesClassProfileState()
+        {
+            var sourceProfile = new ClassProfile();
+            sourceProfile.AssignClass(ClassBootstrap.BuildTlamatini());
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                sourceProfile);
+            var restoredProfile = new ClassProfile();
+
+            bool restored = service.RestoreClassProfile(
+                snapshot,
+                restoredProfile,
+                ClassBootstrap.BuildDefinitionRegistry());
+
+            Assert(
+                restored,
+                "Known class snapshot should restore successfully.");
+
+            Assert(
+                restoredProfile.CurrentClassId == ClassId.Tlamatini,
+                "Restore should recreate class profile current class id.");
+        }
+
+        private static void AssertClassSnapshotRestoreUsesRegistryValidation()
+        {
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                new V2ClassProfileSnapshot(ClassId.Wanderer));
+            var profile = new ClassProfile();
+
+            bool restored = new V2ProgressSnapshotService().RestoreClassProfile(
+                snapshot,
+                profile,
+                ClassBootstrap.BuildDefinitionRegistry());
+
+            Assert(
+                !restored,
+                "Class snapshot restore should reject ids missing from the registry.");
+
+            Assert(
+                profile.CurrentClassId == string.Empty,
+                "Rejected class snapshot restore should not mutate profile state.");
+        }
+
+        private static void AssertUnknownClassSnapshotFailsSafelyWithoutCorruptingProfile()
+        {
+            var profile = new ClassProfile();
+            profile.AssignClass(ClassBootstrap.BuildTlamatini());
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                new V2ClassProfileSnapshot("class_unknown"));
+
+            bool restored = new V2ProgressSnapshotService().RestoreClassProfile(
+                snapshot,
+                profile,
+                ClassBootstrap.BuildDefinitionRegistry());
+
+            Assert(
+                !restored,
+                "Unknown class id should fail safely during restore.");
+
+            Assert(
+                profile.CurrentClassId == ClassId.Tlamatini,
+                "Unknown class id restore should preserve existing class profile state.");
+        }
+
+        private static void AssertOlderJsonWithoutClassDataRestoresSafely()
+        {
+            string json = JsonSerializer.Serialize(new
+            {
+                SchemaVersion = V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                CodexEntries = new object[0],
+                MissionLeads = new object[0],
+                ActiveMissions = new object[0],
+                Unlocks = new object[0]
+            });
+            var snapshot = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+            var profile = new ClassProfile();
+
+            bool restored = new V2ProgressSnapshotService().RestoreClassProfile(
+                snapshot,
+                profile,
+                ClassBootstrap.BuildDefinitionRegistry());
+
+            Assert(
+                restored,
+                "Older JSON without class data should restore safely.");
+
+            Assert(
+                profile.CurrentClassId == string.Empty,
+                "Older JSON without class data should leave class profile unchanged.");
         }
     }
 }
