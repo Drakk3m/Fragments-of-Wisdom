@@ -29,6 +29,16 @@ namespace Game.SmokeTests
                     AssertUnknownClassSnapshotFailsSafelyWithoutCorruptingProfile();
                     AssertOlderJsonWithoutClassDataRestoresSafely();
                 });
+
+            RunSection(
+                "Mastery foundation assertions",
+                delegate
+                {
+                    AssertMasteryProgressIncreases();
+                    AssertMasteryCanReachMasteredState();
+                    AssertDuplicateMasteryApplicationIsSafe();
+                    AssertUnknownSkillMasteryFailsSafely();
+                });
         }
 
         private static void AssertClassCanBeAssigned()
@@ -314,6 +324,104 @@ namespace Game.SmokeTests
             Assert(
                 profile.CurrentClassId == string.Empty,
                 "Older JSON without class data should leave class profile unchanged.");
+        }
+
+        private static void AssertMasteryProgressIncreases()
+        {
+            var profile = new MasteryProfile();
+
+            bool increased = profile.IncreaseProgress(
+                "skill_deep_sight",
+                25,
+                BuildKnownSkillIds());
+            var record = profile.GetRecord("skill_deep_sight");
+
+            Assert(
+                increased,
+                "Known skill mastery progress should increase.");
+
+            Assert(
+                record != null
+                && record.Progress == 25
+                && record.Rank == MasteryRank.Practiced,
+                "Mastery profile should track practiced progress for a skill.");
+        }
+
+        private static void AssertMasteryCanReachMasteredState()
+        {
+            var profile = new MasteryProfile();
+
+            profile.IncreaseProgress("skill_balance_ritual", 40, BuildKnownSkillIds());
+            bool increased = profile.IncreaseProgress(
+                "skill_balance_ritual",
+                80,
+                BuildKnownSkillIds());
+            var record = profile.GetRecord("skill_balance_ritual");
+
+            Assert(
+                increased,
+                "Known skill mastery progress should continue increasing until mastered.");
+
+            Assert(
+                record.Progress == MasteryRecord.MasteredProgress
+                && record.Rank == MasteryRank.Mastered
+                && profile.IsMastered("skill_balance_ritual"),
+                "Mastery progress should clamp at mastered state.");
+        }
+
+        private static void AssertDuplicateMasteryApplicationIsSafe()
+        {
+            var profile = new MasteryProfile();
+
+            bool firstIncrease = profile.IncreaseProgress(
+                "skill_minor_cleanse",
+                MasteryRecord.MasteredProgress,
+                BuildKnownSkillIds());
+            bool duplicateIncrease = profile.IncreaseProgress(
+                "skill_minor_cleanse",
+                10,
+                BuildKnownSkillIds());
+            var record = profile.GetRecord("skill_minor_cleanse");
+
+            Assert(
+                firstIncrease && !duplicateIncrease,
+                "Duplicate mastery application after mastered state should be ignored safely.");
+
+            Assert(
+                profile.Records.Count == 1
+                && record.Progress == MasteryRecord.MasteredProgress
+                && profile.IsMastered("skill_minor_cleanse"),
+                "Duplicate mastery application should not duplicate records or exceed mastered progress.");
+        }
+
+        private static void AssertUnknownSkillMasteryFailsSafely()
+        {
+            var profile = new MasteryProfile();
+
+            bool increased = profile.IncreaseProgress(
+                "skill_unknown",
+                50,
+                BuildKnownSkillIds());
+
+            Assert(
+                !increased,
+                "Unknown skill ids should fail safely for mastery progress.");
+
+            Assert(
+                profile.Records.Count == 0
+                && profile.GetRecord("skill_unknown") == null
+                && !profile.IsMastered("skill_unknown"),
+                "Unknown skill mastery should not create records or mastered facts.");
+        }
+
+        private static IReadOnlyList<string> BuildKnownSkillIds()
+        {
+            return new[]
+            {
+                "skill_deep_sight",
+                "skill_balance_ritual",
+                "skill_minor_cleanse"
+            };
         }
     }
 }
