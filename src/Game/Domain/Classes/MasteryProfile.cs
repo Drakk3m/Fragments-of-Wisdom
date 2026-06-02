@@ -56,5 +56,27 @@ namespace Game.Domain.Classes
             var record = GetRecord(skillId);
             return record != null && record.IsMastered;
         }
+
+        public bool RestoreRecord(
+            string skillId,
+            int progress,
+            SkillDefinitionRegistry skillRegistry)
+        {
+            if (skillRegistry == null || !skillRegistry.Contains(skillId))
+            {
+                return false;
+            }
+
+            var record = GetRecord(skillId);
+
+            if (record == null)
+            {
+                records.Add(new MasteryRecord(skillId, progress));
+                return true;
+            }
+
+            record.SetProgress(progress);
+            return true;
+        }
     }
 }

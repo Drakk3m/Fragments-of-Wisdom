@@ -30,6 +30,14 @@ namespace Game.Domain.Classes
             SkillId = skillId;
         }
 
+        public MasteryRecord(
+            string skillId,
+            int progress)
+        {
+            SkillId = skillId;
+            SetProgress(progress);
+        }
+
         public bool AddProgress(int amount)
         {
             if (amount <= 0 || IsMastered)
@@ -45,6 +53,21 @@ namespace Game.Domain.Classes
             }
 
             return true;
+        }
+
+        public void SetProgress(int progress)
+        {
+            Progress = progress;
+
+            if (Progress < 0)
+            {
+                Progress = 0;
+            }
+
+            if (Progress > MasteredProgress)
+            {
+                Progress = MasteredProgress;
+            }
         }
     }
 }
