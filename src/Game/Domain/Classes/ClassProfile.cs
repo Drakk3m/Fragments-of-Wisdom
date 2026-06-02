@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using Game.Domain.Skills;
+
 namespace Game.Domain.Classes
 {
     public class ClassProfile
@@ -56,6 +59,29 @@ namespace Game.Domain.Classes
         {
             var classDefinition = ResolveCurrentClass(registry);
             return classDefinition != null && classDefinition.AllowsSkill(skillId);
+        }
+
+        public bool CurrentClassAllowsSkill(
+            string skillId,
+            ClassDefinitionRegistry classRegistry,
+            SkillDefinitionRegistry skillRegistry)
+        {
+            var classDefinition = ResolveCurrentClass(classRegistry);
+            return classDefinition != null && classDefinition.AllowsSkill(skillId, skillRegistry);
+        }
+
+        public IReadOnlyList<SkillDefinition> ResolveCurrentClassAllowedSkills(
+            ClassDefinitionRegistry classRegistry,
+            SkillDefinitionRegistry skillRegistry)
+        {
+            var classDefinition = ResolveCurrentClass(classRegistry);
+
+            if (classDefinition == null)
+            {
+                return new List<SkillDefinition>();
+            }
+
+            return classDefinition.ResolveAllowedSkills(skillRegistry);
         }
 
         private static bool IsValidClass(ClassDefinition classDefinition)

@@ -4,6 +4,7 @@ using Game.Domain.Classes;
 using Game.Domain.Codex;
 using Game.Domain.Missions;
 using Game.Domain.Progress;
+using Game.Domain.Skills;
 
 namespace Game.SmokeTests
 {
@@ -31,12 +32,23 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Skill definition registry assertions",
+                delegate
+                {
+                    AssertSkillDefinitionCanBeRegisteredAndResolved();
+                    AssertDuplicateSkillIdHandlingIsSafe();
+                    AssertClassAllowedSkillIdsResolveThroughRegistry();
+                    AssertUnknownSkillIdFailsSafelyThroughRegistry();
+                });
+
+            RunSection(
                 "Mastery foundation assertions",
                 delegate
                 {
                     AssertMasteryProgressIncreases();
                     AssertMasteryCanReachMasteredState();
                     AssertDuplicateMasteryApplicationIsSafe();
+                    AssertMasteryProgressValidatesThroughRegistry();
                     AssertUnknownSkillMasteryFailsSafely();
                 });
         }
@@ -329,11 +341,12 @@ namespace Game.SmokeTests
         private static void AssertMasteryProgressIncreases()
         {
             var profile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
 
             bool increased = profile.IncreaseProgress(
                 "skill_deep_sight",
                 25,
-                BuildKnownSkillIds());
+                skillRegistry);
             var record = profile.GetRecord("skill_deep_sight");
 
             Assert(
@@ -350,12 +363,13 @@ namespace Game.SmokeTests
         private static void AssertMasteryCanReachMasteredState()
         {
             var profile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
 
-            profile.IncreaseProgress("skill_balance_ritual", 40, BuildKnownSkillIds());
+            profile.IncreaseProgress("skill_balance_ritual", 40, skillRegistry);
             bool increased = profile.IncreaseProgress(
                 "skill_balance_ritual",
                 80,
-                BuildKnownSkillIds());
+                skillRegistry);
             var record = profile.GetRecord("skill_balance_ritual");
 
             Assert(
@@ -372,15 +386,16 @@ namespace Game.SmokeTests
         private static void AssertDuplicateMasteryApplicationIsSafe()
         {
             var profile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
 
             bool firstIncrease = profile.IncreaseProgress(
                 "skill_minor_cleanse",
                 MasteryRecord.MasteredProgress,
-                BuildKnownSkillIds());
+                skillRegistry);
             bool duplicateIncrease = profile.IncreaseProgress(
                 "skill_minor_cleanse",
                 10,
-                BuildKnownSkillIds());
+                skillRegistry);
             var record = profile.GetRecord("skill_minor_cleanse");
 
             Assert(
@@ -394,14 +409,42 @@ namespace Game.SmokeTests
                 "Duplicate mastery application should not duplicate records or exceed mastered progress.");
         }
 
+        private static void AssertMasteryProgressValidatesThroughRegistry()
+        {
+            var profile = new MasteryProfile();
+            var skillRegistry = new SkillDefinitionRegistry();
+            var skillDefinition = BuildTestSkillDefinition(
+                "skill_deep_sight",
+                "Deep Sight");
+
+            bool beforeRegistered = profile.IncreaseProgress(
+                skillDefinition.Id,
+                10,
+                skillRegistry);
+            bool registered = skillRegistry.Register(skillDefinition);
+            bool afterRegistered = profile.IncreaseProgress(
+                skillDefinition.Id,
+                10,
+                skillRegistry);
+
+            Assert(
+                !beforeRegistered && registered && afterRegistered,
+                "Mastery progress should validate skill ids through the skill registry.");
+
+            Assert(
+                profile.GetRecord(skillDefinition.Id).Progress == 10,
+                "Mastery progress should apply only after the skill definition is registered.");
+        }
+
         private static void AssertUnknownSkillMasteryFailsSafely()
         {
             var profile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
 
             bool increased = profile.IncreaseProgress(
                 "skill_unknown",
                 50,
-                BuildKnownSkillIds());
+                skillRegistry);
 
             Assert(
                 !increased,
@@ -414,14 +457,110 @@ namespace Game.SmokeTests
                 "Unknown skill mastery should not create records or mastered facts.");
         }
 
-        private static IReadOnlyList<string> BuildKnownSkillIds()
+        private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
         {
-            return new[]
-            {
+            var registry = new SkillDefinitionRegistry();
+            var definition = BuildTestSkillDefinition(
                 "skill_deep_sight",
-                "skill_balance_ritual",
-                "skill_minor_cleanse"
-            };
+                "Deep Sight");
+
+            bool registered = registry.Register(definition);
+            var resolved = registry.Get("skill_deep_sight");
+
+            Assert(
+                registered && registry.Contains("skill_deep_sight"),
+                "Skill definition registry should accept valid skill definitions by stable id.");
+
+            Assert(
+                resolved == definition && resolved.Name == "Deep Sight",
+                "Skill definition registry should resolve the registered definition by id.");
+        }
+
+        private static void AssertDuplicateSkillIdHandlingIsSafe()
+        {
+            var registry = new SkillDefinitionRegistry();
+            var firstDefinition = BuildTestSkillDefinition(
+                "skill_deep_sight",
+                "Deep Sight");
+            var duplicateDefinition = BuildTestSkillDefinition(
+                "skill_deep_sight",
+                "Duplicate Deep Sight");
+
+            bool firstRegistered = registry.Register(firstDefinition);
+            bool duplicateRegistered = registry.Register(duplicateDefinition);
+
+            Assert(
+                firstRegistered && !duplicateRegistered,
+                "Duplicate skill ids should be rejected safely.");
+
+            Assert(
+                registry.Get("skill_deep_sight") == firstDefinition,
+                "Duplicate skill ids should not replace the original definition.");
+        }
+
+        private static void AssertClassAllowedSkillIdsResolveThroughRegistry()
+        {
+            var skillRegistry = BuildTestSkillRegistry();
+            var classDefinition = new ClassDefinition(
+                "class_test",
+                "Test Class",
+                new[]
+                {
+                    "skill_deep_sight",
+                    "skill_unknown"
+                });
+
+            var resolvedSkills = classDefinition.ResolveAllowedSkills(skillRegistry);
+
+            Assert(
+                resolvedSkills.Count == 1
+                && resolvedSkills[0].Id == "skill_deep_sight",
+                "Class allowed skill ids should resolve registered skill definitions.");
+
+            Assert(
+                classDefinition.AllowsSkill("skill_deep_sight", skillRegistry)
+                && !classDefinition.AllowsSkill("skill_unknown", skillRegistry),
+                "Class registry-aware skill access should reject unknown allowed skill ids.");
+        }
+
+        private static void AssertUnknownSkillIdFailsSafelyThroughRegistry()
+        {
+            var registry = BuildTestSkillRegistry();
+
+            Assert(
+                !registry.Contains("skill_unknown"),
+                "Unknown skill ids should not be reported as registered.");
+
+            Assert(
+                registry.Get("skill_unknown") == null
+                && !registry.Register(BuildTestSkillDefinition("", "Invalid Skill")),
+                "Unknown or invalid skill ids should fail safely.");
+        }
+
+        private static SkillDefinitionRegistry BuildTestSkillRegistry()
+        {
+            var registry = new SkillDefinitionRegistry();
+
+            registry.Register(BuildTestSkillDefinition("skill_deep_sight", "Deep Sight"));
+            registry.Register(BuildTestSkillDefinition("skill_balance_ritual", "Balance Ritual"));
+            registry.Register(BuildTestSkillDefinition("skill_minor_cleanse", "Minor Cleanse"));
+
+            return registry;
+        }
+
+        private static SkillDefinition BuildTestSkillDefinition(
+            string skillId,
+            string name)
+        {
+            return new SkillDefinition(
+                skillId,
+                name,
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Utility,
+                SkillTargeting.Self,
+                SkillEffectType.Cleanse,
+                "");
         }
     }
 }
