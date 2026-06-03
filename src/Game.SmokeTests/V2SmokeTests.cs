@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Game.Domain.Alignment;
+using Game.Domain.Classes;
 using Game.Domain.Common;
 using Game.Domain.Combat;
 using Game.Domain.Combat.Passives;
@@ -202,6 +203,7 @@ namespace Game.SmokeTests
                     AssertV2SnapshotUsesCurrentVersion();
                     AssertV2SnapshotCurrentVersionRestores();
                     AssertV2SnapshotUnsupportedVersionIsRejected();
+                    AssertV2SnapshotValidationRejectsInvalidMasteryId();
                 });
 
             RunSection(
@@ -2317,6 +2319,28 @@ namespace Game.SmokeTests
                 "Unsupported V2 snapshot restore should not mutate target profiles.");
         }
 
+        private static void AssertV2SnapshotValidationRejectsInvalidMasteryId()
+        {
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new[]
+                {
+                    new V2MasterySnapshot(
+                        "",
+                        MasteryRecord.MasteredProgress,
+                        MasteryRank.Mastered)
+                });
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(snapshot),
+                "Semantic snapshot validation should reject mastery records with empty skill ids.");
+        }
+
         private static void AssertV2SnapshotSerializesToJson()
         {
             var snapshot = BuildSnapshotWithCodexAndMissionLead();
@@ -2612,6 +2636,20 @@ namespace Game.SmokeTests
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
+            }
+
+            string backupFilePath = V2ProgressSnapshotFileRepository.BuildBackupFilePath(filePath);
+
+            if (File.Exists(backupFilePath))
+            {
+                File.Delete(backupFilePath);
+            }
+
+            string tempFilePath = filePath + ".tmp";
+
+            if (File.Exists(tempFilePath))
+            {
+                File.Delete(tempFilePath);
             }
         }
 
