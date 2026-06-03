@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using Game.Domain.Alignment;
+using Game.Domain.Classes;
 using Game.Domain.Common;
 using Game.Domain.Combat;
 using Game.Domain.Combat.Passives;
@@ -202,6 +203,7 @@ namespace Game.SmokeTests
                     AssertV2SnapshotUsesCurrentVersion();
                     AssertV2SnapshotCurrentVersionRestores();
                     AssertV2SnapshotUnsupportedVersionIsRejected();
+                    AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots();
                 });
 
             RunSection(
@@ -223,6 +225,10 @@ namespace Game.SmokeTests
                     AssertV2SnapshotFileRepositoryMissingFileFailsSafely();
                     AssertV2SnapshotFileRepositoryMalformedFileFailsSafely();
                     AssertV2SnapshotFileRepositoryUnsupportedVersionFileFailsSafely();
+                    AssertV2SnapshotFileRepositoryAtomicSaveWritesValidFile();
+                    AssertV2SnapshotFileRepositoryCorruptMainFallsBackToBackup();
+                    AssertV2SnapshotFileRepositoryCorruptMainAndBackupFailSafely();
+                    AssertV2SnapshotFileRepositoryOlderJsonWithMissingOptionalFieldsLoadsSafely();
                 });
 
             RunSection(
@@ -2317,6 +2323,46 @@ namespace Game.SmokeTests
                 "Unsupported V2 snapshot restore should not mutate target profiles.");
         }
 
+        private static void AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots()
+        {
+            var validator = new V2ProgressSnapshotValidationService();
+            var invalidNullCollectionSnapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                null,
+                new List<V2MissionLeadSnapshot>());
+            var invalidEmptyIdSnapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new[]
+                {
+                    new V2CodexEntrySnapshot(
+                        "",
+                        CodexEntryType.Practice,
+                        CodexConceptKeys.ForbiddenTransmutation,
+                        NarrativeHookIds.TransmutationForbiddenPractice,
+                        MissionTriggerIds.NahualTransmutationDiscovery,
+                        new List<string>())
+                },
+                new List<V2MissionLeadSnapshot>());
+            var invalidClassSnapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                new V2ClassProfileSnapshot("class_unknown"));
+
+            Assert(
+                !validator.IsValid(invalidNullCollectionSnapshot)
+                && !validator.IsValid(invalidEmptyIdSnapshot),
+                "Semantic snapshot validation should reject null collections and empty required ids.");
+
+            Assert(
+                !validator.IsValid(
+                    invalidClassSnapshot,
+                    ClassBootstrap.BuildDefinitionRegistry()),
+                "Semantic snapshot validation should reject unknown class ids when a class registry is supplied.");
+        }
+
         private static void AssertV2SnapshotSerializesToJson()
         {
             var snapshot = BuildSnapshotWithCodexAndMissionLead();
@@ -2593,6 +2639,111 @@ namespace Game.SmokeTests
                 "Unsupported V2 snapshot file versions should fail safely.");
         }
 
+        private static void AssertV2SnapshotFileRepositoryAtomicSaveWritesValidFile()
+        {
+            string filePath = BuildTempSnapshotPath();
+
+            try
+            {
+                var repository = new V2ProgressSnapshotFileRepository();
+
+                repository.Save(filePath, BuildSnapshotWithCodexAndMissionLead());
+                var loaded = repository.Load(filePath);
+
+                Assert(
+                    File.Exists(filePath)
+                    && !File.Exists(filePath + ".tmp"),
+                    "Atomic V2 snapshot save should leave a valid target file and no temp file.");
+
+                Assert(
+                    loaded.CodexEntries.Count == 1
+                    && loaded.MissionLeads.Count == 1,
+                    "Atomic V2 snapshot save should write loadable snapshot JSON.");
+            }
+            finally
+            {
+                DeleteTempSnapshotFile(filePath);
+            }
+        }
+
+        private static void AssertV2SnapshotFileRepositoryCorruptMainFallsBackToBackup()
+        {
+            string filePath = BuildTempSnapshotPath();
+            string backupFilePath = V2ProgressSnapshotFileRepository.BuildBackupFilePath(filePath);
+
+            try
+            {
+                var serializer = new V2ProgressSnapshotJsonSerializer();
+                File.WriteAllText(filePath, "{not valid json");
+                File.WriteAllText(
+                    backupFilePath,
+                    serializer.Serialize(BuildSnapshotWithCodexAndMissionLead()));
+
+                var loaded = new V2ProgressSnapshotFileRepository().Load(filePath);
+
+                Assert(
+                    loaded.CodexEntries.Count == 1
+                    && loaded.CodexEntries[0].EntryId == CodexEntryIds.ForbiddenTransmutation,
+                    "Corrupt main V2 snapshot should fall back to the backup file.");
+            }
+            finally
+            {
+                DeleteTempSnapshotFile(filePath);
+            }
+        }
+
+        private static void AssertV2SnapshotFileRepositoryCorruptMainAndBackupFailSafely()
+        {
+            string filePath = BuildTempSnapshotPath();
+            string backupFilePath = V2ProgressSnapshotFileRepository.BuildBackupFilePath(filePath);
+            bool failedSafely = false;
+
+            try
+            {
+                File.WriteAllText(filePath, "{not valid json");
+                File.WriteAllText(backupFilePath, "{also not valid json");
+                new V2ProgressSnapshotFileRepository().Load(filePath);
+            }
+            catch (JsonException)
+            {
+                failedSafely = true;
+            }
+            finally
+            {
+                DeleteTempSnapshotFile(filePath);
+            }
+
+            Assert(
+                failedSafely,
+                "Corrupt main and corrupt backup V2 snapshot files should fail safely.");
+        }
+
+        private static void AssertV2SnapshotFileRepositoryOlderJsonWithMissingOptionalFieldsLoadsSafely()
+        {
+            string filePath = BuildTempSnapshotPath();
+
+            try
+            {
+                File.WriteAllText(
+                    filePath,
+                    "{\"SchemaVersion\":"
+                    + V2ProgressSnapshotVersions.CurrentSchemaVersion
+                    + ",\"CodexEntries\":[],\"MissionLeads\":[]}");
+
+                var loaded = new V2ProgressSnapshotFileRepository().Load(filePath);
+
+                Assert(
+                    loaded.ActiveMissions.Count == 0
+                    && loaded.Unlocks.Count == 0
+                    && loaded.MasteryRecords.Count == 0,
+                    "Older V2 snapshot JSON with missing optional fields should load safely.");
+            }
+            finally
+            {
+                DeleteTempSnapshotFile(filePath);
+            }
+        }
+
         private static string BuildTempSnapshotPath()
         {
             return Path.Combine(
@@ -2612,6 +2763,20 @@ namespace Game.SmokeTests
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
+            }
+
+            string backupFilePath = V2ProgressSnapshotFileRepository.BuildBackupFilePath(filePath);
+
+            if (File.Exists(backupFilePath))
+            {
+                File.Delete(backupFilePath);
+            }
+
+            string tempFilePath = filePath + ".tmp";
+
+            if (File.Exists(tempFilePath))
+            {
+                File.Delete(tempFilePath);
             }
         }
 
