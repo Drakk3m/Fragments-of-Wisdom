@@ -203,6 +203,7 @@ namespace Game.SmokeTests
                     AssertV2SnapshotUsesCurrentVersion();
                     AssertV2SnapshotCurrentVersionRestores();
                     AssertV2SnapshotUnsupportedVersionIsRejected();
+                    AssertV2SnapshotValidationRejectsInvalidMasteryId();
                     AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots();
                 });
 
@@ -2323,6 +2324,28 @@ namespace Game.SmokeTests
                 "Unsupported V2 snapshot restore should not mutate target profiles.");
         }
 
+        private static void AssertV2SnapshotValidationRejectsInvalidMasteryId()
+        {
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new[]
+                {
+                    new V2MasterySnapshot(
+                        "",
+                        MasteryRecord.MasteredProgress,
+                        MasteryRank.Mastered)
+                });
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(snapshot),
+                "Semantic snapshot validation should reject mastery records with empty skill ids.");
+        }
+      
         private static void AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots()
         {
             var validator = new V2ProgressSnapshotValidationService();
