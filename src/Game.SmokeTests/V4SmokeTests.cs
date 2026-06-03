@@ -62,6 +62,17 @@ namespace Game.SmokeTests
                     AssertUnknownSkillMasterySnapshotDoesNotCorruptProfile();
                     AssertOlderJsonWithoutMasteryDataRestoresSafely();
                 });
+
+            RunSection(
+                "Mentor foundation assertions",
+                delegate
+                {
+                    AssertMentorCanBeDiscovered();
+                    AssertDuplicateMentorDiscoveryIsIdempotent();
+                    AssertMentorTrustCanIncrease();
+                    AssertUnavailableMentorIsReportedAsUnavailable();
+                    AssertUnknownOrNullMentorIsRejectedSafely();
+                });
         }
 
         private static void AssertClassCanBeAssigned()
@@ -694,6 +705,117 @@ namespace Game.SmokeTests
                 registry.Get("skill_unknown") == null
                 && !registry.Register(BuildTestSkillDefinition("", "Invalid Skill")),
                 "Unknown or invalid skill ids should fail safely.");
+        }
+
+        private static void AssertMentorCanBeDiscovered()
+        {
+            var profile = new MentorRelationshipProfile();
+            var mentor = BuildLyraMentor(true);
+
+            bool discovered = profile.Discover(mentor);
+
+            Assert(
+                discovered,
+                "Known mentor should be discoverable.");
+
+            Assert(
+                profile.IsDiscovered(MentorId.Lyra)
+                && profile.IsAvailable(MentorId.Lyra)
+                && profile.GetTrust(MentorId.Lyra) == 0,
+                "Discovered mentor should expose relationship facts without granting rewards.");
+        }
+
+        private static void AssertDuplicateMentorDiscoveryIsIdempotent()
+        {
+            var profile = new MentorRelationshipProfile();
+            var mentor = BuildLyraMentor(true);
+
+            bool firstDiscovery = profile.Discover(mentor);
+            bool duplicateDiscovery = profile.Discover(mentor);
+
+            Assert(
+                firstDiscovery && !duplicateDiscovery,
+                "Duplicate mentor discovery should be idempotent.");
+
+            Assert(
+                profile.DiscoveredMentorIds.Count == 1
+                && profile.GetTrust(MentorId.Lyra) == 0,
+                "Duplicate mentor discovery should not duplicate records or inflate trust.");
+        }
+
+        private static void AssertMentorTrustCanIncrease()
+        {
+            var profile = new MentorRelationshipProfile();
+            var mentor = BuildLyraMentor(true);
+
+            profile.Discover(mentor);
+            bool increased = profile.IncreaseTrust(mentor, 15);
+
+            Assert(
+                increased,
+                "Discovered mentor trust should increase.");
+
+            Assert(
+                profile.GetTrust(MentorId.Lyra) == 15,
+                "Mentor relationship profile should track trust progress.");
+        }
+
+        private static void AssertUnavailableMentorIsReportedAsUnavailable()
+        {
+            var profile = new MentorRelationshipProfile();
+            var mentor = BuildAtlasMentor(false);
+
+            bool discovered = profile.Discover(mentor);
+
+            Assert(
+                discovered,
+                "Unavailable mentor can still be discovered as a relationship fact.");
+
+            Assert(
+                profile.IsDiscovered(MentorId.Atlas)
+                && !profile.IsAvailable(MentorId.Atlas),
+                "Unavailable mentor should be reported as unavailable.");
+        }
+
+        private static void AssertUnknownOrNullMentorIsRejectedSafely()
+        {
+            var profile = new MentorRelationshipProfile();
+            var invalidMentor = new MentorDefinition(
+                "",
+                "Invalid",
+                true);
+
+            bool nullDiscovered = profile.Discover(null);
+            bool invalidDiscovered = profile.Discover(invalidMentor);
+            bool trustIncreased = profile.IncreaseTrust(
+                BuildLyraMentor(true),
+                10);
+
+            Assert(
+                !nullDiscovered && !invalidDiscovered && !trustIncreased,
+                "Null, invalid, or undiscovered mentors should be rejected safely.");
+
+            Assert(
+                profile.DiscoveredMentorIds.Count == 0
+                && !profile.IsDiscovered(MentorId.Lyra)
+                && !profile.IsAvailable(MentorId.Lyra),
+                "Rejected mentor operations should not mutate relationship state.");
+        }
+
+        private static MentorDefinition BuildLyraMentor(bool isAvailable)
+        {
+            return new MentorDefinition(
+                MentorId.Lyra,
+                "Lyra",
+                isAvailable);
+        }
+
+        private static MentorDefinition BuildAtlasMentor(bool isAvailable)
+        {
+            return new MentorDefinition(
+                MentorId.Atlas,
+                "Atlas",
+                isAvailable);
         }
 
         private static SkillDefinitionRegistry BuildTestSkillRegistry()
