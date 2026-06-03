@@ -31,6 +31,18 @@ namespace Game.Domain.Classes
             return discovered;
         }
 
+        public bool Discover(
+            string mentorId,
+            MentorDefinitionRegistry registry)
+        {
+            if (registry == null)
+            {
+                return false;
+            }
+
+            return Discover(registry.Get(mentorId));
+        }
+
         public bool IsDiscovered(string mentorId)
         {
             return !string.IsNullOrWhiteSpace(mentorId)
@@ -66,6 +78,21 @@ namespace Game.Domain.Classes
             trustByMentorId[mentor.Id] = GetTrust(mentor.Id) + amount;
             availabilityByMentorId[mentor.Id] = mentor.IsAvailable;
             return true;
+        }
+
+        public bool IncreaseTrust(
+            string mentorId,
+            int amount,
+            MentorDefinitionRegistry registry)
+        {
+            if (registry == null)
+            {
+                return false;
+            }
+
+            return IncreaseTrust(
+                registry.Get(mentorId),
+                amount);
         }
 
         private static bool IsValidMentor(MentorDefinition mentor)

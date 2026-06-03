@@ -73,6 +73,17 @@ namespace Game.SmokeTests
                     AssertUnavailableMentorIsReportedAsUnavailable();
                     AssertUnknownOrNullMentorIsRejectedSafely();
                 });
+
+            RunSection(
+                "Mentor definition registry assertions",
+                delegate
+                {
+                    AssertMentorDefinitionCanBeRegisteredAndResolved();
+                    AssertDuplicateMentorIdIsRejectedSafely();
+                    AssertMentorDiscoveryValidatesThroughRegistry();
+                    AssertMentorTrustIncreaseValidatesThroughRegistry();
+                    AssertUnknownMentorIdFailsSafelyThroughRegistry();
+                });
         }
 
         private static void AssertClassCanBeAssigned()
@@ -802,6 +813,102 @@ namespace Game.SmokeTests
                 "Rejected mentor operations should not mutate relationship state.");
         }
 
+        private static void AssertMentorDefinitionCanBeRegisteredAndResolved()
+        {
+            var registry = new MentorDefinitionRegistry();
+            var mentor = BuildLyraMentor(true);
+
+            bool registered = registry.Register(mentor);
+            var resolved = registry.Get(MentorId.Lyra);
+
+            Assert(
+                registered && registry.Contains(MentorId.Lyra),
+                "Mentor definition registry should accept valid mentors by stable id.");
+
+            Assert(
+                resolved == mentor && resolved.Name == "Lyra",
+                "Mentor definition registry should resolve registered mentor definitions.");
+        }
+
+        private static void AssertDuplicateMentorIdIsRejectedSafely()
+        {
+            var registry = new MentorDefinitionRegistry();
+            var firstMentor = BuildLyraMentor(true);
+            var duplicateMentor = new MentorDefinition(
+                MentorId.Lyra,
+                "Duplicate Lyra",
+                false);
+
+            bool firstRegistered = registry.Register(firstMentor);
+            bool duplicateRegistered = registry.Register(duplicateMentor);
+
+            Assert(
+                firstRegistered && !duplicateRegistered,
+                "Duplicate mentor ids should be rejected safely.");
+
+            Assert(
+                registry.Get(MentorId.Lyra) == firstMentor,
+                "Duplicate mentor ids should not replace the original definition.");
+        }
+
+        private static void AssertMentorDiscoveryValidatesThroughRegistry()
+        {
+            var profile = new MentorRelationshipProfile();
+            var registry = BuildTestMentorRegistry();
+
+            bool discovered = profile.Discover(MentorId.Lyra, registry);
+
+            Assert(
+                discovered,
+                "Mentor discovery should validate through the mentor registry.");
+
+            Assert(
+                profile.IsDiscovered(MentorId.Lyra)
+                && profile.IsAvailable(MentorId.Lyra),
+                "Registry-backed mentor discovery should apply registered mentor facts.");
+        }
+
+        private static void AssertMentorTrustIncreaseValidatesThroughRegistry()
+        {
+            var profile = new MentorRelationshipProfile();
+            var registry = BuildTestMentorRegistry();
+
+            profile.Discover(MentorId.Lyra, registry);
+            bool increased = profile.IncreaseTrust(
+                MentorId.Lyra,
+                20,
+                registry);
+
+            Assert(
+                increased,
+                "Mentor trust increase should validate through the mentor registry.");
+
+            Assert(
+                profile.GetTrust(MentorId.Lyra) == 20,
+                "Registry-backed mentor trust increase should track trust progress.");
+        }
+
+        private static void AssertUnknownMentorIdFailsSafelyThroughRegistry()
+        {
+            var profile = new MentorRelationshipProfile();
+            var registry = BuildTestMentorRegistry();
+
+            bool discovered = profile.Discover("mentor_unknown", registry);
+            bool increased = profile.IncreaseTrust(
+                "mentor_unknown",
+                10,
+                registry);
+
+            Assert(
+                !discovered && !increased,
+                "Unknown mentor ids should fail safely through the mentor registry.");
+
+            Assert(
+                profile.DiscoveredMentorIds.Count == 0
+                && registry.Get("mentor_unknown") == null,
+                "Unknown mentor ids should not create relationship state.");
+        }
+
         private static MentorDefinition BuildLyraMentor(bool isAvailable)
         {
             return new MentorDefinition(
@@ -816,6 +923,16 @@ namespace Game.SmokeTests
                 MentorId.Atlas,
                 "Atlas",
                 isAvailable);
+        }
+
+        private static MentorDefinitionRegistry BuildTestMentorRegistry()
+        {
+            var registry = new MentorDefinitionRegistry();
+
+            registry.Register(BuildLyraMentor(true));
+            registry.Register(BuildAtlasMentor(false));
+
+            return registry;
         }
 
         private static SkillDefinitionRegistry BuildTestSkillRegistry()
