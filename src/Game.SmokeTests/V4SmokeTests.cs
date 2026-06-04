@@ -88,6 +88,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Mentor save snapshot assertions",
+                delegate
+                {
+                    AssertMentorRelationshipSnapshotCapturesRecords();
+                    AssertMentorRelationshipSnapshotRestoreRecreatesState();
+                    AssertMentorRelationshipSnapshotRestoreValidatesMentorIdsThroughRegistry();
+                    AssertUnknownMentorRelationshipSnapshotDoesNotCorruptProfile();
+                    AssertOlderJsonWithoutMentorRelationshipDataRestoresSafely();
+                });
+
+            RunSection(
                 "Mentor teaching foundation assertions",
                 delegate
                 {
@@ -984,6 +995,132 @@ namespace Game.SmokeTests
                 "Unknown mentor ids should not create relationship state.");
         }
 
+        private static void AssertMentorRelationshipSnapshotCapturesRecords()
+        {
+            var relationshipProfile = BuildMentorProfileWithRelationships();
+
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                new ClassProfile(),
+                new MasteryProfile(),
+                relationshipProfile);
+
+            Assert(
+                snapshot.MentorRelationships.Count == 2,
+                "Snapshot should capture discovered mentor relationship records.");
+
+            var lyraSnapshot = FindMentorRelationshipSnapshot(snapshot, MentorId.Lyra);
+
+            Assert(
+                lyraSnapshot != null
+                && lyraSnapshot.IsDiscovered
+                && lyraSnapshot.Trust == 25
+                && lyraSnapshot.IsAvailable,
+                "Snapshot should capture mentor discovery, trust, and availability facts.");
+        }
+
+        private static void AssertMentorRelationshipSnapshotRestoreRecreatesState()
+        {
+            var sourceProfile = BuildMentorProfileWithRelationships();
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                new ClassProfile(),
+                new MasteryProfile(),
+                sourceProfile);
+            var restoredProfile = new MentorRelationshipProfile();
+
+            bool restored = service.RestoreMentorRelationshipProfile(
+                snapshot,
+                restoredProfile,
+                BuildTestMentorRegistry());
+
+            Assert(
+                restored,
+                "Known mentor relationship snapshot should restore successfully.");
+
+            Assert(
+                restoredProfile.IsDiscovered(MentorId.Lyra)
+                && restoredProfile.GetTrust(MentorId.Lyra) == 25
+                && restoredProfile.IsAvailable(MentorId.Lyra)
+                && restoredProfile.IsDiscovered(MentorId.Atlas)
+                && restoredProfile.GetTrust(MentorId.Atlas) == 3
+                && !restoredProfile.IsAvailable(MentorId.Atlas),
+                "Restore should recreate mentor discovery, trust, and availability state.");
+        }
+
+        private static void AssertMentorRelationshipSnapshotRestoreValidatesMentorIdsThroughRegistry()
+        {
+            var snapshot = BuildUnknownMentorRelationshipSnapshot();
+            var profile = new MentorRelationshipProfile();
+
+            bool restored = new V2ProgressSnapshotService().RestoreMentorRelationshipProfile(
+                snapshot,
+                profile,
+                BuildTestMentorRegistry());
+
+            Assert(
+                !restored,
+                "Mentor relationship restore should reject ids missing from the mentor registry.");
+
+            Assert(
+                profile.DiscoveredMentorIds.Count == 0,
+                "Rejected mentor relationship restore should not mutate profile state.");
+        }
+
+        private static void AssertUnknownMentorRelationshipSnapshotDoesNotCorruptProfile()
+        {
+            var snapshot = BuildUnknownMentorRelationshipSnapshot();
+            var profile = BuildTrustedLyraRelationship(10);
+
+            bool restored = new V2ProgressSnapshotService().RestoreMentorRelationshipProfile(
+                snapshot,
+                profile,
+                BuildTestMentorRegistry());
+
+            Assert(
+                !restored,
+                "Unknown mentor relationship snapshot ids should fail safely without corrupting existing state.");
+
+            Assert(
+                profile.IsDiscovered(MentorId.Lyra)
+                && profile.GetTrust(MentorId.Lyra) == 10
+                && !profile.IsDiscovered("mentor_unknown"),
+                "Unknown mentor relationship snapshot ids should preserve existing mentor relationships.");
+        }
+
+        private static void AssertOlderJsonWithoutMentorRelationshipDataRestoresSafely()
+        {
+            string json = "{"
+                + "\"SchemaVersion\":" + V2ProgressSnapshotVersions.CurrentSchemaVersion + ","
+                + "\"CodexEntries\":[],"
+                + "\"MissionLeads\":[],"
+                + "\"ActiveMissions\":[],"
+                + "\"Unlocks\":[],"
+                + "\"MasteryRecords\":[]"
+                + "}";
+            var snapshot = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+            var profile = new MentorRelationshipProfile();
+
+            bool restored = new V2ProgressSnapshotService().RestoreMentorRelationshipProfile(
+                snapshot,
+                profile,
+                BuildTestMentorRegistry());
+
+            Assert(
+                restored,
+                "Older JSON without mentor relationship data should restore safely.");
+
+            Assert(
+                snapshot.MentorRelationships.Count == 0
+                && profile.DiscoveredMentorIds.Count == 0,
+                "Missing mentor relationship data should restore as empty mentor relationship state.");
+        }
+
         private static void AssertMentorTeachingAvailableWhenTrustRequirementIsMet()
         {
             var relationshipProfile = BuildTrustedLyraRelationship(25);
@@ -1400,6 +1537,60 @@ namespace Game.SmokeTests
                 registry);
 
             return profile;
+        }
+
+        private static MentorRelationshipProfile BuildMentorProfileWithRelationships()
+        {
+            var profile = new MentorRelationshipProfile();
+            var registry = BuildTestMentorRegistry();
+
+            profile.Discover(MentorId.Lyra, registry);
+            profile.IncreaseTrust(
+                MentorId.Lyra,
+                25,
+                registry);
+            profile.Discover(MentorId.Atlas, registry);
+            profile.IncreaseTrust(
+                MentorId.Atlas,
+                3,
+                registry);
+
+            return profile;
+        }
+
+        private static V2ProgressSnapshot BuildUnknownMentorRelationshipSnapshot()
+        {
+            return new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new List<V2MasterySnapshot>(),
+                new[]
+                {
+                    new V2MentorRelationshipSnapshot(
+                        "mentor_unknown",
+                        true,
+                        15,
+                        true)
+                });
+        }
+
+        private static V2MentorRelationshipSnapshot FindMentorRelationshipSnapshot(
+            V2ProgressSnapshot snapshot,
+            string mentorId)
+        {
+            foreach (var mentorRelationship in snapshot.MentorRelationships)
+            {
+                if (mentorRelationship.MentorId == mentorId)
+                {
+                    return mentorRelationship;
+                }
+            }
+
+            return null;
         }
 
         private static MentorTeachingDefinition BuildLyraDeepSightTeaching(

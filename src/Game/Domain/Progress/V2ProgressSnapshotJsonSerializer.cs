@@ -71,6 +71,7 @@ namespace Game.Domain.Progress
             dto.ActiveMissions = new List<ActiveMissionDto>();
             dto.Unlocks = new List<UnlockDto>();
             dto.MasteryRecords = new List<MasteryDto>();
+            dto.MentorRelationships = new List<MentorRelationshipDto>();
             dto.ClassProfile = snapshot.ClassProfile == null
                 ? null
                 : new ClassProfileDto
@@ -142,6 +143,17 @@ namespace Game.Domain.Progress
                 });
             }
 
+            foreach (var mentorRelationship in snapshot.MentorRelationships)
+            {
+                dto.MentorRelationships.Add(new MentorRelationshipDto
+                {
+                    MentorId = mentorRelationship.MentorId,
+                    IsDiscovered = mentorRelationship.IsDiscovered,
+                    Trust = mentorRelationship.Trust,
+                    IsAvailable = mentorRelationship.IsAvailable
+                });
+            }
+
             return dto;
         }
 
@@ -152,6 +164,7 @@ namespace Game.Domain.Progress
             var activeMissions = new List<V2ActiveMissionSnapshot>();
             var unlocks = new List<V2UnlockSnapshot>();
             var masteryRecords = new List<V2MasterySnapshot>();
+            var mentorRelationships = new List<V2MentorRelationshipSnapshot>();
 
             if (dto.CodexEntries != null)
             {
@@ -222,6 +235,18 @@ namespace Game.Domain.Progress
                 }
             }
 
+            if (dto.MentorRelationships != null)
+            {
+                foreach (var mentorRelationship in dto.MentorRelationships)
+                {
+                    mentorRelationships.Add(new V2MentorRelationshipSnapshot(
+                        mentorRelationship.MentorId,
+                        mentorRelationship.IsDiscovered,
+                        mentorRelationship.Trust,
+                        mentorRelationship.IsAvailable));
+                }
+            }
+
             return new V2ProgressSnapshot(
                 dto.SchemaVersion,
                 codexEntries,
@@ -231,7 +256,8 @@ namespace Game.Domain.Progress
                 dto.ClassProfile == null
                     ? null
                     : new V2ClassProfileSnapshot(dto.ClassProfile.CurrentClassId),
-                masteryRecords);
+                masteryRecords,
+                mentorRelationships);
         }
 
         private static List<string> CopyTags(IReadOnlyList<string> sourceTags)
@@ -260,6 +286,7 @@ namespace Game.Domain.Progress
             public List<UnlockDto> Unlocks { get; set; }
             public ClassProfileDto ClassProfile { get; set; }
             public List<MasteryDto> MasteryRecords { get; set; }
+            public List<MentorRelationshipDto> MentorRelationships { get; set; }
         }
 
         private class CodexEntryDto
@@ -314,6 +341,14 @@ namespace Game.Domain.Progress
             public string SkillId { get; set; }
             public int Progress { get; set; }
             public MasteryRank Rank { get; set; }
+        }
+
+        private class MentorRelationshipDto
+        {
+            public string MentorId { get; set; }
+            public bool IsDiscovered { get; set; }
+            public int Trust { get; set; }
+            public bool IsAvailable { get; set; }
         }
     }
 }

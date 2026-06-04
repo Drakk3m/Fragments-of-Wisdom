@@ -100,6 +100,37 @@ namespace Game.Domain.Progress
                 BuildMasterySnapshots(masteryProfile.Records));
         }
 
+        public V2ProgressSnapshot CreateSnapshot(
+            CodexProfile codexProfile,
+            MissionJournalProfile missionJournalProfile,
+            UnlockProfile unlockProfile,
+            ClassProfile classProfile,
+            MasteryProfile masteryProfile,
+            MentorRelationshipProfile mentorRelationshipProfile)
+        {
+            if (mentorRelationshipProfile == null)
+            {
+                throw new ArgumentNullException(nameof(mentorRelationshipProfile));
+            }
+
+            var snapshot = CreateSnapshot(
+                codexProfile,
+                missionJournalProfile,
+                unlockProfile,
+                classProfile,
+                masteryProfile);
+
+            return new V2ProgressSnapshot(
+                snapshot.SchemaVersion,
+                snapshot.CodexEntries,
+                snapshot.MissionLeads,
+                snapshot.ActiveMissions,
+                snapshot.Unlocks,
+                snapshot.ClassProfile,
+                snapshot.MasteryRecords,
+                BuildMentorRelationshipSnapshots(mentorRelationshipProfile));
+        }
+
         public bool CanRestore(V2ProgressSnapshot snapshot)
         {
             if (snapshot == null)
@@ -279,6 +310,51 @@ namespace Game.Domain.Progress
             return allRestored;
         }
 
+        public bool RestoreMentorRelationshipProfile(
+            V2ProgressSnapshot snapshot,
+            MentorRelationshipProfile mentorRelationshipProfile,
+            MentorDefinitionRegistry mentorRegistry)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (mentorRelationshipProfile == null)
+            {
+                throw new ArgumentNullException(nameof(mentorRelationshipProfile));
+            }
+
+            if (mentorRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(mentorRegistry));
+            }
+
+            if (!CanRestore(snapshot))
+            {
+                throw new InvalidOperationException("Unsupported V2 progress snapshot schema version.");
+            }
+
+            bool allRestored = true;
+
+            foreach (var mentorSnapshot in snapshot.MentorRelationships)
+            {
+                bool restored = mentorRelationshipProfile.RestoreRelationship(
+                    mentorSnapshot.MentorId,
+                    mentorSnapshot.IsDiscovered,
+                    mentorSnapshot.Trust,
+                    mentorSnapshot.IsAvailable,
+                    mentorRegistry);
+
+                if (!restored)
+                {
+                    allRestored = false;
+                }
+            }
+
+            return allRestored;
+        }
+
         private static IReadOnlyList<V2CodexEntrySnapshot> BuildCodexSnapshots(
             IReadOnlyList<CodexEntryRecord> entries)
         {
@@ -373,6 +449,23 @@ namespace Game.Domain.Progress
                     record.SkillId,
                     record.Progress,
                     record.Rank));
+            }
+
+            return snapshots;
+        }
+
+        private static IReadOnlyList<V2MentorRelationshipSnapshot> BuildMentorRelationshipSnapshots(
+            MentorRelationshipProfile mentorRelationshipProfile)
+        {
+            var snapshots = new List<V2MentorRelationshipSnapshot>();
+
+            foreach (var mentorId in mentorRelationshipProfile.DiscoveredMentorIds)
+            {
+                snapshots.Add(new V2MentorRelationshipSnapshot(
+                    mentorId,
+                    true,
+                    mentorRelationshipProfile.GetTrust(mentorId),
+                    mentorRelationshipProfile.IsAvailable(mentorId)));
             }
 
             return snapshots;
