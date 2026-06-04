@@ -138,6 +138,7 @@ namespace Game.SmokeTests
                 delegate
                 {
                     AssertClassMentorTeachingMasteryWorkflow();
+                    AssertMasteredSkillRetentionIntegratedWorkflow();
                 });
         }
 
@@ -1622,6 +1623,105 @@ namespace Game.SmokeTests
                 masteryRestored
                 && restoredMasteryProfile.GetRecord("skill_deep_sight").Progress == 15,
                 "Integrated workflow should restore mastery state through the registry.");
+        }
+
+        private static void AssertMasteredSkillRetentionIntegratedWorkflow()
+        {
+            const string firstClassId = "class_first_memory";
+            const string secondClassId = "class_second_empty";
+            const string masteredSkillId = "skill_memory_focus";
+            const string unmasteredSkillId = "skill_memory_unmastered";
+
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(BuildTestSkillDefinition(masteredSkillId, "Memory Focus"));
+            skillRegistry.Register(BuildTestSkillDefinition(unmasteredSkillId, "Memory Unmastered"));
+
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                firstClassId,
+                "First Memory",
+                new[]
+                {
+                    masteredSkillId,
+                    unmasteredSkillId
+                }));
+            classRegistry.Register(new ClassDefinition(
+                secondClassId,
+                "Second Empty",
+                new string[0]));
+
+            var classProfile = new ClassProfile();
+            var mentorProfile = BuildTrustedLyraRelationship(25);
+            var masteryProfile = new MasteryProfile();
+            var teachingDefinition = new MentorTeachingDefinition(
+                MentorId.Lyra,
+                masteredSkillId,
+                20,
+                MasteryRecord.MasteredProgress);
+
+            Assert(
+                skillRegistry.Contains(masteredSkillId)
+                && skillRegistry.Contains(unmasteredSkillId),
+                "Retention workflow should register two skills.");
+
+            Assert(
+                classRegistry.Contains(firstClassId)
+                && classRegistry.Contains(secondClassId)
+                && classRegistry.Get(firstClassId).AllowsSkill(unmasteredSkillId, skillRegistry)
+                && !classRegistry.Get(secondClassId).AllowsSkill(unmasteredSkillId, skillRegistry),
+                "Retention workflow should register two classes with different allowed skills.");
+
+            Assert(
+                classProfile.AssignClassId(firstClassId, classRegistry)
+                && classProfile.CurrentClassAllowsSkill(masteredSkillId, classRegistry, skillRegistry),
+                "Retention workflow should assign the first class before mentor teaching.");
+
+            var teachingResult = new MentorTeachingService().Evaluate(
+                teachingDefinition,
+                mentorProfile,
+                BuildTestMentorRegistry(),
+                skillRegistry);
+            var applicationResult = new MentorTeachingApplicationService().Apply(
+                teachingResult,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                teachingResult.IsAvailable
+                && applicationResult.Applied
+                && masteryProfile.IsMastered(masteredSkillId),
+                "Retention workflow should mentor-teach and master the first-class skill.");
+
+            Assert(
+                classProfile.ChangeClassId(secondClassId, classRegistry)
+                && classProfile.CurrentClassId == secondClassId,
+                "Retention workflow should switch to the second class.");
+
+            var retentionPolicy = new MasteredSkillRetentionPolicy();
+            var masteredResult = retentionPolicy.Evaluate(
+                masteredSkillId,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+            var unmasteredResult = retentionPolicy.Evaluate(
+                unmasteredSkillId,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                masteredResult.IsUsable
+                && !masteredResult.AllowedByCurrentClass
+                && masteredResult.AllowedByMastery,
+                "Retention workflow should keep mastered first-class skill usable after class switch.");
+
+            Assert(
+                !unmasteredResult.IsUsable
+                && !unmasteredResult.AllowedByCurrentClass
+                && !unmasteredResult.AllowedByMastery,
+                "Retention workflow should block non-mastered first-class skill after class switch.");
         }
 
         private static MentorDefinition BuildLyraMentor(bool isAvailable)
