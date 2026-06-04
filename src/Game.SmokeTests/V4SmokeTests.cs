@@ -44,6 +44,18 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Skill tree progression assertions",
+                delegate
+                {
+                    AssertSkillTreeNodeCanBeRegisteredAndResolved();
+                    AssertSkillTreeNodeWithRegisteredSkillIdIsValid();
+                    AssertSkillTreeNodeWithUnknownSkillIdIsRejected();
+                    AssertSkillTreePrerequisiteBlocksUnlockUntilMet();
+                    AssertUnlockedPrerequisiteAllowsNextNode();
+                    AssertDuplicateSkillTreeNodeIdIsRejectedSafely();
+                });
+
+            RunSection(
                 "Mastery foundation assertions",
                 delegate
                 {
@@ -928,6 +940,125 @@ namespace Game.SmokeTests
                 registry.Get("skill_unknown") == null
                 && !registry.Register(BuildTestSkillDefinition("", "Invalid Skill")),
                 "Unknown or invalid skill ids should fail safely.");
+        }
+
+        private static void AssertSkillTreeNodeCanBeRegisteredAndResolved()
+        {
+            var skillTree = new SkillTreeDefinition();
+            var node = new SkillTreeNodeDefinition(
+                "node_deep_sight",
+                "skill_deep_sight",
+                new string[0]);
+
+            bool registered = skillTree.RegisterNode(
+                node,
+                BuildTestSkillRegistry());
+
+            Assert(
+                registered
+                && skillTree.Contains("node_deep_sight")
+                && skillTree.Get("node_deep_sight") == node,
+                "Skill tree node should register and resolve by stable node id.");
+        }
+
+        private static void AssertSkillTreeNodeWithRegisteredSkillIdIsValid()
+        {
+            var node = new SkillTreeNodeDefinition(
+                "node_deep_sight",
+                "skill_deep_sight",
+                new string[0]);
+
+            Assert(
+                SkillTreeDefinition.IsValidNode(
+                    node,
+                    BuildTestSkillRegistry()),
+                "Skill tree node with registered skill id should be valid.");
+        }
+
+        private static void AssertSkillTreeNodeWithUnknownSkillIdIsRejected()
+        {
+            var skillTree = new SkillTreeDefinition();
+            var node = new SkillTreeNodeDefinition(
+                "node_unknown",
+                "skill_unknown",
+                new string[0]);
+
+            bool registered = skillTree.RegisterNode(
+                node,
+                BuildTestSkillRegistry());
+
+            Assert(
+                !registered
+                && !SkillTreeDefinition.IsValidNode(node, BuildTestSkillRegistry())
+                && !skillTree.Contains("node_unknown"),
+                "Skill tree node with unknown skill id should be rejected safely.");
+        }
+
+        private static void AssertSkillTreePrerequisiteBlocksUnlockUntilMet()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var progress = new SkillTreeProgressProfile();
+
+            progress.DiscoverNode("node_balance_ritual", skillTree);
+
+            var result = new SkillTreeUnlockPolicy().Evaluate(
+                "node_balance_ritual",
+                skillTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.CanUnlock
+                && result.BlockReason == SkillTreeUnlockBlockReason.PrerequisiteMissing
+                && result.MissingPrerequisiteNodeId == "node_deep_sight",
+                "Skill tree prerequisite should block unlock until the prerequisite node is unlocked.");
+        }
+
+        private static void AssertUnlockedPrerequisiteAllowsNextNode()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var progress = new SkillTreeProgressProfile();
+
+            progress.DiscoverNode("node_deep_sight", skillTree);
+            progress.UnlockNode("node_deep_sight", skillTree);
+            progress.DiscoverNode("node_balance_ritual", skillTree);
+
+            var result = new SkillTreeUnlockPolicy().Evaluate(
+                "node_balance_ritual",
+                skillTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            Assert(
+                result.CanUnlock
+                && result.BlockReason == SkillTreeUnlockBlockReason.None,
+                "Unlocked prerequisite should allow the next skill tree node to unlock.");
+        }
+
+        private static void AssertDuplicateSkillTreeNodeIdIsRejectedSafely()
+        {
+            var skillTree = new SkillTreeDefinition();
+            var original = new SkillTreeNodeDefinition(
+                "node_deep_sight",
+                "skill_deep_sight",
+                new string[0]);
+            var duplicate = new SkillTreeNodeDefinition(
+                "node_deep_sight",
+                "skill_balance_ritual",
+                new string[0]);
+
+            bool firstRegistered = skillTree.RegisterNode(
+                original,
+                BuildTestSkillRegistry());
+            bool duplicateRegistered = skillTree.RegisterNode(
+                duplicate,
+                BuildTestSkillRegistry());
+
+            Assert(
+                firstRegistered
+                && !duplicateRegistered
+                && skillTree.Get("node_deep_sight") == original,
+                "Duplicate skill tree node ids should be rejected without replacing the original node.");
         }
 
         private static void AssertMentorCanBeDiscovered()
@@ -1847,6 +1978,27 @@ namespace Game.SmokeTests
             registry.Register(BuildTestSkillDefinition("skill_minor_cleanse", "Minor Cleanse"));
 
             return registry;
+        }
+
+        private static SkillTreeDefinition BuildTestSkillTreeDefinition()
+        {
+            var skillTree = new SkillTreeDefinition();
+            var skillRegistry = BuildTestSkillRegistry();
+
+            skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    "node_deep_sight",
+                    "skill_deep_sight",
+                    new string[0]),
+                skillRegistry);
+            skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    "node_balance_ritual",
+                    "skill_balance_ritual",
+                    new[] { "node_deep_sight" }),
+                skillRegistry);
+
+            return skillTree;
         }
 
         private static MasteryProfile BuildMasteryProfileWithProgress()
