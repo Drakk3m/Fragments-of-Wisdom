@@ -19,6 +19,8 @@ namespace Game.SmokeTests
                     AssertClassCanBeAssigned();
                     AssertClassCanBeChanged();
                     AssertClassExposesAllowedSkillFacts();
+                    AssertClassDefinitionCanBeRegisteredAndResolved();
+                    AssertDuplicateClassIdIsRejectedSafely();
                     AssertCurrentClassDefinitionResolvesFromRegistry();
                     AssertClassChangeStoresOnlyClassId();
                     AssertUnknownClassIdFailsSafely();
@@ -170,6 +172,48 @@ namespace Game.SmokeTests
                 profile.CurrentClassAllowsSkill("skill_balance_ritual", registry)
                 && !profile.CurrentClassAllowsSkill("skill_unknown", registry),
                 "Class profile should expose current class skill access facts.");
+        }
+
+        private static void AssertClassDefinitionCanBeRegisteredAndResolved()
+        {
+            var registry = new ClassDefinitionRegistry();
+            var classDefinition = BuildWandererClass();
+
+            bool registered = registry.Register(classDefinition);
+
+            Assert(
+                registered,
+                "Class definition registry should accept valid class definitions by stable id.");
+
+            Assert(
+                registry.Contains(ClassId.Wanderer)
+                && registry.Get(ClassId.Wanderer) == classDefinition,
+                "Class definition registry should resolve the registered definition by id.");
+        }
+
+        private static void AssertDuplicateClassIdIsRejectedSafely()
+        {
+            var registry = new ClassDefinitionRegistry();
+            var original = new ClassDefinition(
+                ClassId.Wanderer,
+                "Original Wanderer",
+                new[] { "skill_minor_cleanse" });
+            var duplicate = new ClassDefinition(
+                ClassId.Wanderer,
+                "Duplicate Wanderer",
+                new[] { "skill_deep_sight" });
+
+            bool firstRegistered = registry.Register(original);
+            bool duplicateRegistered = registry.Register(duplicate);
+
+            Assert(
+                firstRegistered && !duplicateRegistered,
+                "Class definition registry should reject duplicate class ids safely.");
+
+            Assert(
+                registry.Get(ClassId.Wanderer) == original
+                && registry.Get(ClassId.Wanderer).Name == "Original Wanderer",
+                "Duplicate class ids should not replace the original definition.");
         }
 
         private static void AssertCurrentClassDefinitionResolvesFromRegistry()
