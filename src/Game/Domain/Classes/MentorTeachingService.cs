@@ -4,11 +4,6 @@ namespace Game.Domain.Classes
 {
     public class MentorTeachingService
     {
-        public const string InvalidTeaching = "invalid_teaching";
-        public const string UnknownMentor = "unknown_mentor";
-        public const string UnknownSkill = "unknown_skill";
-        public const string TrustInsufficient = "trust_insufficient";
-
         public MentorTeachingResult Evaluate(
             MentorTeachingDefinition teaching,
             MentorRelationshipProfile relationshipProfile,
@@ -20,7 +15,8 @@ namespace Game.Domain.Classes
                 return Blocked(
                     teaching,
                     0,
-                    InvalidTeaching);
+                    MentorTeachingBlockReason.InvalidTeaching,
+                    "Mentor teaching definition is invalid.");
             }
 
             if (mentorRegistry == null || !mentorRegistry.Contains(teaching.MentorId))
@@ -28,7 +24,8 @@ namespace Game.Domain.Classes
                 return Blocked(
                     teaching,
                     0,
-                    UnknownMentor);
+                    MentorTeachingBlockReason.UnknownMentor,
+                    "Mentor id is not registered.");
             }
 
             if (skillRegistry == null || !skillRegistry.Contains(teaching.TaughtSkillId))
@@ -36,7 +33,8 @@ namespace Game.Domain.Classes
                 return Blocked(
                     teaching,
                     0,
-                    UnknownSkill);
+                    MentorTeachingBlockReason.UnknownSkill,
+                    "Taught skill id is not registered.");
             }
 
             int currentTrust = relationshipProfile == null
@@ -44,13 +42,22 @@ namespace Game.Domain.Classes
                 : relationshipProfile.GetTrust(teaching.MentorId);
 
             if (relationshipProfile == null
-                || !relationshipProfile.IsDiscovered(teaching.MentorId)
-                || currentTrust < teaching.RequiredTrust)
+                || !relationshipProfile.IsDiscovered(teaching.MentorId))
             {
                 return Blocked(
                     teaching,
                     currentTrust,
-                    TrustInsufficient);
+                    MentorTeachingBlockReason.MentorNotDiscovered,
+                    "Mentor has not been discovered.");
+            }
+
+            if (currentTrust < teaching.RequiredTrust)
+            {
+                return Blocked(
+                    teaching,
+                    currentTrust,
+                    MentorTeachingBlockReason.TrustInsufficient,
+                    "Mentor trust requirement is not met.");
             }
 
             return new MentorTeachingResult(
@@ -60,13 +67,15 @@ namespace Game.Domain.Classes
                 teaching.RequiredTrust,
                 currentTrust,
                 teaching.MasteryProgressGranted,
+                MentorTeachingBlockReason.None,
                 "");
         }
 
         private static MentorTeachingResult Blocked(
             MentorTeachingDefinition teaching,
             int currentTrust,
-            string blockReason)
+            MentorTeachingBlockReason blockReason,
+            string blockMessage)
         {
             return new MentorTeachingResult(
                 false,
@@ -75,7 +84,8 @@ namespace Game.Domain.Classes
                 teaching == null ? 0 : teaching.RequiredTrust,
                 currentTrust,
                 teaching == null ? 0 : teaching.MasteryProgressGranted,
-                blockReason);
+                blockReason,
+                blockMessage);
         }
     }
 }

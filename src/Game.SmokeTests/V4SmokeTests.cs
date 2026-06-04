@@ -92,6 +92,7 @@ namespace Game.SmokeTests
                     AssertMentorTeachingAvailableWhenTrustRequirementIsMet();
                     AssertMentorTeachingBlockedWhenMentorIsUnknown();
                     AssertMentorTeachingBlockedWhenSkillIsUnknown();
+                    AssertMentorTeachingBlockedWhenMentorIsNotDiscovered();
                     AssertMentorTeachingBlockedWhenTrustIsInsufficient();
                     AssertMentorTeachingResultExposesSkillAndMasteryFacts();
                 });
@@ -937,8 +938,9 @@ namespace Game.SmokeTests
 
             Assert(
                 result.CurrentTrust == 25
-                && result.RequiredTrust == 20,
-                "Available mentor teaching should expose current and required trust facts.");
+                && result.RequiredTrust == 20
+                && result.BlockReason == MentorTeachingBlockReason.None,
+                "Available mentor teaching should expose trust facts and no block reason.");
         }
 
         private static void AssertMentorTeachingBlockedWhenMentorIsUnknown()
@@ -961,7 +963,7 @@ namespace Game.SmokeTests
                 "Mentor teaching should be blocked when mentor id is unknown.");
 
             Assert(
-                result.BlockReason == MentorTeachingService.UnknownMentor,
+                result.BlockReason == MentorTeachingBlockReason.UnknownMentor,
                 "Unknown mentor teaching block should report an unknown mentor reason.");
         }
 
@@ -985,8 +987,28 @@ namespace Game.SmokeTests
                 "Mentor teaching should be blocked when taught skill id is unknown.");
 
             Assert(
-                result.BlockReason == MentorTeachingService.UnknownSkill,
+                result.BlockReason == MentorTeachingBlockReason.UnknownSkill,
                 "Unknown skill teaching block should report an unknown skill reason.");
+        }
+
+        private static void AssertMentorTeachingBlockedWhenMentorIsNotDiscovered()
+        {
+            var relationshipProfile = new MentorRelationshipProfile();
+            var teaching = BuildLyraDeepSightTeaching(0, 5);
+
+            var result = new MentorTeachingService().Evaluate(
+                teaching,
+                relationshipProfile,
+                BuildTestMentorRegistry(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.IsAvailable,
+                "Mentor teaching should be blocked when mentor is registered but not discovered.");
+
+            Assert(
+                result.BlockReason == MentorTeachingBlockReason.MentorNotDiscovered,
+                "Undiscovered mentor teaching block should report a mentor-not-discovered reason.");
         }
 
         private static void AssertMentorTeachingBlockedWhenTrustIsInsufficient()
@@ -1005,7 +1027,7 @@ namespace Game.SmokeTests
                 "Mentor teaching should be blocked when trust is insufficient.");
 
             Assert(
-                result.BlockReason == MentorTeachingService.TrustInsufficient
+                result.BlockReason == MentorTeachingBlockReason.TrustInsufficient
                 && result.CurrentTrust == 5,
                 "Insufficient trust block should expose current trust facts.");
         }
