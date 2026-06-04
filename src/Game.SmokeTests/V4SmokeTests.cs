@@ -84,6 +84,17 @@ namespace Game.SmokeTests
                     AssertMentorTrustIncreaseValidatesThroughRegistry();
                     AssertUnknownMentorIdFailsSafelyThroughRegistry();
                 });
+
+            RunSection(
+                "Mentor teaching foundation assertions",
+                delegate
+                {
+                    AssertMentorTeachingAvailableWhenTrustRequirementIsMet();
+                    AssertMentorTeachingBlockedWhenMentorIsUnknown();
+                    AssertMentorTeachingBlockedWhenSkillIsUnknown();
+                    AssertMentorTeachingBlockedWhenTrustIsInsufficient();
+                    AssertMentorTeachingResultExposesSkillAndMasteryFacts();
+                });
         }
 
         private static void AssertClassCanBeAssigned()
@@ -909,6 +920,117 @@ namespace Game.SmokeTests
                 "Unknown mentor ids should not create relationship state.");
         }
 
+        private static void AssertMentorTeachingAvailableWhenTrustRequirementIsMet()
+        {
+            var relationshipProfile = BuildTrustedLyraRelationship(25);
+            var teaching = BuildLyraDeepSightTeaching(20, 5);
+
+            var result = new MentorTeachingService().Evaluate(
+                teaching,
+                relationshipProfile,
+                BuildTestMentorRegistry(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                result.IsAvailable,
+                "Mentor teaching should be available when mentor is discovered and trust requirement is met.");
+
+            Assert(
+                result.CurrentTrust == 25
+                && result.RequiredTrust == 20,
+                "Available mentor teaching should expose current and required trust facts.");
+        }
+
+        private static void AssertMentorTeachingBlockedWhenMentorIsUnknown()
+        {
+            var relationshipProfile = BuildTrustedLyraRelationship(25);
+            var teaching = new MentorTeachingDefinition(
+                "mentor_unknown",
+                "skill_deep_sight",
+                10,
+                5);
+
+            var result = new MentorTeachingService().Evaluate(
+                teaching,
+                relationshipProfile,
+                BuildTestMentorRegistry(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.IsAvailable,
+                "Mentor teaching should be blocked when mentor id is unknown.");
+
+            Assert(
+                result.BlockReason == MentorTeachingService.UnknownMentor,
+                "Unknown mentor teaching block should report an unknown mentor reason.");
+        }
+
+        private static void AssertMentorTeachingBlockedWhenSkillIsUnknown()
+        {
+            var relationshipProfile = BuildTrustedLyraRelationship(25);
+            var teaching = new MentorTeachingDefinition(
+                MentorId.Lyra,
+                "skill_unknown",
+                10,
+                5);
+
+            var result = new MentorTeachingService().Evaluate(
+                teaching,
+                relationshipProfile,
+                BuildTestMentorRegistry(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.IsAvailable,
+                "Mentor teaching should be blocked when taught skill id is unknown.");
+
+            Assert(
+                result.BlockReason == MentorTeachingService.UnknownSkill,
+                "Unknown skill teaching block should report an unknown skill reason.");
+        }
+
+        private static void AssertMentorTeachingBlockedWhenTrustIsInsufficient()
+        {
+            var relationshipProfile = BuildTrustedLyraRelationship(5);
+            var teaching = BuildLyraDeepSightTeaching(20, 5);
+
+            var result = new MentorTeachingService().Evaluate(
+                teaching,
+                relationshipProfile,
+                BuildTestMentorRegistry(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.IsAvailable,
+                "Mentor teaching should be blocked when trust is insufficient.");
+
+            Assert(
+                result.BlockReason == MentorTeachingService.TrustInsufficient
+                && result.CurrentTrust == 5,
+                "Insufficient trust block should expose current trust facts.");
+        }
+
+        private static void AssertMentorTeachingResultExposesSkillAndMasteryFacts()
+        {
+            var relationshipProfile = BuildTrustedLyraRelationship(25);
+            var teaching = BuildLyraDeepSightTeaching(20, 7);
+
+            var result = new MentorTeachingService().Evaluate(
+                teaching,
+                relationshipProfile,
+                BuildTestMentorRegistry(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                result.TaughtSkillId == "skill_deep_sight"
+                && result.MentorId == MentorId.Lyra,
+                "Mentor teaching result should expose mentor and taught skill facts.");
+
+            Assert(
+                result.MasteryProgressGranted == 7,
+                "Mentor teaching result should expose mastery progress facts without mutating mastery.");
+        }
+
         private static MentorDefinition BuildLyraMentor(bool isAvailable)
         {
             return new MentorDefinition(
@@ -933,6 +1055,31 @@ namespace Game.SmokeTests
             registry.Register(BuildAtlasMentor(false));
 
             return registry;
+        }
+
+        private static MentorRelationshipProfile BuildTrustedLyraRelationship(int trust)
+        {
+            var profile = new MentorRelationshipProfile();
+            var registry = BuildTestMentorRegistry();
+
+            profile.Discover(MentorId.Lyra, registry);
+            profile.IncreaseTrust(
+                MentorId.Lyra,
+                trust,
+                registry);
+
+            return profile;
+        }
+
+        private static MentorTeachingDefinition BuildLyraDeepSightTeaching(
+            int requiredTrust,
+            int masteryProgressGranted)
+        {
+            return new MentorTeachingDefinition(
+                MentorId.Lyra,
+                "skill_deep_sight",
+                requiredTrust,
+                masteryProgressGranted);
         }
 
         private static SkillDefinitionRegistry BuildTestSkillRegistry()
