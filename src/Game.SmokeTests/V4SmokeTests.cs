@@ -66,6 +66,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Mastered skill retention assertions",
+                delegate
+                {
+                    AssertClassAllowedSkillIsUsableByRetentionPolicy();
+                    AssertMasteredCrossClassSkillIsUsableByRetentionPolicy();
+                    AssertNonClassNonMasteredSkillIsBlockedByRetentionPolicy();
+                    AssertUnknownSkillRetentionFailsSafely();
+                    AssertMasteredSkillRetentionWorksWithoutCurrentClass();
+                });
+
+            RunSection(
                 "Mentor foundation assertions",
                 delegate
                 {
@@ -722,6 +733,120 @@ namespace Game.SmokeTests
                 snapshot.MasteryRecords.Count == 0
                 && profile.Records.Count == 0,
                 "Older JSON without mastery data should leave mastery state unchanged.");
+        }
+
+        private static void AssertClassAllowedSkillIsUsableByRetentionPolicy()
+        {
+            var classProfile = new ClassProfile();
+            var classRegistry = BuildTestClassRegistry();
+            var skillRegistry = BuildTestSkillRegistry();
+
+            classProfile.AssignClassId(ClassId.Tlamatini, classRegistry);
+
+            var result = new MasteredSkillRetentionPolicy().Evaluate(
+                "skill_deep_sight",
+                classProfile,
+                classRegistry,
+                new MasteryProfile(),
+                skillRegistry);
+
+            Assert(
+                result.IsUsable
+                && result.AllowedByCurrentClass
+                && !result.AllowedByMastery
+                && result.BlockReason == MasteredSkillRetentionBlockReason.None,
+                "Class-allowed skill should be usable through the retention policy.");
+        }
+
+        private static void AssertMasteredCrossClassSkillIsUsableByRetentionPolicy()
+        {
+            var classProfile = new ClassProfile();
+            var classRegistry = BuildTestClassRegistry();
+            var skillRegistry = BuildTestSkillRegistry();
+            var masteryProfile = new MasteryProfile();
+
+            classProfile.AssignClassId(ClassId.Wanderer, classRegistry);
+            masteryProfile.IncreaseProgress(
+                "skill_deep_sight",
+                MasteryRecord.MasteredProgress,
+                skillRegistry);
+
+            var result = new MasteredSkillRetentionPolicy().Evaluate(
+                "skill_deep_sight",
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                result.IsUsable
+                && !result.AllowedByCurrentClass
+                && result.AllowedByMastery,
+                "Mastered cross-class skill should be usable through mastery facts.");
+        }
+
+        private static void AssertNonClassNonMasteredSkillIsBlockedByRetentionPolicy()
+        {
+            var classProfile = new ClassProfile();
+            var classRegistry = BuildTestClassRegistry();
+            var skillRegistry = BuildTestSkillRegistry();
+
+            classProfile.AssignClassId(ClassId.Tlamatini, classRegistry);
+
+            var result = new MasteredSkillRetentionPolicy().Evaluate(
+                "skill_minor_cleanse",
+                classProfile,
+                classRegistry,
+                new MasteryProfile(),
+                skillRegistry);
+
+            Assert(
+                !result.IsUsable
+                && !result.AllowedByCurrentClass
+                && !result.AllowedByMastery
+                && result.BlockReason == MasteredSkillRetentionBlockReason.SkillNotAllowed,
+                "Non-class non-mastered skill should be blocked by the retention policy.");
+        }
+
+        private static void AssertUnknownSkillRetentionFailsSafely()
+        {
+            var result = new MasteredSkillRetentionPolicy().Evaluate(
+                "skill_unknown",
+                new ClassProfile(),
+                BuildTestClassRegistry(),
+                new MasteryProfile(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.IsUsable
+                && !result.AllowedByCurrentClass
+                && !result.AllowedByMastery
+                && result.BlockReason == MasteredSkillRetentionBlockReason.UnknownSkill,
+                "Unknown skill ids should fail safely in the retention policy.");
+        }
+
+        private static void AssertMasteredSkillRetentionWorksWithoutCurrentClass()
+        {
+            var skillRegistry = BuildTestSkillRegistry();
+            var masteryProfile = new MasteryProfile();
+
+            masteryProfile.IncreaseProgress(
+                "skill_deep_sight",
+                MasteryRecord.MasteredProgress,
+                skillRegistry);
+
+            var result = new MasteredSkillRetentionPolicy().Evaluate(
+                "skill_deep_sight",
+                new ClassProfile(),
+                BuildTestClassRegistry(),
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                result.IsUsable
+                && !result.AllowedByCurrentClass
+                && result.AllowedByMastery,
+                "Mastered registered skill should remain usable even without a current class.");
         }
 
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
