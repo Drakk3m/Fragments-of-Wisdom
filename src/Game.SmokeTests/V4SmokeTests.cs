@@ -96,6 +96,17 @@ namespace Game.SmokeTests
                     AssertMentorTeachingBlockedWhenTrustIsInsufficient();
                     AssertMentorTeachingResultExposesSkillAndMasteryFacts();
                 });
+
+            RunSection(
+                "Mentor teaching application assertions",
+                delegate
+                {
+                    AssertAvailableMentorTeachingAppliesMasteryProgress();
+                    AssertBlockedMentorTeachingDoesNotMutateMastery();
+                    AssertMentorTeachingApplicationUnknownSkillFailsSafely();
+                    AssertMentorTeachingApplicationCanMasterSkill();
+                    AssertDuplicateMentorTeachingApplicationAfterMasteryIsSafe();
+                });
         }
 
         private static void AssertClassCanBeAssigned()
@@ -1053,6 +1064,129 @@ namespace Game.SmokeTests
                 "Mentor teaching result should expose mastery progress facts without mutating mastery.");
         }
 
+        private static void AssertAvailableMentorTeachingAppliesMasteryProgress()
+        {
+            var masteryProfile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
+            var teachingResult = BuildAvailableLyraDeepSightTeachingResult(12);
+
+            var applicationResult = new MentorTeachingApplicationService().Apply(
+                teachingResult,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                applicationResult.Applied
+                && applicationResult.ProgressApplied == 12
+                && applicationResult.BlockReason == MentorTeachingApplicationBlockReason.None,
+                "Available mentor teaching should apply mastery progress.");
+
+            Assert(
+                masteryProfile.GetRecord("skill_deep_sight").Progress == 12,
+                "Mentor teaching application should mutate only mastery progress.");
+        }
+
+        private static void AssertBlockedMentorTeachingDoesNotMutateMastery()
+        {
+            var masteryProfile = new MasteryProfile();
+            var blockedTeaching = new MentorTeachingService().Evaluate(
+                BuildLyraDeepSightTeaching(20, 10),
+                BuildTrustedLyraRelationship(5),
+                BuildTestMentorRegistry(),
+                BuildTestSkillRegistry());
+
+            var applicationResult = new MentorTeachingApplicationService().Apply(
+                blockedTeaching,
+                masteryProfile,
+                BuildTestSkillRegistry());
+
+            Assert(
+                !applicationResult.Applied
+                && applicationResult.BlockReason == MentorTeachingApplicationBlockReason.TeachingBlocked,
+                "Blocked mentor teaching should not apply mastery progress.");
+
+            Assert(
+                masteryProfile.Records.Count == 0,
+                "Blocked mentor teaching should not mutate mastery state.");
+        }
+
+        private static void AssertMentorTeachingApplicationUnknownSkillFailsSafely()
+        {
+            var masteryProfile = new MasteryProfile();
+            var teachingResult = new MentorTeachingResult(
+                true,
+                MentorId.Lyra,
+                "skill_unknown",
+                0,
+                10,
+                10,
+                MentorTeachingBlockReason.None,
+                "");
+
+            var applicationResult = new MentorTeachingApplicationService().Apply(
+                teachingResult,
+                masteryProfile,
+                BuildTestSkillRegistry());
+
+            Assert(
+                !applicationResult.Applied
+                && applicationResult.BlockReason == MentorTeachingApplicationBlockReason.UnknownSkill,
+                "Mentor teaching application should reject unknown skill ids safely.");
+
+            Assert(
+                masteryProfile.Records.Count == 0,
+                "Unknown skill mentor teaching application should not mutate mastery state.");
+        }
+
+        private static void AssertMentorTeachingApplicationCanMasterSkill()
+        {
+            var masteryProfile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
+            var teachingResult = BuildAvailableLyraDeepSightTeachingResult(MasteryRecord.MasteredProgress);
+
+            var applicationResult = new MentorTeachingApplicationService().Apply(
+                teachingResult,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                applicationResult.Applied
+                && applicationResult.ProgressApplied == MasteryRecord.MasteredProgress,
+                "Mentor teaching application should apply enough progress to master a skill.");
+
+            Assert(
+                masteryProfile.IsMastered("skill_deep_sight"),
+                "Applied mentor teaching progress should be able to master a skill.");
+        }
+
+        private static void AssertDuplicateMentorTeachingApplicationAfterMasteryIsSafe()
+        {
+            var masteryProfile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
+            var teachingResult = BuildAvailableLyraDeepSightTeachingResult(MasteryRecord.MasteredProgress);
+            var service = new MentorTeachingApplicationService();
+
+            var firstApplication = service.Apply(
+                teachingResult,
+                masteryProfile,
+                skillRegistry);
+            var duplicateApplication = service.Apply(
+                teachingResult,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                firstApplication.Applied
+                && !duplicateApplication.Applied
+                && duplicateApplication.WasAlreadyMastered,
+                "Duplicate mentor teaching application after mastery should be safe.");
+
+            Assert(
+                duplicateApplication.BlockReason == MentorTeachingApplicationBlockReason.AlreadyMastered
+                && masteryProfile.GetRecord("skill_deep_sight").Progress == MasteryRecord.MasteredProgress,
+                "Duplicate mentor teaching application should not exceed mastered progress.");
+        }
+
         private static MentorDefinition BuildLyraMentor(bool isAvailable)
         {
             return new MentorDefinition(
@@ -1102,6 +1236,15 @@ namespace Game.SmokeTests
                 "skill_deep_sight",
                 requiredTrust,
                 masteryProgressGranted);
+        }
+
+        private static MentorTeachingResult BuildAvailableLyraDeepSightTeachingResult(int masteryProgressGranted)
+        {
+            return new MentorTeachingService().Evaluate(
+                BuildLyraDeepSightTeaching(20, masteryProgressGranted),
+                BuildTrustedLyraRelationship(25),
+                BuildTestMentorRegistry(),
+                BuildTestSkillRegistry());
         }
 
         private static SkillDefinitionRegistry BuildTestSkillRegistry()
