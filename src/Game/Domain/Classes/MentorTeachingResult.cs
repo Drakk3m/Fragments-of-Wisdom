@@ -8,7 +8,8 @@ namespace Game.Domain.Classes
         public int RequiredTrust { get; private set; }
         public int CurrentTrust { get; private set; }
         public int MasteryProgressGranted { get; private set; }
-        public string BlockReason { get; private set; }
+        public MentorTeachingBlockReason BlockReason { get; private set; }
+        public string BlockMessage { get; private set; }
 
         public MentorTeachingResult(
             bool isAvailable,
@@ -17,7 +18,8 @@ namespace Game.Domain.Classes
             int requiredTrust,
             int currentTrust,
             int masteryProgressGranted,
-            string blockReason)
+            MentorTeachingBlockReason blockReason,
+            string blockMessage)
         {
             IsAvailable = isAvailable;
             MentorId = mentorId;
@@ -26,6 +28,7 @@ namespace Game.Domain.Classes
             CurrentTrust = currentTrust;
             MasteryProgressGranted = masteryProgressGranted;
             BlockReason = blockReason;
+            BlockMessage = blockMessage;
         }
     }
 }
