@@ -95,6 +95,29 @@ namespace Game.Domain.Classes
                 amount);
         }
 
+        public bool RestoreRelationship(
+            string mentorId,
+            bool isDiscovered,
+            int trust,
+            bool isAvailable,
+            MentorDefinitionRegistry registry)
+        {
+            if (registry == null || !registry.Contains(mentorId))
+            {
+                return false;
+            }
+
+            if (!isDiscovered)
+            {
+                return true;
+            }
+
+            discoveredMentorIds.Add(mentorId);
+            trustByMentorId[mentorId] = trust < 0 ? 0 : trust;
+            availabilityByMentorId[mentorId] = isAvailable;
+            return true;
+        }
+
         private static bool IsValidMentor(MentorDefinition mentor)
         {
             return mentor != null && mentor.IsValid();

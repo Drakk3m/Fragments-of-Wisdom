@@ -208,6 +208,7 @@ namespace Game.SmokeTests
                     AssertV2SnapshotValidationRejectsUnknownMasterySkillIdWithRegistry();
                     AssertV2SnapshotValidationWithoutSkillRegistryRemainsCompatible();
                     AssertV2SnapshotValidationOlderJsonWithoutMasteryDataIsSafe();
+                    AssertV2SnapshotValidationRejectsInvalidMentorRelationshipId();
                     AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots();
                 });
 
@@ -2398,6 +2399,30 @@ namespace Game.SmokeTests
                     BuildV2ValidationSkillRegistry())
                 && snapshot.MasteryRecords.Count == 0,
                 "Older JSON without mastery data should validate safely with a skill registry.");
+        }
+
+        private static void AssertV2SnapshotValidationRejectsInvalidMentorRelationshipId()
+        {
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new List<V2MasterySnapshot>(),
+                new[]
+                {
+                    new V2MentorRelationshipSnapshot(
+                        "",
+                        true,
+                        5,
+                        true)
+                });
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(snapshot),
+                "Semantic snapshot validation should reject mentor relationship records with empty mentor ids.");
         }
 
         private static void AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots()

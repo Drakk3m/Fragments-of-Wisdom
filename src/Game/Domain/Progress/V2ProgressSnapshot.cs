@@ -11,6 +11,7 @@ namespace Game.Domain.Progress
         public IReadOnlyList<V2UnlockSnapshot> Unlocks { get; private set; }
         public V2ClassProfileSnapshot ClassProfile { get; private set; }
         public IReadOnlyList<V2MasterySnapshot> MasteryRecords { get; private set; }
+        public IReadOnlyList<V2MentorRelationshipSnapshot> MentorRelationships { get; private set; }
 
         public V2ProgressSnapshot(
             int schemaVersion,
@@ -85,6 +86,27 @@ namespace Game.Domain.Progress
             IReadOnlyList<V2UnlockSnapshot> unlocks,
             V2ClassProfileSnapshot classProfile,
             IReadOnlyList<V2MasterySnapshot> masteryRecords)
+            : this(
+                schemaVersion,
+                codexEntries,
+                missionLeads,
+                activeMissions,
+                unlocks,
+                classProfile,
+                masteryRecords,
+                new List<V2MentorRelationshipSnapshot>())
+        {
+        }
+
+        public V2ProgressSnapshot(
+            int schemaVersion,
+            IReadOnlyList<V2CodexEntrySnapshot> codexEntries,
+            IReadOnlyList<V2MissionLeadSnapshot> missionLeads,
+            IReadOnlyList<V2ActiveMissionSnapshot> activeMissions,
+            IReadOnlyList<V2UnlockSnapshot> unlocks,
+            V2ClassProfileSnapshot classProfile,
+            IReadOnlyList<V2MasterySnapshot> masteryRecords,
+            IReadOnlyList<V2MentorRelationshipSnapshot> mentorRelationships)
         {
             SchemaVersion = schemaVersion;
             CodexEntries = codexEntries;
@@ -95,6 +117,9 @@ namespace Game.Domain.Progress
             MasteryRecords = masteryRecords == null
                 ? new List<V2MasterySnapshot>()
                 : masteryRecords;
+            MentorRelationships = mentorRelationships == null
+                ? new List<V2MentorRelationshipSnapshot>()
+                : mentorRelationships;
         }
 
         public bool IsCurrentVersion()
