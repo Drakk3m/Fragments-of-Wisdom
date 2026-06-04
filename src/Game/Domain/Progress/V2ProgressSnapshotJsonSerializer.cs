@@ -72,6 +72,11 @@ namespace Game.Domain.Progress
             dto.Unlocks = new List<UnlockDto>();
             dto.MasteryRecords = new List<MasteryDto>();
             dto.MentorRelationships = new List<MentorRelationshipDto>();
+            dto.SkillTreeProgress = new SkillTreeProgressDto
+            {
+                DiscoveredNodeIds = CopyTags(snapshot.SkillTreeProgress.DiscoveredNodeIds),
+                UnlockedNodeIds = CopyTags(snapshot.SkillTreeProgress.UnlockedNodeIds)
+            };
             dto.ClassProfile = snapshot.ClassProfile == null
                 ? null
                 : new ClassProfileDto
@@ -165,6 +170,11 @@ namespace Game.Domain.Progress
             var unlocks = new List<V2UnlockSnapshot>();
             var masteryRecords = new List<V2MasterySnapshot>();
             var mentorRelationships = new List<V2MentorRelationshipSnapshot>();
+            var skillTreeProgress = dto.SkillTreeProgress == null
+                ? new V2SkillTreeProgressSnapshot(new List<string>(), new List<string>())
+                : new V2SkillTreeProgressSnapshot(
+                    CopyTags(dto.SkillTreeProgress.DiscoveredNodeIds),
+                    CopyTags(dto.SkillTreeProgress.UnlockedNodeIds));
 
             if (dto.CodexEntries != null)
             {
@@ -257,7 +267,8 @@ namespace Game.Domain.Progress
                     ? null
                     : new V2ClassProfileSnapshot(dto.ClassProfile.CurrentClassId),
                 masteryRecords,
-                mentorRelationships);
+                mentorRelationships,
+                skillTreeProgress);
         }
 
         private static List<string> CopyTags(IReadOnlyList<string> sourceTags)
@@ -287,6 +298,7 @@ namespace Game.Domain.Progress
             public ClassProfileDto ClassProfile { get; set; }
             public List<MasteryDto> MasteryRecords { get; set; }
             public List<MentorRelationshipDto> MentorRelationships { get; set; }
+            public SkillTreeProgressDto SkillTreeProgress { get; set; }
         }
 
         private class CodexEntryDto
@@ -349,6 +361,12 @@ namespace Game.Domain.Progress
             public bool IsDiscovered { get; set; }
             public int Trust { get; set; }
             public bool IsAvailable { get; set; }
+        }
+
+        private class SkillTreeProgressDto
+        {
+            public List<string> DiscoveredNodeIds { get; set; }
+            public List<string> UnlockedNodeIds { get; set; }
         }
     }
 }

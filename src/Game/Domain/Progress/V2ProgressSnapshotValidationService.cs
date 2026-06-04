@@ -40,7 +40,8 @@ namespace Game.Domain.Progress
                 || snapshot.ActiveMissions == null
                 || snapshot.Unlocks == null
                 || snapshot.MasteryRecords == null
-                || snapshot.MentorRelationships == null)
+                || snapshot.MentorRelationships == null
+                || snapshot.SkillTreeProgress == null)
             {
                 return false;
             }
@@ -50,7 +51,8 @@ namespace Game.Domain.Progress
                 || !HasValidActiveMissions(snapshot)
                 || !HasValidUnlocks(snapshot)
                 || !HasValidMasteryRecords(snapshot, skillRegistry)
-                || !HasValidMentorRelationships(snapshot))
+                || !HasValidMentorRelationships(snapshot)
+                || !HasValidSkillTreeProgress(snapshot))
             {
                 return false;
             }
@@ -165,6 +167,33 @@ namespace Game.Domain.Progress
             foreach (var mentorRelationship in snapshot.MentorRelationships)
             {
                 if (mentorRelationship == null || string.IsNullOrWhiteSpace(mentorRelationship.MentorId))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasValidSkillTreeProgress(V2ProgressSnapshot snapshot)
+        {
+            if (snapshot.SkillTreeProgress.DiscoveredNodeIds == null
+                || snapshot.SkillTreeProgress.UnlockedNodeIds == null)
+            {
+                return false;
+            }
+
+            foreach (var nodeId in snapshot.SkillTreeProgress.DiscoveredNodeIds)
+            {
+                if (string.IsNullOrWhiteSpace(nodeId))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var nodeId in snapshot.SkillTreeProgress.UnlockedNodeIds)
+            {
+                if (string.IsNullOrWhiteSpace(nodeId))
                 {
                     return false;
                 }

@@ -131,6 +131,40 @@ namespace Game.Domain.Progress
                 BuildMentorRelationshipSnapshots(mentorRelationshipProfile));
         }
 
+        public V2ProgressSnapshot CreateSnapshot(
+            CodexProfile codexProfile,
+            MissionJournalProfile missionJournalProfile,
+            UnlockProfile unlockProfile,
+            ClassProfile classProfile,
+            MasteryProfile masteryProfile,
+            MentorRelationshipProfile mentorRelationshipProfile,
+            SkillTreeProgressProfile skillTreeProgressProfile)
+        {
+            if (skillTreeProgressProfile == null)
+            {
+                throw new ArgumentNullException(nameof(skillTreeProgressProfile));
+            }
+
+            var snapshot = CreateSnapshot(
+                codexProfile,
+                missionJournalProfile,
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                mentorRelationshipProfile);
+
+            return new V2ProgressSnapshot(
+                snapshot.SchemaVersion,
+                snapshot.CodexEntries,
+                snapshot.MissionLeads,
+                snapshot.ActiveMissions,
+                snapshot.Unlocks,
+                snapshot.ClassProfile,
+                snapshot.MasteryRecords,
+                snapshot.MentorRelationships,
+                BuildSkillTreeProgressSnapshot(skillTreeProgressProfile));
+        }
+
         public bool CanRestore(V2ProgressSnapshot snapshot)
         {
             if (snapshot == null)
@@ -355,6 +389,60 @@ namespace Game.Domain.Progress
             return allRestored;
         }
 
+        public bool RestoreSkillTreeProgressProfile(
+            V2ProgressSnapshot snapshot,
+            SkillTreeProgressProfile skillTreeProgressProfile,
+            SkillTreeDefinition skillTree)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (skillTreeProgressProfile == null)
+            {
+                throw new ArgumentNullException(nameof(skillTreeProgressProfile));
+            }
+
+            if (skillTree == null)
+            {
+                throw new ArgumentNullException(nameof(skillTree));
+            }
+
+            if (!CanRestore(snapshot))
+            {
+                throw new InvalidOperationException("Unsupported V2 progress snapshot schema version.");
+            }
+
+            foreach (var nodeId in snapshot.SkillTreeProgress.DiscoveredNodeIds)
+            {
+                if (!skillTree.Contains(nodeId))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var nodeId in snapshot.SkillTreeProgress.UnlockedNodeIds)
+            {
+                if (!skillTree.Contains(nodeId))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var nodeId in snapshot.SkillTreeProgress.DiscoveredNodeIds)
+            {
+                skillTreeProgressProfile.DiscoverNode(nodeId, skillTree);
+            }
+
+            foreach (var nodeId in snapshot.SkillTreeProgress.UnlockedNodeIds)
+            {
+                skillTreeProgressProfile.UnlockNode(nodeId, skillTree);
+            }
+
+            return true;
+        }
+
         private static IReadOnlyList<V2CodexEntrySnapshot> BuildCodexSnapshots(
             IReadOnlyList<CodexEntryRecord> entries)
         {
@@ -469,6 +557,26 @@ namespace Game.Domain.Progress
             }
 
             return snapshots;
+        }
+
+        private static V2SkillTreeProgressSnapshot BuildSkillTreeProgressSnapshot(
+            SkillTreeProgressProfile skillTreeProgressProfile)
+        {
+            return new V2SkillTreeProgressSnapshot(
+                CopyIds(skillTreeProgressProfile.DiscoveredNodeIds),
+                CopyIds(skillTreeProgressProfile.UnlockedNodeIds));
+        }
+
+        private static IReadOnlyList<string> CopyIds(IReadOnlyCollection<string> sourceIds)
+        {
+            var ids = new List<string>();
+
+            foreach (var sourceId in sourceIds)
+            {
+                ids.Add(sourceId);
+            }
+
+            return ids;
         }
 
         private static IReadOnlyList<string> CopyTags(IReadOnlyList<string> sourceTags)

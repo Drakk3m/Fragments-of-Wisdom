@@ -12,6 +12,7 @@ namespace Game.Domain.Progress
         public V2ClassProfileSnapshot ClassProfile { get; private set; }
         public IReadOnlyList<V2MasterySnapshot> MasteryRecords { get; private set; }
         public IReadOnlyList<V2MentorRelationshipSnapshot> MentorRelationships { get; private set; }
+        public V2SkillTreeProgressSnapshot SkillTreeProgress { get; private set; }
 
         public V2ProgressSnapshot(
             int schemaVersion,
@@ -107,6 +108,29 @@ namespace Game.Domain.Progress
             V2ClassProfileSnapshot classProfile,
             IReadOnlyList<V2MasterySnapshot> masteryRecords,
             IReadOnlyList<V2MentorRelationshipSnapshot> mentorRelationships)
+            : this(
+                schemaVersion,
+                codexEntries,
+                missionLeads,
+                activeMissions,
+                unlocks,
+                classProfile,
+                masteryRecords,
+                mentorRelationships,
+                null)
+        {
+        }
+
+        public V2ProgressSnapshot(
+            int schemaVersion,
+            IReadOnlyList<V2CodexEntrySnapshot> codexEntries,
+            IReadOnlyList<V2MissionLeadSnapshot> missionLeads,
+            IReadOnlyList<V2ActiveMissionSnapshot> activeMissions,
+            IReadOnlyList<V2UnlockSnapshot> unlocks,
+            V2ClassProfileSnapshot classProfile,
+            IReadOnlyList<V2MasterySnapshot> masteryRecords,
+            IReadOnlyList<V2MentorRelationshipSnapshot> mentorRelationships,
+            V2SkillTreeProgressSnapshot skillTreeProgress)
         {
             SchemaVersion = schemaVersion;
             CodexEntries = codexEntries;
@@ -120,6 +144,9 @@ namespace Game.Domain.Progress
             MentorRelationships = mentorRelationships == null
                 ? new List<V2MentorRelationshipSnapshot>()
                 : mentorRelationships;
+            SkillTreeProgress = skillTreeProgress == null
+                ? new V2SkillTreeProgressSnapshot(new List<string>(), new List<string>())
+                : skillTreeProgress;
         }
 
         public bool IsCurrentVersion()

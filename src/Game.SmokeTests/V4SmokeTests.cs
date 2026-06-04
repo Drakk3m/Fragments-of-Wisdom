@@ -57,6 +57,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Skill tree save snapshot assertions",
+                delegate
+                {
+                    AssertSkillTreeSnapshotCapturesDiscoveredAndUnlockedNodes();
+                    AssertSkillTreeSnapshotRestoreRecreatesProgressState();
+                    AssertSkillTreeSnapshotRestoreValidatesNodeIdsThroughDefinition();
+                    AssertUnknownSkillTreeSnapshotNodeDoesNotCorruptProfile();
+                    AssertOlderJsonWithoutSkillTreeProgressRestoresSafely();
+                });
+
+            RunSection(
                 "Mastery foundation assertions",
                 delegate
                 {
@@ -1061,6 +1072,137 @@ namespace Game.SmokeTests
                 && !duplicateRegistered
                 && skillTree.Get("node_deep_sight") == original,
                 "Duplicate skill tree node ids should be rejected without replacing the original node.");
+        }
+
+        private static void AssertSkillTreeSnapshotCapturesDiscoveredAndUnlockedNodes()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var progress = BuildSkillTreeProgressWithUnlockedRoot(skillTree);
+
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                new ClassProfile(),
+                new MasteryProfile(),
+                new MentorRelationshipProfile(),
+                progress);
+
+            Assert(
+                snapshot.SkillTreeProgress.DiscoveredNodeIds.Count == 2
+                && snapshot.SkillTreeProgress.UnlockedNodeIds.Count == 1,
+                "Snapshot should capture discovered and unlocked skill tree node ids.");
+
+            Assert(
+                ContainsId(snapshot.SkillTreeProgress.DiscoveredNodeIds, "node_deep_sight")
+                && ContainsId(snapshot.SkillTreeProgress.DiscoveredNodeIds, "node_balance_ritual")
+                && ContainsId(snapshot.SkillTreeProgress.UnlockedNodeIds, "node_deep_sight"),
+                "Snapshot should preserve skill tree progress facts by stable node id.");
+        }
+
+        private static void AssertSkillTreeSnapshotRestoreRecreatesProgressState()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var sourceProgress = BuildSkillTreeProgressWithUnlockedRoot(skillTree);
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                new ClassProfile(),
+                new MasteryProfile(),
+                new MentorRelationshipProfile(),
+                sourceProgress);
+            var restoredProgress = new SkillTreeProgressProfile();
+
+            bool restored = service.RestoreSkillTreeProgressProfile(
+                snapshot,
+                restoredProgress,
+                skillTree);
+
+            Assert(
+                restored,
+                "Known skill tree progress snapshot should restore successfully.");
+
+            Assert(
+                restoredProgress.IsDiscovered("node_deep_sight")
+                && restoredProgress.IsUnlocked("node_deep_sight")
+                && restoredProgress.IsDiscovered("node_balance_ritual")
+                && !restoredProgress.IsUnlocked("node_balance_ritual"),
+                "Restore should recreate discovered and unlocked skill tree progress state.");
+        }
+
+        private static void AssertSkillTreeSnapshotRestoreValidatesNodeIdsThroughDefinition()
+        {
+            var snapshot = BuildUnknownSkillTreeProgressSnapshot();
+            var profile = new SkillTreeProgressProfile();
+
+            bool restored = new V2ProgressSnapshotService().RestoreSkillTreeProgressProfile(
+                snapshot,
+                profile,
+                BuildTestSkillTreeDefinition());
+
+            Assert(
+                !restored,
+                "Skill tree progress restore should reject node ids missing from the skill tree definition.");
+
+            Assert(
+                profile.DiscoveredNodeIds.Count == 0
+                && profile.UnlockedNodeIds.Count == 0,
+                "Rejected skill tree progress restore should not mutate profile state.");
+        }
+
+        private static void AssertUnknownSkillTreeSnapshotNodeDoesNotCorruptProfile()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var profile = BuildSkillTreeProgressWithUnlockedRoot(skillTree);
+            var snapshot = BuildUnknownSkillTreeProgressSnapshot();
+
+            bool restored = new V2ProgressSnapshotService().RestoreSkillTreeProgressProfile(
+                snapshot,
+                profile,
+                skillTree);
+
+            Assert(
+                !restored,
+                "Unknown skill tree node ids should fail safely without corrupting existing progress.");
+
+            Assert(
+                profile.IsDiscovered("node_deep_sight")
+                && profile.IsUnlocked("node_deep_sight")
+                && !profile.IsDiscovered("node_unknown"),
+                "Unknown skill tree node ids should preserve existing progress state.");
+        }
+
+        private static void AssertOlderJsonWithoutSkillTreeProgressRestoresSafely()
+        {
+            string json = "{"
+                + "\"SchemaVersion\":" + V2ProgressSnapshotVersions.CurrentSchemaVersion + ","
+                + "\"CodexEntries\":[],"
+                + "\"MissionLeads\":[],"
+                + "\"ActiveMissions\":[],"
+                + "\"Unlocks\":[],"
+                + "\"MasteryRecords\":[],"
+                + "\"MentorRelationships\":[]"
+                + "}";
+            var snapshot = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+            var profile = new SkillTreeProgressProfile();
+
+            bool restored = new V2ProgressSnapshotService().RestoreSkillTreeProgressProfile(
+                snapshot,
+                profile,
+                BuildTestSkillTreeDefinition());
+
+            Assert(
+                restored,
+                "Older JSON without skill tree progress data should restore safely.");
+
+            Assert(
+                snapshot.SkillTreeProgress.DiscoveredNodeIds.Count == 0
+                && snapshot.SkillTreeProgress.UnlockedNodeIds.Count == 0
+                && profile.DiscoveredNodeIds.Count == 0
+                && profile.UnlockedNodeIds.Count == 0,
+                "Missing skill tree progress data should restore as empty progress state.");
         }
 
         private static void AssertMentorCanBeDiscovered()
@@ -2118,6 +2260,49 @@ namespace Game.SmokeTests
                 skillRegistry);
 
             return skillTree;
+        }
+
+        private static SkillTreeProgressProfile BuildSkillTreeProgressWithUnlockedRoot(
+            SkillTreeDefinition skillTree)
+        {
+            var progress = new SkillTreeProgressProfile();
+
+            progress.DiscoverNode("node_deep_sight", skillTree);
+            progress.UnlockNode("node_deep_sight", skillTree);
+            progress.DiscoverNode("node_balance_ritual", skillTree);
+
+            return progress;
+        }
+
+        private static V2ProgressSnapshot BuildUnknownSkillTreeProgressSnapshot()
+        {
+            return new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new List<V2MasterySnapshot>(),
+                new List<V2MentorRelationshipSnapshot>(),
+                new V2SkillTreeProgressSnapshot(
+                    new[] { "node_unknown" },
+                    new List<string>()));
+        }
+
+        private static bool ContainsId(
+            IReadOnlyList<string> ids,
+            string id)
+        {
+            foreach (var candidateId in ids)
+            {
+                if (candidateId == id)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static MasteryProfile BuildMasteryProfileWithProgress()
