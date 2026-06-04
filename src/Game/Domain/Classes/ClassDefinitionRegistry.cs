@@ -14,12 +14,12 @@ namespace Game.Domain.Classes
 
         public bool Register(ClassDefinition classDefinition)
         {
-            if (!IsValidClass(classDefinition))
+            if (!IsValidClass(classDefinition) || definitions.ContainsKey(classDefinition.Id))
             {
                 return false;
             }
 
-            definitions[classDefinition.Id] = classDefinition;
+            definitions.Add(classDefinition.Id, classDefinition);
             return true;
         }
 
