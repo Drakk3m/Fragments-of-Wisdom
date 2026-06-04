@@ -15,7 +15,27 @@ namespace Game.Domain.Classes
         {
             Id = id;
             SkillId = skillId;
-            RequiredNodeIds = requiredNodeIds;
+            RequiredNodeIds = CopyRequiredNodeIds(requiredNodeIds);
+        }
+
+        private static IReadOnlyList<string> CopyRequiredNodeIds(IReadOnlyList<string> sourceNodeIds)
+        {
+            var nodeIds = new List<string>();
+
+            if (sourceNodeIds == null)
+            {
+                return nodeIds;
+            }
+
+            foreach (var nodeId in sourceNodeIds)
+            {
+                if (!string.IsNullOrWhiteSpace(nodeId))
+                {
+                    nodeIds.Add(nodeId);
+                }
+            }
+
+            return nodeIds;
         }
     }
 }
