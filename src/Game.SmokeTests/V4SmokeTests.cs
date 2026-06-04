@@ -3,6 +3,7 @@ using System.Text.Json;
 using Game.Domain.Classes;
 using Game.Domain.Codex;
 using Game.Domain.Missions;
+using Game.Domain.Player;
 using Game.Domain.Progress;
 using Game.Domain.Skills;
 
@@ -151,6 +152,7 @@ namespace Game.SmokeTests
                 {
                     AssertClassMentorTeachingMasteryWorkflow();
                     AssertMasteredSkillRetentionIntegratedWorkflow();
+                    AssertSkillTreeProgressionIntegratedWorkflow();
                 });
         }
 
@@ -1853,6 +1855,123 @@ namespace Game.SmokeTests
                 && !unmasteredResult.AllowedByCurrentClass
                 && !unmasteredResult.AllowedByMastery,
                 "Retention workflow should block non-mastered first-class skill after class switch.");
+        }
+
+        private static void AssertSkillTreeProgressionIntegratedWorkflow()
+        {
+            const string rootSkillId = "skill_tree_root";
+            const string prerequisiteSkillId = "skill_tree_prerequisite";
+            const string dependentSkillId = "skill_tree_dependent";
+            const string rootNodeId = "node_tree_root";
+            const string prerequisiteNodeId = "node_tree_prerequisite";
+            const string dependentNodeId = "node_tree_dependent";
+
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(BuildTestSkillDefinition(rootSkillId, "Tree Root"));
+            skillRegistry.Register(BuildTestSkillDefinition(prerequisiteSkillId, "Tree Prerequisite"));
+            skillRegistry.Register(BuildTestSkillDefinition(dependentSkillId, "Tree Dependent"));
+
+            var skillTree = new SkillTreeDefinition();
+            skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    rootNodeId,
+                    rootSkillId,
+                    new string[0]),
+                skillRegistry);
+            skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    prerequisiteNodeId,
+                    prerequisiteSkillId,
+                    new[] { rootNodeId }),
+                skillRegistry);
+            skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    dependentNodeId,
+                    dependentSkillId,
+                    new[] { prerequisiteNodeId }),
+                skillRegistry);
+
+            var progress = new SkillTreeProgressProfile();
+            var skillBook = new PlayerSkillBook();
+            var masteryProfile = new MasteryProfile();
+            var unlockPolicy = new SkillTreeUnlockPolicy();
+
+            Assert(
+                skillRegistry.Contains(rootSkillId)
+                && skillRegistry.Contains(prerequisiteSkillId)
+                && skillRegistry.Contains(dependentSkillId),
+                "Skill tree workflow should register skills.");
+
+            Assert(
+                skillTree.Contains(rootNodeId)
+                && skillTree.Contains(prerequisiteNodeId)
+                && skillTree.Contains(dependentNodeId),
+                "Skill tree workflow should create a three-node skill tree.");
+
+            Assert(
+                progress.DiscoverNode(rootNodeId, skillTree)
+                && progress.IsDiscovered(rootNodeId),
+                "Skill tree workflow should discover the first node.");
+
+            var rootResult = unlockPolicy.Evaluate(
+                rootNodeId,
+                skillTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                rootResult.CanUnlock
+                && progress.UnlockNode(rootNodeId, skillTree)
+                && progress.IsUnlocked(rootNodeId),
+                "Skill tree workflow should unlock the first node.");
+
+            progress.DiscoverNode(prerequisiteNodeId, skillTree);
+            progress.DiscoverNode(dependentNodeId, skillTree);
+            var blockedDependent = unlockPolicy.Evaluate(
+                dependentNodeId,
+                skillTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                !blockedDependent.CanUnlock
+                && blockedDependent.BlockReason == SkillTreeUnlockBlockReason.PrerequisiteMissing
+                && blockedDependent.MissingPrerequisiteNodeId == prerequisiteNodeId,
+                "Skill tree workflow should block dependent node before prerequisite unlock.");
+
+            var prerequisiteResult = unlockPolicy.Evaluate(
+                prerequisiteNodeId,
+                skillTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                prerequisiteResult.CanUnlock
+                && progress.UnlockNode(prerequisiteNodeId, skillTree)
+                && progress.IsUnlocked(prerequisiteNodeId),
+                "Skill tree workflow should unlock the prerequisite node.");
+
+            var dependentResult = unlockPolicy.Evaluate(
+                dependentNodeId,
+                skillTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                dependentResult.CanUnlock
+                && progress.UnlockNode(dependentNodeId, skillTree)
+                && progress.IsUnlocked(dependentNodeId),
+                "Skill tree workflow should allow and unlock the dependent node after prerequisite unlock.");
+
+            Assert(
+                !skillBook.HasSkill(rootSkillId)
+                && !skillBook.HasSkill(prerequisiteSkillId)
+                && !skillBook.HasSkill(dependentSkillId),
+                "Skill tree workflow should not automatically grant skills.");
+
+            Assert(
+                masteryProfile.Records.Count == 0,
+                "Skill tree workflow should leave mastery profile unchanged.");
         }
 
         private static MentorDefinition BuildLyraMentor(bool isAvailable)
