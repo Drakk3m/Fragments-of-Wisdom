@@ -64,3 +64,28 @@ After making changes, summarize:
 - Any behavior risks or architectural risks.
 - Tests or checks that were run.
 - Manual Unity validation steps, especially for scenes, prefabs, ScriptableObjects, serialized references, and `.meta` files.
+
+## Workflow Verification Rule
+
+After completing any significant mechanic:
+
+- Do not continue immediately with the next feature.
+- Create a verification iteration.
+- Validate:
+  - Build.
+  - Smoke tests.
+  - Assertion counts.
+  - Save/restore when state exists.
+  - Compatibility with older snapshots.
+  - Absence of parallel systems.
+  - Respect for architectural boundaries.
+  - Documentation updates.
+  - At least one integrated E2E flow.
+
+Suggested branch format:
+
+`codex/<mechanic>-workflow-verification`
+
+Goal:
+
+Detect technical debt and integration problems early before continuing to expand the backend.
