@@ -45,12 +45,10 @@ namespace Game.Domain.Classes
 
             if (teachingResult.MasteryProgressGranted <= 0)
             {
-                return new MentorTeachingApplicationResult(
-                    true,
+                return Blocked(
                     teachingResult.TaughtSkillId,
-                    0,
                     false,
-                    MentorTeachingApplicationBlockReason.None);
+                    MentorTeachingApplicationBlockReason.NoProgressGranted);
             }
 
             bool applied = masteryProfile.IncreaseProgress(

@@ -6,6 +6,7 @@ namespace Game.Domain.Classes
         TeachingBlocked,
         UnknownSkill,
         MasteryProfileMissing,
+        NoProgressGranted,
         AlreadyMastered
     }
 }

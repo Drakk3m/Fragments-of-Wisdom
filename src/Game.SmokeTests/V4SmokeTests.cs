@@ -101,6 +101,7 @@ namespace Game.SmokeTests
                 "Mentor teaching application assertions",
                 delegate
                 {
+                    AssertZeroProgressMentorTeachingIsNotApplied();
                     AssertAvailableMentorTeachingAppliesMasteryProgress();
                     AssertBlockedMentorTeachingDoesNotMutateMastery();
                     AssertMentorTeachingApplicationUnknownSkillFailsSafely();
@@ -1084,6 +1085,28 @@ namespace Game.SmokeTests
             Assert(
                 masteryProfile.GetRecord("skill_deep_sight").Progress == 12,
                 "Mentor teaching application should mutate only mastery progress.");
+        }
+
+        private static void AssertZeroProgressMentorTeachingIsNotApplied()
+        {
+            var masteryProfile = new MasteryProfile();
+            var skillRegistry = BuildTestSkillRegistry();
+            var teachingResult = BuildAvailableLyraDeepSightTeachingResult(0);
+
+            var applicationResult = new MentorTeachingApplicationService().Apply(
+                teachingResult,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                !applicationResult.Applied
+                && applicationResult.ProgressApplied == 0
+                && applicationResult.BlockReason == MentorTeachingApplicationBlockReason.NoProgressGranted,
+                "Zero-progress mentor teaching should not be treated as applied.");
+
+            Assert(
+                masteryProfile.Records.Count == 0,
+                "Zero-progress mentor teaching should not mutate mastery state.");
         }
 
         private static void AssertBlockedMentorTeachingDoesNotMutateMastery()
