@@ -2,7 +2,7 @@
 
 This document describes the current Vertical Slice V4 foundation for classes,
 mentors, mastery, mentor teaching, persistence, mastered skill retention, and
-workflow verification.
+skill tree progression.
 
 The scope remains intentionally small and domain-first. V4 stores and evaluates
 facts; it does not execute combat skills, grant rewards, drive UI, or introduce
@@ -16,6 +16,9 @@ SkillDefinition
   -> ClassDefinition allowed skill ids
   -> ClassDefinitionRegistry
   -> ClassProfile current class id
+  -> SkillTreeDefinition node/prerequisite facts
+  -> SkillTreeProgressProfile discovered/unlocked facts
+  -> SkillTreeUnlockPolicy
   -> MasteryProfile mastered skill facts
   -> MasteredSkillRetentionPolicy
 ```
@@ -28,8 +31,7 @@ MentorDefinition
   -> MentorTeachingApplicationService explicit MasteryProfile progress
 ```
 
-`UnlockProfile`, combat execution, UI, Unity presentation, and skill trees remain
-separate.
+`UnlockProfile`, combat execution, UI, and Unity presentation remain separate.
 
 ## Class Foundation
 
@@ -82,7 +84,8 @@ or skill definitions.
 ## Skill Definition Registry
 
 `SkillDefinitionRegistry` is the stable source of truth for skill ids used by
-class, mastery, mentor teaching, retention, and snapshot validation.
+class, skill tree nodes, mastery, mentor teaching, retention, and snapshot
+validation.
 
 Rules:
 
@@ -90,6 +93,106 @@ Rules:
 - null, empty id, and empty name are rejected safely
 - duplicate skill ids are rejected safely
 - unknown skill ids fail safely when a registry-aware operation is used
+
+## Skill Tree Progression
+
+`SkillTreeNodeDefinition` describes a skill tree node:
+
+- `Id`
+- `SkillId`
+- `RequiredNodeIds`
+
+Node rules:
+
+- node ids are stable ids
+- skill ids must resolve through `SkillDefinitionRegistry`
+- missing prerequisite lists are treated as empty
+- prerequisite ids are copied as stable node id facts
+
+`SkillTreeDefinition` owns skill tree node lookup:
+
+- `RegisterNode(node, skillRegistry)`
+- `Contains(nodeId)`
+- `Get(nodeId)`
+- `IsValidNode(node, skillRegistry)`
+
+Registry rules:
+
+- valid nodes register by stable node id
+- null or empty node ids are rejected safely
+- nodes with unknown skill ids are rejected safely
+- duplicate node ids are rejected safely
+- duplicate node ids do not replace the original node
+
+`SkillTreeProgressProfile` owns progression facts:
+
+- discovered node ids
+- unlocked node ids
+- `DiscoverNode(nodeId, skillTree)`
+- `UnlockNode(nodeId, skillTree)`
+- `IsDiscovered(nodeId)`
+- `IsUnlocked(nodeId)`
+
+Progress rules:
+
+- discovery validates node ids through `SkillTreeDefinition`
+- unlock validates node ids through `SkillTreeDefinition`
+- unlock records node facts only
+- unlock does not grant skills automatically
+- unlock does not mutate mastery
+
+`SkillTreeUnlockPolicy` evaluates whether a node can be unlocked.
+
+It returns `SkillTreeUnlockResult` facts:
+
+- `NodeId`
+- `SkillId`
+- `CanUnlock`
+- `IsDiscovered`
+- `IsAlreadyUnlocked`
+- `MissingPrerequisiteNodeId`
+- `BlockReason`
+
+Block reasons:
+
+- `None`
+- `UnknownNode`
+- `UnknownSkill`
+- `NodeNotDiscovered`
+- `PrerequisiteMissing`
+
+Unlock policy rules:
+
+- unknown nodes fail safely
+- node skill ids are validated through `SkillDefinitionRegistry`
+- undiscovered nodes are blocked
+- prerequisite node ids must already be unlocked
+- unlocked prerequisites allow dependent nodes to become unlockable
+- the policy returns facts only and does not grant skills
+
+## Skill Tree Snapshot And Save Behavior
+
+Skill tree progress persistence extends `V2ProgressSnapshot` in a
+backward-compatible way.
+
+Snapshot stores:
+
+- `DiscoveredNodeIds`
+- `UnlockedNodeIds`
+
+Restore rules:
+
+- restore validates all node ids through `SkillTreeDefinition`
+- known discovered node ids restore into `SkillTreeProgressProfile`
+- known unlocked node ids restore into `SkillTreeProgressProfile`
+- unknown node ids fail safely and do not mutate the target profile
+- older JSON without skill tree progress data restores safely as empty progress
+  state
+- schema version remains unchanged because missing skill tree progress data is
+  optional
+
+`V2ProgressSnapshotValidationService` rejects null skill tree progress sections,
+null discovered/unlocked node id lists, and empty node ids.
 
 ## Mastery Foundation
 
@@ -288,6 +391,7 @@ V4 smoke tests include integrated workflow coverage for:
 - class + mentor + teaching + mastery
 - class/mastery snapshot and restore
 - mastered skill retention after class switch
+- skill tree progression
 
 The mastered skill retention workflow verifies:
 
@@ -300,6 +404,19 @@ The mastered skill retention workflow verifies:
 - the mastered first-class skill remains usable through
   `MasteredSkillRetentionPolicy`
 - a non-mastered first-class skill is not usable after the class switch
+
+The skill tree workflow verifies:
+
+- skills are registered
+- a three-node skill tree is created
+- the first node is discovered
+- the first node is unlocked
+- a dependent node is blocked before its prerequisite unlock
+- the prerequisite node unlocks
+- the dependent node becomes unlockable
+- the dependent node unlocks
+- no skills are automatically granted
+- `MasteryProfile` remains unchanged
 
 ## Boundaries
 
@@ -319,7 +436,6 @@ Not included:
 - mentor rewards
 - mentor missions
 - dialogue
-- class skill trees beyond existing definition facts
 - UI
 - Unity
 - generator-wide rewrites
@@ -331,10 +447,10 @@ Current smoke groups:
 - V1 Legacy Slice assertions: `2`
 - V1 emitted event count: `38`
 - Shared Domain Foundations assertions: `16`
-- V2 Narrative / Progression / Persistence assertions: `252`
+- V2 Narrative / Progression / Persistence assertions: `253`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `133`
-- Total smoke assertions executed: `503`
+- V4 Classes / Mentors / Mastery assertions: `158`
+- Total smoke assertions executed: `529`
 
 ## Validation
 
