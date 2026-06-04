@@ -108,6 +108,13 @@ namespace Game.SmokeTests
                     AssertMentorTeachingApplicationCanMasterSkill();
                     AssertDuplicateMentorTeachingApplicationAfterMasteryIsSafe();
                 });
+
+            RunSection(
+                "Integrated workflow assertions",
+                delegate
+                {
+                    AssertClassMentorTeachingMasteryWorkflow();
+                });
         }
 
         private static void AssertClassCanBeAssigned()
@@ -1208,6 +1215,107 @@ namespace Game.SmokeTests
                 duplicateApplication.BlockReason == MentorTeachingApplicationBlockReason.AlreadyMastered
                 && masteryProfile.GetRecord("skill_deep_sight").Progress == MasteryRecord.MasteredProgress,
                 "Duplicate mentor teaching application should not exceed mastered progress.");
+        }
+
+        private static void AssertClassMentorTeachingMasteryWorkflow()
+        {
+            var skillRegistry = BuildTestSkillRegistry();
+            var classRegistry = BuildTestClassRegistry();
+            var mentorRegistry = BuildTestMentorRegistry();
+            var classProfile = new ClassProfile();
+            var mentorProfile = new MentorRelationshipProfile();
+            var masteryProfile = new MasteryProfile();
+            var teachingDefinition = BuildLyraDeepSightTeaching(20, 15);
+            var teachingService = new MentorTeachingService();
+            var applicationService = new MentorTeachingApplicationService();
+
+            Assert(
+                skillRegistry.Contains("skill_deep_sight"),
+                "Integrated workflow should register the taught skill.");
+
+            Assert(
+                classRegistry.Contains(ClassId.Tlamatini)
+                && classRegistry.Get(ClassId.Tlamatini).AllowsSkill("skill_deep_sight", skillRegistry),
+                "Integrated workflow should register a class that resolves the taught skill.");
+
+            Assert(
+                classProfile.AssignClassId(ClassId.Tlamatini, classRegistry)
+                && classProfile.CurrentClassAllowsSkill("skill_deep_sight", classRegistry, skillRegistry),
+                "Integrated workflow should assign a class that allows the taught skill.");
+
+            Assert(
+                mentorRegistry.Contains(MentorId.Lyra),
+                "Integrated workflow should register the mentor definition.");
+
+            Assert(
+                mentorProfile.Discover(MentorId.Lyra, mentorRegistry)
+                && mentorProfile.IsDiscovered(MentorId.Lyra),
+                "Integrated workflow should discover the mentor through the registry.");
+
+            Assert(
+                mentorProfile.IncreaseTrust(MentorId.Lyra, 25, mentorRegistry)
+                && mentorProfile.GetTrust(MentorId.Lyra) == 25,
+                "Integrated workflow should increase mentor trust through the registry.");
+
+            var teachingResult = teachingService.Evaluate(
+                teachingDefinition,
+                mentorProfile,
+                mentorRegistry,
+                skillRegistry);
+
+            Assert(
+                teachingResult.IsAvailable
+                && teachingResult.TaughtSkillId == "skill_deep_sight"
+                && teachingResult.MasteryProgressGranted == 15,
+                "Integrated workflow should resolve available mentor teaching facts.");
+
+            var applicationResult = applicationService.Apply(
+                teachingResult,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                applicationResult.Applied
+                && applicationResult.ProgressApplied == 15,
+                "Integrated workflow should apply available teaching to mastery.");
+
+            Assert(
+                masteryProfile.GetRecord("skill_deep_sight").Progress == 15,
+                "Integrated workflow should change mastery progress.");
+
+            var snapshotService = new V2ProgressSnapshotService();
+            var snapshot = snapshotService.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                classProfile,
+                masteryProfile);
+
+            Assert(
+                snapshot.ClassProfile != null
+                && snapshot.MasteryRecords.Count == 1,
+                "Integrated workflow should snapshot class and mastery state.");
+
+            var restoredClassProfile = new ClassProfile();
+            var restoredMasteryProfile = new MasteryProfile();
+            bool classRestored = snapshotService.RestoreClassProfile(
+                snapshot,
+                restoredClassProfile,
+                classRegistry);
+            bool masteryRestored = snapshotService.RestoreMasteryProfile(
+                snapshot,
+                restoredMasteryProfile,
+                skillRegistry);
+
+            Assert(
+                classRestored
+                && restoredClassProfile.CurrentClassId == ClassId.Tlamatini,
+                "Integrated workflow should restore class state through the registry.");
+
+            Assert(
+                masteryRestored
+                && restoredMasteryProfile.GetRecord("skill_deep_sight").Progress == 15,
+                "Integrated workflow should restore mastery state through the registry.");
         }
 
         private static MentorDefinition BuildLyraMentor(bool isAvailable)
