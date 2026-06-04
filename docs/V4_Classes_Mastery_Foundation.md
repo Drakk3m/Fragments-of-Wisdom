@@ -1,22 +1,37 @@
-# V4 Classes Mastery Foundation
+# V4 Classes, Mentors, Mastery Foundation
 
-This document describes the first Vertical Slice V4 foundation step for classes, mentors, and mastery.
+This document describes the current Vertical Slice V4 foundation for classes,
+mentors, mastery, mentor teaching, persistence, mastered skill retention, and
+workflow verification.
 
-The current scope is intentionally small: class identity, current class state, class changes, and class-specific skill access facts.
+The scope remains intentionally small and domain-first. V4 stores and evaluates
+facts; it does not execute combat skills, grant rewards, drive UI, or introduce
+Unity behavior.
 
 ## Current Flow
 
 ```text
-ClassDefinition
+SkillDefinition
+  -> SkillDefinitionRegistry
+  -> ClassDefinition allowed skill ids
   -> ClassDefinitionRegistry
   -> ClassProfile current class id
-  -> registry lookup
-  -> allowed skill id facts
+  -> MasteryProfile mastered skill facts
+  -> MasteredSkillRetentionPolicy
 ```
 
-`UnlockProfile` remains separate. Changing class does not remove learned or unlocked skills.
+```text
+MentorDefinition
+  -> MentorDefinitionRegistry
+  -> MentorRelationshipProfile discovery/trust/availability facts
+  -> MentorTeachingService teaching facts
+  -> MentorTeachingApplicationService explicit MasteryProfile progress
+```
 
-## Current Types
+`UnlockProfile`, combat execution, UI, Unity presentation, and skill trees remain
+separate.
+
+## Class Foundation
 
 `ClassId` centralizes stable class ids.
 
@@ -32,6 +47,8 @@ Current ids:
 - `FixedSkillIds`
 - `AllowedSkillIds`
 - `AllowsSkill(skillId)`
+- `AllowsSkill(skillId, skillRegistry)`
+- `ResolveAllowedSkills(skillRegistry)`
 
 `ClassDefinitionRegistry` owns class definition lookup:
 
@@ -39,6 +56,13 @@ Current ids:
 - `Contains(classId)`
 - `Get(classId)`
 - `ResolveCurrentClass(profile)`
+
+Registry rules:
+
+- valid class definitions register by stable id
+- null, empty id, and empty name are rejected safely
+- duplicate class ids are rejected safely
+- duplicate class ids do not replace the original definition
 
 `ClassProfile` owns only current class id state:
 
@@ -49,69 +73,268 @@ Current ids:
 - `ChangeClassId(classId, registry)`
 - `ResolveCurrentClass(registry)`
 - `CurrentClassAllowsSkill(skillId, registry)`
+- `CurrentClassAllowsSkill(skillId, classRegistry, skillRegistry)`
+- `ResolveCurrentClassAllowedSkills(classRegistry, skillRegistry)`
 
-`ClassBootstrap` still provides the current Tlamatini definition used by the V1 slice.
+Class changes do not mutate unlocks, mastery, mentors, combat state, inventory,
+or skill definitions.
 
-## Snapshot Boundary
+## Skill Definition Registry
 
-Class profile persistence extends the existing progress snapshot in a backward-compatible way.
+`SkillDefinitionRegistry` is the stable source of truth for skill ids used by
+class, mastery, mentor teaching, retention, and snapshot validation.
 
 Rules:
 
-- Snapshot stores only `CurrentClassId`.
-- Snapshot does not store `ClassDefinition` objects.
-- Restore validates the stored id through `ClassDefinitionRegistry`.
-- Known class ids restore into `ClassProfile.CurrentClassId`.
-- Unknown class ids fail safely and preserve existing class profile state.
-- Older JSON without class profile data restores safely and leaves class state unchanged.
-- Schema version remains unchanged because missing class data is treated as an empty optional section.
+- valid skill definitions register by stable id
+- null, empty id, and empty name are rejected safely
+- duplicate skill ids are rejected safely
+- unknown skill ids fail safely when a registry-aware operation is used
 
-## Rules
+## Mastery Foundation
 
-- A valid class can be assigned.
-- A valid class can replace the current class.
-- `ClassProfile` stores only the stable current class id.
-- Class definitions are resolved through `ClassDefinitionRegistry`.
-- Unknown class ids are rejected safely.
-- Null classes are rejected safely.
-- Classes with empty ids or names are rejected safely.
-- Rejected class changes preserve the current class.
-- Class definitions expose allowed skill id facts.
-- Class changes do not mutate `UnlockProfile`.
-- Learned or unlocked skills remain outside `ClassProfile`.
+`MasteryRecord` stores skill mastery facts:
+
+- `SkillId`
+- `Progress`
+- `Rank`
+- `IsMastered`
+
+`MasteryRank` is derived from progress:
+
+- `Unranked`
+- `Practiced`
+- `Mastered`
+
+`MasteryProfile` owns mastery records:
+
+- `Records`
+- `IncreaseProgress(skillId, amount, skillRegistry)`
+- `GetRecord(skillId)`
+- `IsMastered(skillId)`
+- `RestoreRecord(skillId, progress, skillRegistry)`
+
+Rules:
+
+- progress only applies for registered skill ids
+- zero or negative progress does not increase mastery
+- mastered progress is capped at `MasteryRecord.MasteredProgress`
+- duplicate progress after mastery is safe
+- mastery remains facts only
+
+## Mastery Snapshot And Save Behavior
+
+Mastery persistence extends `V2ProgressSnapshot` in a backward-compatible way.
+
+Snapshot stores:
+
+- `SkillId`
+- `Progress`
+- derived `Rank`
+
+Restore rules:
+
+- restore validates skill ids through `SkillDefinitionRegistry`
+- known skill ids restore into `MasteryProfile`
+- unknown skill ids fail safely and do not create mastery records
+- older JSON without mastery data restores safely as empty mastery state
+- schema version remains unchanged because missing mastery data is optional
+
+`V2ProgressSnapshotValidationService` also supports registry-aware mastery
+validation. When a `SkillDefinitionRegistry` is supplied, mastery snapshot skill
+ids must resolve through that registry.
+
+## Mentor Foundation
+
+`MentorId` centralizes stable mentor ids.
+
+Current ids:
+
+- `MentorId.Lyra`
+- `MentorId.Atlas`
+
+`MentorDefinition` describes a mentor:
+
+- `Id`
+- `Name`
+- `IsAvailable`
+- `IsValid()`
+
+`MentorDefinitionRegistry` owns mentor definition lookup:
+
+- `Register(mentor)`
+- `Contains(mentorId)`
+- `Get(mentorId)`
+
+Registry rules:
+
+- valid mentor definitions register by stable id
+- null, empty id, and empty name are rejected safely
+- duplicate mentor ids are rejected safely
+- duplicate mentor ids do not replace the original definition
+
+`MentorRelationshipProfile` owns relationship facts:
+
+- discovered mentor ids
+- trust/progress per mentor id
+- availability fact per discovered mentor id
+
+Relationship rules:
+
+- discovery validates mentor ids through `MentorDefinitionRegistry`
+- duplicate discovery is idempotent
+- trust increases only for discovered, registered mentors
+- unavailable mentors are reported as unavailable
+- unknown mentor ids fail safely
+
+## Mentor Relationship Snapshot And Save Behavior
+
+Mentor relationship persistence extends `V2ProgressSnapshot` in a
+backward-compatible way.
+
+Snapshot stores:
+
+- `MentorId`
+- `IsDiscovered`
+- `Trust`
+- `IsAvailable`
+
+Restore rules:
+
+- restore validates mentor ids through `MentorDefinitionRegistry`
+- known mentor ids restore discovered, trust, and availability facts
+- unknown mentor ids fail safely and do not create relationship state
+- older JSON without mentor relationship data restores safely as empty mentor
+  relationship state
+- schema version remains unchanged because missing mentor relationship data is
+  optional
+
+`V2ProgressSnapshotValidationService` rejects null mentor relationship
+collections and mentor relationship records with empty mentor ids.
+
+## Mentor Teaching
+
+`MentorTeachingDefinition` describes a teaching fact:
+
+- `MentorId`
+- `TaughtSkillId`
+- `RequiredTrust`
+- `MasteryProgressGranted`
+
+`MentorTeachingService` evaluates availability. It validates:
+
+- mentor id through `MentorDefinitionRegistry`
+- taught skill id through `SkillDefinitionRegistry`
+- mentor discovery through `MentorRelationshipProfile`
+- required trust through `MentorRelationshipProfile`
+
+It returns `MentorTeachingResult` facts only:
+
+- availability
+- mentor id
+- taught skill id
+- required trust
+- current trust
+- mastery progress granted
+- stable block reason
+- optional block message
+
+Teaching does not grant skills, mutate mastery, start missions, affect combat, or
+drive UI.
+
+`MentorTeachingApplicationService` explicitly consumes an available
+`MentorTeachingResult` and applies its mastery progress to `MasteryProfile`.
+
+Application rules:
+
+- blocked teaching does not mutate mastery
+- unknown skill ids fail safely
+- missing mastery profile fails safely
+- zero or negative mastery progress is not applied
+- already-mastered skills are safe and are not over-applied
+- successful application mutates only `MasteryProfile`
+
+## Mastered Skill Retention
+
+`MasteredSkillRetentionPolicy` evaluates whether a registered skill is usable
+after class changes.
+
+A skill is usable if:
+
+- the current class allows it, or
+- it is mastered in `MasteryProfile`
+
+The policy returns facts only:
+
+- `SkillId`
+- `IsUsable`
+- `AllowedByCurrentClass`
+- `AllowedByMastery`
+- stable block reason
+
+Rules:
+
+- skill ids must resolve through `SkillDefinitionRegistry`
+- class access is resolved through `ClassProfile` and `ClassDefinitionRegistry`
+- mastery access is resolved through `MasteryProfile`
+- no class is required when mastery allows the skill
+- the policy does not mutate `ClassProfile` or `MasteryProfile`
+- the policy does not execute skills or integrate with combat
+
+## Integrated Workflow Verification
+
+V4 smoke tests include integrated workflow coverage for:
+
+- class + mentor + teaching + mastery
+- class/mastery snapshot and restore
+- mastered skill retention after class switch
+
+The mastered skill retention workflow verifies:
+
+- two skills are registered
+- two classes with different allowed skills are registered
+- the first class is assigned
+- a mentor teaches a first-class skill
+- teaching is applied until the skill is mastered
+- the profile switches to a second class
+- the mastered first-class skill remains usable through
+  `MasteredSkillRetentionPolicy`
+- a non-mastered first-class skill is not usable after the class switch
 
 ## Boundaries
 
 Allowed:
 
 - pure C# domain models
-- smoke-testable class assignment and class change behavior
-- class-specific skill access facts
+- registry-backed validation
+- smoke-testable facts and services
+- snapshot DTOs and restore helpers
+- explicit service calls for state mutation
 
-Not included yet:
+Not included:
 
-- mastery
-- mentors
-- class trees
-- equipment restrictions
-- save changes
+- combat integration
+- skill execution changes
+- automatic skill unlock grants
+- mentor rewards
+- mentor missions
+- dialogue
+- class skill trees beyond existing definition facts
 - UI
 - Unity
-- combat rewrites
-- automatic skill grants or removals
+- generator-wide rewrites
 
 ## Smoke Expectations
 
 Current smoke groups:
 
 - V1 Legacy Slice assertions: `2`
+- V1 emitted event count: `38`
 - Shared Domain Foundations assertions: `16`
-- V2 Narrative / Progression / Persistence assertions: `239`
+- V2 Narrative / Progression / Persistence assertions: `252`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `23`
-- Total smoke assertions executed: `380`
-
-The V1 slice emitted event count remains `38`.
+- V4 Classes / Mentors / Mastery assertions: `133`
+- Total smoke assertions executed: `503`
 
 ## Validation
 
