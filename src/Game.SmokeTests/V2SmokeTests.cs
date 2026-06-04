@@ -204,6 +204,10 @@ namespace Game.SmokeTests
                     AssertV2SnapshotCurrentVersionRestores();
                     AssertV2SnapshotUnsupportedVersionIsRejected();
                     AssertV2SnapshotValidationRejectsInvalidMasteryId();
+                    AssertV2SnapshotValidationAcceptsRegisteredMasterySkillId();
+                    AssertV2SnapshotValidationRejectsUnknownMasterySkillIdWithRegistry();
+                    AssertV2SnapshotValidationWithoutSkillRegistryRemainsCompatible();
+                    AssertV2SnapshotValidationOlderJsonWithoutMasteryDataIsSafe();
                     AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots();
                 });
 
@@ -2345,7 +2349,57 @@ namespace Game.SmokeTests
                 !new V2ProgressSnapshotValidationService().IsValid(snapshot),
                 "Semantic snapshot validation should reject mastery records with empty skill ids.");
         }
-      
+
+        private static void AssertV2SnapshotValidationAcceptsRegisteredMasterySkillId()
+        {
+            var snapshot = BuildV2MasteryValidationSnapshot("skill_deep_sight");
+            var skillRegistry = BuildV2ValidationSkillRegistry();
+
+            Assert(
+                new V2ProgressSnapshotValidationService().IsValid(
+                    snapshot,
+                    skillRegistry),
+                "Registry-aware snapshot validation should accept registered mastery skill ids.");
+        }
+
+        private static void AssertV2SnapshotValidationRejectsUnknownMasterySkillIdWithRegistry()
+        {
+            var snapshot = BuildV2MasteryValidationSnapshot("skill_unknown");
+            var skillRegistry = BuildV2ValidationSkillRegistry();
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(
+                    snapshot,
+                    skillRegistry),
+                "Registry-aware snapshot validation should reject unknown mastery skill ids.");
+        }
+
+        private static void AssertV2SnapshotValidationWithoutSkillRegistryRemainsCompatible()
+        {
+            var snapshot = BuildV2MasteryValidationSnapshot("skill_unknown");
+
+            Assert(
+                new V2ProgressSnapshotValidationService().IsValid(snapshot),
+                "Snapshot validation without a skill registry should preserve existing id-only behavior.");
+        }
+
+        private static void AssertV2SnapshotValidationOlderJsonWithoutMasteryDataIsSafe()
+        {
+            string json = "{"
+                + "\"SchemaVersion\":" + V2ProgressSnapshotVersions.CurrentSchemaVersion + ","
+                + "\"CodexEntries\":[],"
+                + "\"MissionLeads\":[]"
+                + "}";
+            var snapshot = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+
+            Assert(
+                new V2ProgressSnapshotValidationService().IsValid(
+                    snapshot,
+                    BuildV2ValidationSkillRegistry())
+                && snapshot.MasteryRecords.Count == 0,
+                "Older JSON without mastery data should validate safely with a skill registry.");
+        }
+
         private static void AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots()
         {
             var validator = new V2ProgressSnapshotValidationService();
@@ -2384,6 +2438,41 @@ namespace Game.SmokeTests
                     invalidClassSnapshot,
                     ClassBootstrap.BuildDefinitionRegistry()),
                 "Semantic snapshot validation should reject unknown class ids when a class registry is supplied.");
+        }
+
+        private static V2ProgressSnapshot BuildV2MasteryValidationSnapshot(string skillId)
+        {
+            return new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new[]
+                {
+                    new V2MasterySnapshot(
+                        skillId,
+                        25,
+                        MasteryRank.Practiced)
+                });
+        }
+
+        private static SkillDefinitionRegistry BuildV2ValidationSkillRegistry()
+        {
+            var registry = new SkillDefinitionRegistry();
+
+            registry.Register(new SkillDefinition(
+                "skill_deep_sight",
+                "Deep Sight",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Utility,
+                SkillTargeting.Self,
+                SkillEffectType.Cleanse,
+                ""));
+
+            return registry;
         }
 
         private static void AssertV2SnapshotSerializesToJson()

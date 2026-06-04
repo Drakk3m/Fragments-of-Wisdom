@@ -1,5 +1,6 @@
 using System;
 using Game.Domain.Classes;
+using Game.Domain.Skills;
 
 namespace Game.Domain.Progress
 {
@@ -7,12 +8,27 @@ namespace Game.Domain.Progress
     {
         public bool IsValid(V2ProgressSnapshot snapshot)
         {
-            return IsValid(snapshot, null);
+            return IsValid(snapshot, null, null);
         }
 
         public bool IsValid(
             V2ProgressSnapshot snapshot,
             ClassDefinitionRegistry classRegistry)
+        {
+            return IsValid(snapshot, classRegistry, null);
+        }
+
+        public bool IsValid(
+            V2ProgressSnapshot snapshot,
+            SkillDefinitionRegistry skillRegistry)
+        {
+            return IsValid(snapshot, null, skillRegistry);
+        }
+
+        public bool IsValid(
+            V2ProgressSnapshot snapshot,
+            ClassDefinitionRegistry classRegistry,
+            SkillDefinitionRegistry skillRegistry)
         {
             if (snapshot == null || !snapshot.IsCurrentVersion())
             {
@@ -32,7 +48,7 @@ namespace Game.Domain.Progress
                 || !HasValidMissionLeads(snapshot)
                 || !HasValidActiveMissions(snapshot)
                 || !HasValidUnlocks(snapshot)
-                || !HasValidMasteryRecords(snapshot))
+                || !HasValidMasteryRecords(snapshot, skillRegistry))
             {
                 return false;
             }
@@ -42,14 +58,29 @@ namespace Game.Domain.Progress
 
         public void ThrowIfInvalid(V2ProgressSnapshot snapshot)
         {
-            ThrowIfInvalid(snapshot, null);
+            ThrowIfInvalid(snapshot, null, null);
         }
 
         public void ThrowIfInvalid(
             V2ProgressSnapshot snapshot,
             ClassDefinitionRegistry classRegistry)
         {
-            if (!IsValid(snapshot, classRegistry))
+            ThrowIfInvalid(snapshot, classRegistry, null);
+        }
+
+        public void ThrowIfInvalid(
+            V2ProgressSnapshot snapshot,
+            SkillDefinitionRegistry skillRegistry)
+        {
+            ThrowIfInvalid(snapshot, null, skillRegistry);
+        }
+
+        public void ThrowIfInvalid(
+            V2ProgressSnapshot snapshot,
+            ClassDefinitionRegistry classRegistry,
+            SkillDefinitionRegistry skillRegistry)
+        {
+            if (!IsValid(snapshot, classRegistry, skillRegistry))
             {
                 throw new InvalidOperationException("V2 progress snapshot failed semantic validation.");
             }
@@ -107,11 +138,18 @@ namespace Game.Domain.Progress
             return true;
         }
 
-        private static bool HasValidMasteryRecords(V2ProgressSnapshot snapshot)
+        private static bool HasValidMasteryRecords(
+            V2ProgressSnapshot snapshot,
+            SkillDefinitionRegistry skillRegistry)
         {
             foreach (var masteryRecord in snapshot.MasteryRecords)
             {
                 if (masteryRecord == null || string.IsNullOrWhiteSpace(masteryRecord.SkillId))
+                {
+                    return false;
+                }
+
+                if (skillRegistry != null && !skillRegistry.Contains(masteryRecord.SkillId))
                 {
                     return false;
                 }
