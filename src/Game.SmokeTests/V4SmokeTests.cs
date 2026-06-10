@@ -68,6 +68,18 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "V4 restore coordinator assertions",
+                delegate
+                {
+                    AssertV4RestoreCoordinatorRestoresAllProfiles();
+                    AssertV4RestoreCoordinatorReportsClassFailure();
+                    AssertV4RestoreCoordinatorReportsMasteryFailure();
+                    AssertV4RestoreCoordinatorReportsMentorFailure();
+                    AssertV4RestoreCoordinatorReportsSkillTreeFailure();
+                    AssertV4RestoreCoordinatorPartialFailureIsNotFullSuccess();
+                });
+
+            RunSection(
                 "Mastery foundation assertions",
                 delegate
                 {
@@ -1205,6 +1217,129 @@ namespace Game.SmokeTests
                 "Missing skill tree progress data should restore as empty progress state.");
         }
 
+        private static void AssertV4RestoreCoordinatorRestoresAllProfiles()
+        {
+            var snapshot = BuildCompleteV4Snapshot(
+                ClassId.Tlamatini,
+                "skill_deep_sight",
+                MentorId.Lyra,
+                "node_deep_sight");
+            var classProfile = new ClassProfile();
+            var masteryProfile = new MasteryProfile();
+            var mentorProfile = new MentorRelationshipProfile();
+            var skillTreeProgress = new SkillTreeProgressProfile();
+
+            var result = new V4ProgressRestoreCoordinator().Restore(
+                snapshot,
+                classProfile,
+                masteryProfile,
+                mentorProfile,
+                skillTreeProgress,
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                BuildTestSkillTreeDefinition());
+
+            Assert(
+                result.FullyRestored
+                && result.ClassRestored
+                && result.MasteryRestored
+                && result.MentorRelationshipsRestored
+                && result.SkillTreeProgressRestored,
+                "V4 restore coordinator should report all subsystem restore success.");
+
+            Assert(
+                classProfile.CurrentClassId == ClassId.Tlamatini
+                && masteryProfile.GetRecord("skill_deep_sight").Progress == 25
+                && mentorProfile.IsDiscovered(MentorId.Lyra)
+                && skillTreeProgress.IsUnlocked("node_deep_sight"),
+                "V4 restore coordinator should restore class, mastery, mentor, and skill tree state.");
+        }
+
+        private static void AssertV4RestoreCoordinatorReportsClassFailure()
+        {
+            var result = RestoreCompleteV4Snapshot(
+                BuildCompleteV4Snapshot(
+                    "class_unknown",
+                    "skill_deep_sight",
+                    MentorId.Lyra,
+                    "node_deep_sight"));
+
+            Assert(
+                !result.ClassRestored
+                && result.MasteryRestored
+                && result.MentorRelationshipsRestored
+                && result.SkillTreeProgressRestored,
+                "V4 restore coordinator should report class restore failure separately.");
+        }
+
+        private static void AssertV4RestoreCoordinatorReportsMasteryFailure()
+        {
+            var result = RestoreCompleteV4Snapshot(
+                BuildCompleteV4Snapshot(
+                    ClassId.Tlamatini,
+                    "skill_unknown",
+                    MentorId.Lyra,
+                    "node_deep_sight"));
+
+            Assert(
+                result.ClassRestored
+                && !result.MasteryRestored
+                && result.MentorRelationshipsRestored
+                && result.SkillTreeProgressRestored,
+                "V4 restore coordinator should report mastery restore failure separately.");
+        }
+
+        private static void AssertV4RestoreCoordinatorReportsMentorFailure()
+        {
+            var result = RestoreCompleteV4Snapshot(
+                BuildCompleteV4Snapshot(
+                    ClassId.Tlamatini,
+                    "skill_deep_sight",
+                    "mentor_unknown",
+                    "node_deep_sight"));
+
+            Assert(
+                result.ClassRestored
+                && result.MasteryRestored
+                && !result.MentorRelationshipsRestored
+                && result.SkillTreeProgressRestored,
+                "V4 restore coordinator should report mentor relationship restore failure separately.");
+        }
+
+        private static void AssertV4RestoreCoordinatorReportsSkillTreeFailure()
+        {
+            var result = RestoreCompleteV4Snapshot(
+                BuildCompleteV4Snapshot(
+                    ClassId.Tlamatini,
+                    "skill_deep_sight",
+                    MentorId.Lyra,
+                    "node_unknown"));
+
+            Assert(
+                result.ClassRestored
+                && result.MasteryRestored
+                && result.MentorRelationshipsRestored
+                && !result.SkillTreeProgressRestored,
+                "V4 restore coordinator should report skill tree progress restore failure separately.");
+        }
+
+        private static void AssertV4RestoreCoordinatorPartialFailureIsNotFullSuccess()
+        {
+            var result = RestoreCompleteV4Snapshot(
+                BuildCompleteV4Snapshot(
+                    "class_unknown",
+                    "skill_deep_sight",
+                    MentorId.Lyra,
+                    "node_unknown"));
+
+            Assert(
+                !result.FullyRestored
+                && !result.ClassRestored
+                && !result.SkillTreeProgressRestored,
+                "V4 restore coordinator partial failure should not look like full success.");
+        }
+
         private static void AssertMentorCanBeDiscovered()
         {
             var profile = new MentorRelationshipProfile();
@@ -2288,6 +2423,53 @@ namespace Game.SmokeTests
                 new V2SkillTreeProgressSnapshot(
                     new[] { "node_unknown" },
                     new List<string>()));
+        }
+
+        private static V2ProgressSnapshot BuildCompleteV4Snapshot(
+            string classId,
+            string masterySkillId,
+            string mentorId,
+            string skillTreeNodeId)
+        {
+            return new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                new V2ClassProfileSnapshot(classId),
+                new[]
+                {
+                    new V2MasterySnapshot(
+                        masterySkillId,
+                        25,
+                        MasteryRank.Practiced)
+                },
+                new[]
+                {
+                    new V2MentorRelationshipSnapshot(
+                        mentorId,
+                        true,
+                        12,
+                        true)
+                },
+                new V2SkillTreeProgressSnapshot(
+                    new[] { skillTreeNodeId },
+                    new[] { skillTreeNodeId }));
+        }
+
+        private static V4ProgressRestoreResult RestoreCompleteV4Snapshot(V2ProgressSnapshot snapshot)
+        {
+            return new V4ProgressRestoreCoordinator().Restore(
+                snapshot,
+                new ClassProfile(),
+                new MasteryProfile(),
+                new MentorRelationshipProfile(),
+                new SkillTreeProgressProfile(),
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                BuildTestSkillTreeDefinition());
         }
 
         private static bool ContainsId(
