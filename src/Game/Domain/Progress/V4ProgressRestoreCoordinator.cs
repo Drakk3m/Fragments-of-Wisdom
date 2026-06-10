@@ -55,7 +55,31 @@ namespace Game.Domain.Progress
                 classRestored,
                 masteryRestored,
                 mentorRelationshipsRestored,
-                skillTreeProgressRestored);
+                skillTreeProgressRestored,
+                BuildReason(classRestored),
+                BuildReason(masteryRestored),
+                BuildReason(mentorRelationshipsRestored),
+                BuildReason(skillTreeProgressRestored),
+                BuildMessage(classRestored, "ClassProfile"),
+                BuildMessage(masteryRestored, "MasteryProfile"),
+                BuildMessage(mentorRelationshipsRestored, "MentorRelationshipProfile"),
+                BuildMessage(skillTreeProgressRestored, "SkillTreeProgressProfile"));
+        }
+
+        private static V4ProgressRestoreFailureReason BuildReason(bool restored)
+        {
+            return restored
+                ? V4ProgressRestoreFailureReason.None
+                : V4ProgressRestoreFailureReason.ValidationFailed;
+        }
+
+        private static string BuildMessage(
+            bool restored,
+            string subsystemName)
+        {
+            return restored
+                ? ""
+                : subsystemName + " failed registry or snapshot validation during restore.";
         }
     }
 }
