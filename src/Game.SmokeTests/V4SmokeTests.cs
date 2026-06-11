@@ -201,6 +201,7 @@ namespace Game.SmokeTests
                     AssertMasteredSkillRetentionIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
+                    AssertClassSkillTreeBindingSaveRestoreIntegratedWorkflow();
                 });
         }
 
@@ -2624,6 +2625,89 @@ namespace Game.SmokeTests
                 !skillBook.HasSkill("skill_deep_sight")
                 && !skillBook.HasSkill("skill_minor_cleanse"),
                 "Class skill tree bindings should not automatically grant skills.");
+        }
+
+        private static void AssertClassSkillTreeBindingSaveRestoreIntegratedWorkflow()
+        {
+            var classRegistry = BuildTestClassRegistry();
+            var sourceBindingRegistry = BuildTestClassSkillTreeBindingRegistryWithBindings();
+            var progress = new SkillTreeProgressProfile();
+            var skillBook = new PlayerSkillBook();
+
+            Assert(
+                classRegistry.Contains(ClassId.Tlamatini)
+                && classRegistry.Contains(ClassId.Wanderer),
+                "Binding save workflow should register two classes.");
+
+            Assert(
+                sourceBindingRegistry.ContainsSkillTree(SkillTreeId.Tlamatini)
+                && sourceBindingRegistry.ContainsSkillTree(SkillTreeId.Wanderer),
+                "Binding save workflow should register two stable skill trees.");
+
+            Assert(
+                sourceBindingRegistry.GetBindingForClass(ClassId.Tlamatini).SkillTreeId
+                    == SkillTreeId.Tlamatini
+                && sourceBindingRegistry.GetBindingForClass(ClassId.Wanderer).SkillTreeId
+                    == SkillTreeId.Wanderer,
+                "Binding save workflow should bind each class to a different skill tree.");
+
+            var snapshot = BuildClassSkillTreeBindingSnapshot(sourceBindingRegistry);
+
+            Assert(
+                snapshot.ClassSkillTreeBindings.Count == 2,
+                "Binding save workflow should include both bindings in the snapshot.");
+
+            var serializer = new V2ProgressSnapshotJsonSerializer();
+            string json = serializer.Serialize(snapshot);
+            var deserializedSnapshot = serializer.Deserialize(json);
+
+            Assert(
+                deserializedSnapshot.ClassSkillTreeBindings.Count == 2,
+                "Binding save workflow should preserve bindings through JSON serialization.");
+
+            var restoredBindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            bool restored = new V2ProgressSnapshotService().RestoreClassSkillTreeBindings(
+                deserializedSnapshot,
+                restoredBindingRegistry,
+                classRegistry);
+
+            Assert(
+                restored
+                && restoredBindingRegistry.Bindings.Count == 2,
+                "Binding save workflow should restore bindings into a fresh registry.");
+
+            var classProfile = new ClassProfile();
+            bool firstAssigned = classProfile.AssignClassId(
+                ClassId.Tlamatini,
+                classRegistry);
+            var firstSkillTree = restoredBindingRegistry.ResolveCurrentClassSkillTree(classProfile);
+
+            Assert(
+                firstAssigned
+                && firstSkillTree != null
+                && firstSkillTree.Id == SkillTreeId.Tlamatini,
+                "Binding save workflow should resolve the restored first-class skill tree.");
+
+            bool secondAssigned = classProfile.ChangeClassId(
+                ClassId.Wanderer,
+                classRegistry);
+            var secondSkillTree = restoredBindingRegistry.ResolveCurrentClassSkillTree(classProfile);
+
+            Assert(
+                secondAssigned
+                && secondSkillTree != null
+                && secondSkillTree.Id == SkillTreeId.Wanderer,
+                "Binding save workflow should resolve the restored second-class skill tree after switching.");
+
+            Assert(
+                progress.DiscoveredNodeIds.Count == 0
+                && progress.UnlockedNodeIds.Count == 0,
+                "Restored bindings should not mutate skill tree progress.");
+
+            Assert(
+                !skillBook.HasSkill("skill_deep_sight")
+                && !skillBook.HasSkill("skill_minor_cleanse"),
+                "Restored bindings should not automatically grant skills.");
         }
 
         private static MentorDefinition BuildLyraMentor(bool isAvailable)
