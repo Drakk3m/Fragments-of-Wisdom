@@ -50,10 +50,13 @@ namespace Game.SmokeTests
                 {
                     AssertSkillTreeNodeCanBeRegisteredAndResolved();
                     AssertSkillTreeNodeWithRegisteredSkillIdIsValid();
+                    AssertSkillTreeNodeWithExistingPrerequisiteRegistersSuccessfully();
+                    AssertSkillTreeNodeWithMissingPrerequisiteIsRejected();
                     AssertSkillTreeNodeWithUnknownSkillIdIsRejected();
                     AssertSkillTreePrerequisiteBlocksUnlockUntilMet();
                     AssertUnlockedPrerequisiteAllowsNextNode();
                     AssertDuplicateSkillTreeNodeIdIsRejectedSafely();
+                    AssertValidMultiNodeTreeRemainsUsableByUnlockPolicy();
                 });
 
             RunSection(
@@ -1026,6 +1029,47 @@ namespace Game.SmokeTests
                 "Skill tree node with registered skill id should be valid.");
         }
 
+        private static void AssertSkillTreeNodeWithExistingPrerequisiteRegistersSuccessfully()
+        {
+            var skillTree = new SkillTreeDefinition();
+            var skillRegistry = BuildTestSkillRegistry();
+            var rootNode = new SkillTreeNodeDefinition(
+                "node_deep_sight",
+                "skill_deep_sight",
+                new string[0]);
+            var dependentNode = new SkillTreeNodeDefinition(
+                "node_balance_ritual",
+                "skill_balance_ritual",
+                new[] { "node_deep_sight" });
+
+            bool rootRegistered = skillTree.RegisterNode(rootNode, skillRegistry);
+            bool dependentRegistered = skillTree.RegisterNode(dependentNode, skillRegistry);
+
+            Assert(
+                rootRegistered
+                && dependentRegistered
+                && skillTree.Get("node_balance_ritual") == dependentNode,
+                "Skill tree node should register when every prerequisite already exists in the same tree.");
+        }
+
+        private static void AssertSkillTreeNodeWithMissingPrerequisiteIsRejected()
+        {
+            var skillTree = new SkillTreeDefinition();
+            var node = new SkillTreeNodeDefinition(
+                "node_balance_ritual",
+                "skill_balance_ritual",
+                new[] { "node_missing" });
+
+            bool registered = skillTree.RegisterNode(
+                node,
+                BuildTestSkillRegistry());
+
+            Assert(
+                !registered
+                && !skillTree.Contains("node_balance_ritual"),
+                "Skill tree node with a missing prerequisite id should be rejected safely.");
+        }
+
         private static void AssertSkillTreeNodeWithUnknownSkillIdIsRejected()
         {
             var skillTree = new SkillTreeDefinition();
@@ -1110,6 +1154,29 @@ namespace Game.SmokeTests
                 && !duplicateRegistered
                 && skillTree.Get("node_deep_sight") == original,
                 "Duplicate skill tree node ids should be rejected without replacing the original node.");
+        }
+
+        private static void AssertValidMultiNodeTreeRemainsUsableByUnlockPolicy()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var progress = new SkillTreeProgressProfile();
+            var skillRegistry = BuildTestSkillRegistry();
+
+            progress.DiscoverNode("node_deep_sight", skillTree);
+            progress.UnlockNode("node_deep_sight", skillTree);
+            progress.DiscoverNode("node_balance_ritual", skillTree);
+
+            var result = new SkillTreeUnlockPolicy().Evaluate(
+                "node_balance_ritual",
+                skillTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                skillTree.Nodes.Count == 2
+                && result.CanUnlock
+                && result.BlockReason == SkillTreeUnlockBlockReason.None,
+                "Valid multi-node tree should remain usable by SkillTreeUnlockPolicy.");
         }
 
         private static void AssertClassCanBindToSkillTree()
