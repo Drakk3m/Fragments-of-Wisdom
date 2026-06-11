@@ -132,6 +132,14 @@ Registry rules:
 - stable skill tree ids are optional for standalone node/progression tests
 - stable skill tree ids are required when registering a tree for class binding
 - valid nodes register by stable node id
+- prerequisite nodes must already exist in the same `SkillTreeDefinition`
+- nodes must be registered in prerequisite-first order
+- forward prerequisite references are rejected safely
+- self-references are rejected because the node does not exist before its own
+  registration
+- cycles cannot be introduced through incremental registration because every
+  dependency must already exist
+- missing prerequisite ids reject the node without mutating the tree
 - null or empty node ids are rejected safely
 - nodes with unknown skill ids are rejected safely
 - duplicate node ids are rejected safely
@@ -213,6 +221,28 @@ Binding rules:
 - binding returns facts only
 - binding does not grant skills automatically
 - binding does not mutate `SkillTreeProgressProfile`
+
+## Class Skill Tree Binding Snapshot And Restore
+
+Class skill tree binding persistence extends `V2ProgressSnapshot` without a
+schema version bump.
+
+Each binding snapshot stores:
+
+- `ClassId`
+- `SkillTreeId`
+
+Restore rules:
+
+- class ids validate through `ClassDefinitionRegistry`
+- skill tree ids validate through trees registered in
+  `ClassSkillTreeBindingRegistry`
+- the complete binding collection is validated before mutation
+- unknown ids, duplicate class ids, or conflicting existing bindings fail
+  safely
+- invalid binding collections do not partially mutate the target registry
+- matching existing bindings restore idempotently
+- older JSON without binding data restores safely as an empty collection
 
 ## Skill Tree Snapshot And Save Behavior
 
@@ -428,6 +458,47 @@ Rules:
 - the policy does not mutate `ClassProfile` or `MasteryProfile`
 - the policy does not execute skills or integrate with combat
 
+## Unified V4 Restore Coordinator
+
+`V4ProgressRestoreCoordinator` restores V4 state in this defined order:
+
+1. `ClassProfile`
+2. `MasteryProfile`
+3. `MentorRelationshipProfile`
+4. `SkillTreeProgressProfile`
+5. class skill tree bindings
+
+The binding-aware coordinator overload receives:
+
+- `ClassDefinitionRegistry`
+- `SkillDefinitionRegistry`
+- `MentorDefinitionRegistry`
+- `SkillTreeDefinition`
+- `ClassSkillTreeBindingRegistry` containing registered skill tree definitions
+
+Existing coordinator calls remain compatible. The original overload restores
+the original four subsystems and treats binding restore as not required. The
+binding-aware overload restores bindings through the existing
+`V2ProgressSnapshotService` behavior.
+
+`V4ProgressRestoreResult` exposes per-subsystem facts, including:
+
+- `ClassRestored`
+- `MasteryRestored`
+- `MentorRelationshipsRestored`
+- `SkillTreeProgressRestored`
+- `ClassSkillTreeBindingsRestored`
+- `FullyRestored`
+
+Binding restore also exposes structured failure details:
+
+- `ClassSkillTreeBindingsFailureReason`
+- `ClassSkillTreeBindingsFailureMessage`
+
+All subsystems expose stable `V4ProgressRestoreFailureReason` values and
+human-readable messages. Any failed subsystem, including binding restore,
+causes `FullyRestored` to be false.
+
 ## Integrated Workflow Verification
 
 V4 smoke tests include integrated workflow coverage for:
@@ -437,6 +508,7 @@ V4 smoke tests include integrated workflow coverage for:
 - mastered skill retention after class switch
 - skill tree progression
 - class-specific skill tree binding
+- class skill tree binding snapshot, JSON round-trip, and restore
 
 The mastered skill retention workflow verifies:
 
@@ -475,6 +547,15 @@ The class skill tree binding workflow verifies:
 - bindings do not mutate `SkillTreeProgressProfile`
 - bindings do not grant skills automatically
 
+The binding save workflow additionally verifies:
+
+- both bindings are captured in the progress snapshot
+- bindings survive JSON serialization and deserialization
+- bindings restore into a fresh registry
+- restored bindings resolve after assigning and switching classes
+- restored bindings do not mutate skill tree progress
+- restored bindings do not grant skills automatically
+
 ## Boundaries
 
 Allowed:
@@ -504,10 +585,10 @@ Current smoke groups:
 - V1 Legacy Slice assertions: `2`
 - V1 emitted event count: `38`
 - Shared Domain Foundations assertions: `16`
-- V2 Narrative / Progression / Persistence assertions: `253`
+- V2 Narrative / Progression / Persistence assertions: `254`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `186`
-- Total smoke assertions executed: `557`
+- V4 Classes / Mentors / Mastery assertions: `211`
+- Total smoke assertions executed: `583`
 
 ## Validation
 
