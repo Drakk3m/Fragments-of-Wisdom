@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Game.Domain.Classes;
 using Game.Domain.Skills;
 
@@ -41,7 +42,8 @@ namespace Game.Domain.Progress
                 || snapshot.Unlocks == null
                 || snapshot.MasteryRecords == null
                 || snapshot.MentorRelationships == null
-                || snapshot.SkillTreeProgress == null)
+                || snapshot.SkillTreeProgress == null
+                || snapshot.ClassSkillTreeBindings == null)
             {
                 return false;
             }
@@ -52,7 +54,8 @@ namespace Game.Domain.Progress
                 || !HasValidUnlocks(snapshot)
                 || !HasValidMasteryRecords(snapshot, skillRegistry)
                 || !HasValidMentorRelationships(snapshot)
-                || !HasValidSkillTreeProgress(snapshot))
+                || !HasValidSkillTreeProgress(snapshot)
+                || !HasValidClassSkillTreeBindings(snapshot))
             {
                 return false;
             }
@@ -194,6 +197,24 @@ namespace Game.Domain.Progress
             foreach (var nodeId in snapshot.SkillTreeProgress.UnlockedNodeIds)
             {
                 if (string.IsNullOrWhiteSpace(nodeId))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasValidClassSkillTreeBindings(V2ProgressSnapshot snapshot)
+        {
+            var classIds = new HashSet<string>();
+
+            foreach (var binding in snapshot.ClassSkillTreeBindings)
+            {
+                if (binding == null
+                    || string.IsNullOrWhiteSpace(binding.ClassId)
+                    || string.IsNullOrWhiteSpace(binding.SkillTreeId)
+                    || !classIds.Add(binding.ClassId))
                 {
                     return false;
                 }

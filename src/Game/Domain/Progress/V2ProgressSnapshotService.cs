@@ -165,6 +165,43 @@ namespace Game.Domain.Progress
                 BuildSkillTreeProgressSnapshot(skillTreeProgressProfile));
         }
 
+        public V2ProgressSnapshot CreateSnapshot(
+            CodexProfile codexProfile,
+            MissionJournalProfile missionJournalProfile,
+            UnlockProfile unlockProfile,
+            ClassProfile classProfile,
+            MasteryProfile masteryProfile,
+            MentorRelationshipProfile mentorRelationshipProfile,
+            SkillTreeProgressProfile skillTreeProgressProfile,
+            ClassSkillTreeBindingRegistry classSkillTreeBindingRegistry)
+        {
+            if (classSkillTreeBindingRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(classSkillTreeBindingRegistry));
+            }
+
+            var snapshot = CreateSnapshot(
+                codexProfile,
+                missionJournalProfile,
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                mentorRelationshipProfile,
+                skillTreeProgressProfile);
+
+            return new V2ProgressSnapshot(
+                snapshot.SchemaVersion,
+                snapshot.CodexEntries,
+                snapshot.MissionLeads,
+                snapshot.ActiveMissions,
+                snapshot.Unlocks,
+                snapshot.ClassProfile,
+                snapshot.MasteryRecords,
+                snapshot.MentorRelationships,
+                snapshot.SkillTreeProgress,
+                BuildClassSkillTreeBindingSnapshots(classSkillTreeBindingRegistry));
+        }
+
         public bool CanRestore(V2ProgressSnapshot snapshot)
         {
             if (snapshot == null)
@@ -443,6 +480,74 @@ namespace Game.Domain.Progress
             return true;
         }
 
+        public bool RestoreClassSkillTreeBindings(
+            V2ProgressSnapshot snapshot,
+            ClassSkillTreeBindingRegistry bindingRegistry,
+            ClassDefinitionRegistry classRegistry)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (bindingRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(bindingRegistry));
+            }
+
+            if (classRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(classRegistry));
+            }
+
+            if (!CanRestore(snapshot))
+            {
+                throw new InvalidOperationException("Unsupported V2 progress snapshot schema version.");
+            }
+
+            var restoredClassIds = new HashSet<string>();
+
+            foreach (var bindingSnapshot in snapshot.ClassSkillTreeBindings)
+            {
+                if (bindingSnapshot == null
+                    || string.IsNullOrWhiteSpace(bindingSnapshot.ClassId)
+                    || string.IsNullOrWhiteSpace(bindingSnapshot.SkillTreeId)
+                    || !classRegistry.Contains(bindingSnapshot.ClassId)
+                    || !bindingRegistry.ContainsSkillTree(bindingSnapshot.SkillTreeId)
+                    || !restoredClassIds.Add(bindingSnapshot.ClassId))
+                {
+                    return false;
+                }
+
+                var existingBinding = bindingRegistry.GetBindingForClass(bindingSnapshot.ClassId);
+
+                if (existingBinding != null
+                    && existingBinding.SkillTreeId != bindingSnapshot.SkillTreeId)
+                {
+                    return false;
+                }
+            }
+
+            foreach (var bindingSnapshot in snapshot.ClassSkillTreeBindings)
+            {
+                if (bindingRegistry.GetBindingForClass(bindingSnapshot.ClassId) != null)
+                {
+                    continue;
+                }
+
+                if (!bindingRegistry.RegisterBinding(
+                    new ClassSkillTreeBinding(
+                        bindingSnapshot.ClassId,
+                        bindingSnapshot.SkillTreeId),
+                    classRegistry))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private static IReadOnlyList<V2CodexEntrySnapshot> BuildCodexSnapshots(
             IReadOnlyList<CodexEntryRecord> entries)
         {
@@ -565,6 +670,21 @@ namespace Game.Domain.Progress
             return new V2SkillTreeProgressSnapshot(
                 CopyIds(skillTreeProgressProfile.DiscoveredNodeIds),
                 CopyIds(skillTreeProgressProfile.UnlockedNodeIds));
+        }
+
+        private static IReadOnlyList<V2ClassSkillTreeBindingSnapshot> BuildClassSkillTreeBindingSnapshots(
+            ClassSkillTreeBindingRegistry bindingRegistry)
+        {
+            var snapshots = new List<V2ClassSkillTreeBindingSnapshot>();
+
+            foreach (var binding in bindingRegistry.Bindings.Values)
+            {
+                snapshots.Add(new V2ClassSkillTreeBindingSnapshot(
+                    binding.ClassId,
+                    binding.SkillTreeId));
+            }
+
+            return snapshots;
         }
 
         private static IReadOnlyList<string> CopyIds(IReadOnlyCollection<string> sourceIds)

@@ -72,6 +72,7 @@ namespace Game.Domain.Progress
             dto.Unlocks = new List<UnlockDto>();
             dto.MasteryRecords = new List<MasteryDto>();
             dto.MentorRelationships = new List<MentorRelationshipDto>();
+            dto.ClassSkillTreeBindings = new List<ClassSkillTreeBindingDto>();
             dto.SkillTreeProgress = new SkillTreeProgressDto
             {
                 DiscoveredNodeIds = CopyTags(snapshot.SkillTreeProgress.DiscoveredNodeIds),
@@ -159,6 +160,15 @@ namespace Game.Domain.Progress
                 });
             }
 
+            foreach (var binding in snapshot.ClassSkillTreeBindings)
+            {
+                dto.ClassSkillTreeBindings.Add(new ClassSkillTreeBindingDto
+                {
+                    ClassId = binding.ClassId,
+                    SkillTreeId = binding.SkillTreeId
+                });
+            }
+
             return dto;
         }
 
@@ -170,6 +180,7 @@ namespace Game.Domain.Progress
             var unlocks = new List<V2UnlockSnapshot>();
             var masteryRecords = new List<V2MasterySnapshot>();
             var mentorRelationships = new List<V2MentorRelationshipSnapshot>();
+            var classSkillTreeBindings = new List<V2ClassSkillTreeBindingSnapshot>();
             var skillTreeProgress = dto.SkillTreeProgress == null
                 ? new V2SkillTreeProgressSnapshot(new List<string>(), new List<string>())
                 : new V2SkillTreeProgressSnapshot(
@@ -257,6 +268,16 @@ namespace Game.Domain.Progress
                 }
             }
 
+            if (dto.ClassSkillTreeBindings != null)
+            {
+                foreach (var binding in dto.ClassSkillTreeBindings)
+                {
+                    classSkillTreeBindings.Add(new V2ClassSkillTreeBindingSnapshot(
+                        binding.ClassId,
+                        binding.SkillTreeId));
+                }
+            }
+
             return new V2ProgressSnapshot(
                 dto.SchemaVersion,
                 codexEntries,
@@ -268,7 +289,8 @@ namespace Game.Domain.Progress
                     : new V2ClassProfileSnapshot(dto.ClassProfile.CurrentClassId),
                 masteryRecords,
                 mentorRelationships,
-                skillTreeProgress);
+                skillTreeProgress,
+                classSkillTreeBindings);
         }
 
         private static List<string> CopyTags(IReadOnlyList<string> sourceTags)
@@ -299,6 +321,7 @@ namespace Game.Domain.Progress
             public List<MasteryDto> MasteryRecords { get; set; }
             public List<MentorRelationshipDto> MentorRelationships { get; set; }
             public SkillTreeProgressDto SkillTreeProgress { get; set; }
+            public List<ClassSkillTreeBindingDto> ClassSkillTreeBindings { get; set; }
         }
 
         private class CodexEntryDto
@@ -367,6 +390,12 @@ namespace Game.Domain.Progress
         {
             public List<string> DiscoveredNodeIds { get; set; }
             public List<string> UnlockedNodeIds { get; set; }
+        }
+
+        private class ClassSkillTreeBindingDto
+        {
+            public string ClassId { get; set; }
+            public string SkillTreeId { get; set; }
         }
     }
 }

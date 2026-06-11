@@ -13,6 +13,7 @@ namespace Game.Domain.Progress
         public IReadOnlyList<V2MasterySnapshot> MasteryRecords { get; private set; }
         public IReadOnlyList<V2MentorRelationshipSnapshot> MentorRelationships { get; private set; }
         public V2SkillTreeProgressSnapshot SkillTreeProgress { get; private set; }
+        public IReadOnlyList<V2ClassSkillTreeBindingSnapshot> ClassSkillTreeBindings { get; private set; }
 
         public V2ProgressSnapshot(
             int schemaVersion,
@@ -131,6 +132,31 @@ namespace Game.Domain.Progress
             IReadOnlyList<V2MasterySnapshot> masteryRecords,
             IReadOnlyList<V2MentorRelationshipSnapshot> mentorRelationships,
             V2SkillTreeProgressSnapshot skillTreeProgress)
+            : this(
+                schemaVersion,
+                codexEntries,
+                missionLeads,
+                activeMissions,
+                unlocks,
+                classProfile,
+                masteryRecords,
+                mentorRelationships,
+                skillTreeProgress,
+                new List<V2ClassSkillTreeBindingSnapshot>())
+        {
+        }
+
+        public V2ProgressSnapshot(
+            int schemaVersion,
+            IReadOnlyList<V2CodexEntrySnapshot> codexEntries,
+            IReadOnlyList<V2MissionLeadSnapshot> missionLeads,
+            IReadOnlyList<V2ActiveMissionSnapshot> activeMissions,
+            IReadOnlyList<V2UnlockSnapshot> unlocks,
+            V2ClassProfileSnapshot classProfile,
+            IReadOnlyList<V2MasterySnapshot> masteryRecords,
+            IReadOnlyList<V2MentorRelationshipSnapshot> mentorRelationships,
+            V2SkillTreeProgressSnapshot skillTreeProgress,
+            IReadOnlyList<V2ClassSkillTreeBindingSnapshot> classSkillTreeBindings)
         {
             SchemaVersion = schemaVersion;
             CodexEntries = codexEntries;
@@ -147,6 +173,9 @@ namespace Game.Domain.Progress
             SkillTreeProgress = skillTreeProgress == null
                 ? new V2SkillTreeProgressSnapshot(new List<string>(), new List<string>())
                 : skillTreeProgress;
+            ClassSkillTreeBindings = classSkillTreeBindings == null
+                ? new List<V2ClassSkillTreeBindingSnapshot>()
+                : classSkillTreeBindings;
         }
 
         public bool IsCurrentVersion()
