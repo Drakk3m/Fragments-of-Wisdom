@@ -68,6 +68,18 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Class skill tree binding save snapshot assertions",
+                delegate
+                {
+                    AssertClassSkillTreeBindingSnapshotCapturesBindings();
+                    AssertClassSkillTreeBindingSnapshotRestoreRecreatesBindings();
+                    AssertClassSkillTreeBindingSnapshotRestoreValidatesClassIds();
+                    AssertClassSkillTreeBindingSnapshotRestoreValidatesSkillTreeIds();
+                    AssertUnknownClassSkillTreeBindingSnapshotIdsDoNotCorruptExistingBindings();
+                    AssertOlderJsonWithoutClassSkillTreeBindingsRestoresSafely();
+                });
+
+            RunSection(
                 "Skill tree save snapshot assertions",
                 delegate
                 {
@@ -1197,6 +1209,137 @@ namespace Game.SmokeTests
                 currentSkillTree != null
                 && currentSkillTree.Id == SkillTreeId.Tlamatini,
                 "Current class should resolve its registered skill tree binding.");
+        }
+
+        private static void AssertClassSkillTreeBindingSnapshotCapturesBindings()
+        {
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistryWithBindings();
+            var snapshot = BuildClassSkillTreeBindingSnapshot(bindingRegistry);
+
+            Assert(
+                snapshot.ClassSkillTreeBindings.Count == 2
+                && FindClassSkillTreeBindingSnapshot(snapshot, ClassId.Tlamatini).SkillTreeId
+                    == SkillTreeId.Tlamatini
+                && FindClassSkillTreeBindingSnapshot(snapshot, ClassId.Wanderer).SkillTreeId
+                    == SkillTreeId.Wanderer,
+                "Snapshot should capture class skill tree bindings by stable ids.");
+        }
+
+        private static void AssertClassSkillTreeBindingSnapshotRestoreRecreatesBindings()
+        {
+            var sourceRegistry = BuildTestClassSkillTreeBindingRegistryWithBindings();
+            var sourceSnapshot = BuildClassSkillTreeBindingSnapshot(sourceRegistry);
+            string json = new V2ProgressSnapshotJsonSerializer().Serialize(sourceSnapshot);
+            var restoredSnapshot = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+            var targetRegistry = BuildTestClassSkillTreeBindingRegistry();
+
+            bool restored = new V2ProgressSnapshotService().RestoreClassSkillTreeBindings(
+                restoredSnapshot,
+                targetRegistry,
+                BuildTestClassRegistry());
+
+            Assert(
+                restored
+                && targetRegistry.ResolveSkillTreeForClass(ClassId.Tlamatini).Id
+                    == SkillTreeId.Tlamatini
+                && targetRegistry.ResolveSkillTreeForClass(ClassId.Wanderer).Id
+                    == SkillTreeId.Wanderer,
+                "Snapshot JSON round-trip should recreate class skill tree bindings.");
+        }
+
+        private static void AssertClassSkillTreeBindingSnapshotRestoreValidatesClassIds()
+        {
+            var snapshot = BuildClassSkillTreeBindingSnapshot(
+                new V2ClassSkillTreeBindingSnapshot(
+                    "class_unknown",
+                    SkillTreeId.Tlamatini));
+            var targetRegistry = BuildTestClassSkillTreeBindingRegistry();
+
+            bool restored = new V2ProgressSnapshotService().RestoreClassSkillTreeBindings(
+                snapshot,
+                targetRegistry,
+                BuildTestClassRegistry());
+
+            Assert(
+                !restored
+                && targetRegistry.Bindings.Count == 0,
+                "Class skill tree binding restore should reject class ids missing from ClassDefinitionRegistry.");
+        }
+
+        private static void AssertClassSkillTreeBindingSnapshotRestoreValidatesSkillTreeIds()
+        {
+            var snapshot = BuildClassSkillTreeBindingSnapshot(
+                new V2ClassSkillTreeBindingSnapshot(
+                    ClassId.Tlamatini,
+                    "skill_tree_unknown"));
+            var targetRegistry = BuildTestClassSkillTreeBindingRegistry();
+
+            bool restored = new V2ProgressSnapshotService().RestoreClassSkillTreeBindings(
+                snapshot,
+                targetRegistry,
+                BuildTestClassRegistry());
+
+            Assert(
+                !restored
+                && targetRegistry.Bindings.Count == 0,
+                "Class skill tree binding restore should reject unregistered skill tree ids.");
+        }
+
+        private static void AssertUnknownClassSkillTreeBindingSnapshotIdsDoNotCorruptExistingBindings()
+        {
+            var classRegistry = BuildTestClassRegistry();
+            var targetRegistry = BuildTestClassSkillTreeBindingRegistry();
+            targetRegistry.RegisterBinding(
+                new ClassSkillTreeBinding(
+                    ClassId.Tlamatini,
+                    SkillTreeId.Tlamatini),
+                classRegistry);
+            var originalBinding = targetRegistry.GetBindingForClass(ClassId.Tlamatini);
+            var snapshot = BuildClassSkillTreeBindingSnapshot(
+                new V2ClassSkillTreeBindingSnapshot(
+                    ClassId.Wanderer,
+                    SkillTreeId.Wanderer),
+                new V2ClassSkillTreeBindingSnapshot(
+                    ClassId.Tlamatini,
+                    "skill_tree_unknown"));
+
+            bool restored = new V2ProgressSnapshotService().RestoreClassSkillTreeBindings(
+                snapshot,
+                targetRegistry,
+                classRegistry);
+
+            Assert(
+                !restored
+                && targetRegistry.GetBindingForClass(ClassId.Tlamatini) == originalBinding
+                && targetRegistry.GetBindingForClass(ClassId.Wanderer) == null
+                && targetRegistry.Bindings.Count == 1,
+                "Unknown binding ids should fail atomically without corrupting existing bindings.");
+        }
+
+        private static void AssertOlderJsonWithoutClassSkillTreeBindingsRestoresSafely()
+        {
+            string json = "{"
+                + "\"SchemaVersion\":" + V2ProgressSnapshotVersions.CurrentSchemaVersion + ","
+                + "\"CodexEntries\":[],"
+                + "\"MissionLeads\":[],"
+                + "\"ActiveMissions\":[],"
+                + "\"Unlocks\":[],"
+                + "\"MasteryRecords\":[],"
+                + "\"MentorRelationships\":[]"
+                + "}";
+            var snapshot = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+            var targetRegistry = BuildTestClassSkillTreeBindingRegistry();
+
+            bool restored = new V2ProgressSnapshotService().RestoreClassSkillTreeBindings(
+                snapshot,
+                targetRegistry,
+                BuildTestClassRegistry());
+
+            Assert(
+                restored
+                && snapshot.ClassSkillTreeBindings.Count == 0
+                && targetRegistry.Bindings.Count == 0,
+                "Older JSON without class skill tree binding data should restore safely as empty bindings.");
         }
 
         private static void AssertSkillTreeSnapshotCapturesDiscoveredAndUnlockedNodes()
@@ -2642,6 +2785,72 @@ namespace Game.SmokeTests
             registry.RegisterSkillTree(BuildTestSkillTreeDefinition(SkillTreeId.Wanderer));
 
             return registry;
+        }
+
+        private static ClassSkillTreeBindingRegistry BuildTestClassSkillTreeBindingRegistryWithBindings()
+        {
+            var classRegistry = BuildTestClassRegistry();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+
+            bindingRegistry.RegisterBinding(
+                new ClassSkillTreeBinding(
+                    ClassId.Tlamatini,
+                    SkillTreeId.Tlamatini),
+                classRegistry);
+            bindingRegistry.RegisterBinding(
+                new ClassSkillTreeBinding(
+                    ClassId.Wanderer,
+                    SkillTreeId.Wanderer),
+                classRegistry);
+
+            return bindingRegistry;
+        }
+
+        private static V2ProgressSnapshot BuildClassSkillTreeBindingSnapshot(
+            ClassSkillTreeBindingRegistry bindingRegistry)
+        {
+            return new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                new ClassProfile(),
+                new MasteryProfile(),
+                new MentorRelationshipProfile(),
+                new SkillTreeProgressProfile(),
+                bindingRegistry);
+        }
+
+        private static V2ProgressSnapshot BuildClassSkillTreeBindingSnapshot(
+            params V2ClassSkillTreeBindingSnapshot[] bindings)
+        {
+            return new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new List<V2MasterySnapshot>(),
+                new List<V2MentorRelationshipSnapshot>(),
+                new V2SkillTreeProgressSnapshot(
+                    new List<string>(),
+                    new List<string>()),
+                bindings);
+        }
+
+        private static V2ClassSkillTreeBindingSnapshot FindClassSkillTreeBindingSnapshot(
+            V2ProgressSnapshot snapshot,
+            string classId)
+        {
+            foreach (var binding in snapshot.ClassSkillTreeBindings)
+            {
+                if (binding.ClassId == classId)
+                {
+                    return binding;
+                }
+            }
+
+            return null;
         }
 
         private static SkillTreeProgressProfile BuildSkillTreeProgressWithUnlockedRoot(
