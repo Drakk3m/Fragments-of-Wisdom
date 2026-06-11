@@ -188,6 +188,7 @@ namespace Game.SmokeTests
                     AssertClassMentorTeachingMasteryWorkflow();
                     AssertMasteredSkillRetentionIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
+                    AssertClassSkillTreeBindingIntegratedWorkflow();
                 });
         }
 
@@ -2413,6 +2414,73 @@ namespace Game.SmokeTests
             Assert(
                 masteryProfile.Records.Count == 0,
                 "Skill tree workflow should leave mastery profile unchanged.");
+        }
+
+        private static void AssertClassSkillTreeBindingIntegratedWorkflow()
+        {
+            var classRegistry = BuildTestClassRegistry();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var classProfile = new ClassProfile();
+            var progress = new SkillTreeProgressProfile();
+            var skillBook = new PlayerSkillBook();
+
+            bool firstBindingRegistered = bindingRegistry.RegisterBinding(
+                new ClassSkillTreeBinding(
+                    ClassId.Tlamatini,
+                    SkillTreeId.Tlamatini),
+                classRegistry);
+            bool secondBindingRegistered = bindingRegistry.RegisterBinding(
+                new ClassSkillTreeBinding(
+                    ClassId.Wanderer,
+                    SkillTreeId.Wanderer),
+                classRegistry);
+
+            Assert(
+                classRegistry.Contains(ClassId.Tlamatini)
+                && classRegistry.Contains(ClassId.Wanderer),
+                "Class skill tree binding workflow should register two classes.");
+
+            Assert(
+                bindingRegistry.ContainsSkillTree(SkillTreeId.Tlamatini)
+                && bindingRegistry.ContainsSkillTree(SkillTreeId.Wanderer),
+                "Class skill tree binding workflow should register two stable skill trees.");
+
+            Assert(
+                firstBindingRegistered
+                && secondBindingRegistered,
+                "Class skill tree binding workflow should bind each class to a different skill tree.");
+
+            Assert(
+                classProfile.AssignClassId(ClassId.Tlamatini, classRegistry),
+                "Class skill tree binding workflow should assign the first class.");
+
+            var firstSkillTree = bindingRegistry.ResolveCurrentClassSkillTree(classProfile);
+
+            Assert(
+                firstSkillTree != null
+                && firstSkillTree.Id == SkillTreeId.Tlamatini,
+                "Class skill tree binding workflow should resolve the first class skill tree.");
+
+            Assert(
+                classProfile.ChangeClassId(ClassId.Wanderer, classRegistry),
+                "Class skill tree binding workflow should switch to the second class.");
+
+            var secondSkillTree = bindingRegistry.ResolveCurrentClassSkillTree(classProfile);
+
+            Assert(
+                secondSkillTree != null
+                && secondSkillTree.Id == SkillTreeId.Wanderer,
+                "Class skill tree binding workflow should resolve the second class skill tree.");
+
+            Assert(
+                progress.DiscoveredNodeIds.Count == 0
+                && progress.UnlockedNodeIds.Count == 0,
+                "Class skill tree bindings should not mutate skill tree progress.");
+
+            Assert(
+                !skillBook.HasSkill("skill_deep_sight")
+                && !skillBook.HasSkill("skill_minor_cleanse"),
+                "Class skill tree bindings should not automatically grant skills.");
         }
 
         private static MentorDefinition BuildLyraMentor(bool isAvailable)
