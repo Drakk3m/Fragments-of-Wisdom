@@ -8,9 +8,21 @@ namespace Game.Domain.Classes
         private readonly Dictionary<string, SkillTreeNodeDefinition> nodesById =
             new Dictionary<string, SkillTreeNodeDefinition>();
 
+        public string Id { get; private set; }
+
         public IReadOnlyDictionary<string, SkillTreeNodeDefinition> Nodes
         {
             get { return nodesById; }
+        }
+
+        public SkillTreeDefinition()
+            : this("")
+        {
+        }
+
+        public SkillTreeDefinition(string id)
+        {
+            Id = id;
         }
 
         public bool RegisterNode(

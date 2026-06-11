@@ -57,6 +57,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Class skill tree binding assertions",
+                delegate
+                {
+                    AssertClassCanBindToSkillTree();
+                    AssertDuplicateClassSkillTreeBindingIsRejectedSafely();
+                    AssertUnknownClassSkillTreeBindingFailsSafely();
+                    AssertUnknownSkillTreeBindingFailsSafely();
+                    AssertCurrentClassCanResolveSkillTreeBinding();
+                });
+
+            RunSection(
                 "Skill tree save snapshot assertions",
                 delegate
                 {
@@ -1085,6 +1096,106 @@ namespace Game.SmokeTests
                 && !duplicateRegistered
                 && skillTree.Get("node_deep_sight") == original,
                 "Duplicate skill tree node ids should be rejected without replacing the original node.");
+        }
+
+        private static void AssertClassCanBindToSkillTree()
+        {
+            var classRegistry = BuildTestClassRegistry();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var binding = new ClassSkillTreeBinding(
+                ClassId.Tlamatini,
+                SkillTreeId.Tlamatini);
+
+            bool registered = bindingRegistry.RegisterBinding(
+                binding,
+                classRegistry);
+
+            Assert(
+                registered
+                && bindingRegistry.GetBindingForClass(ClassId.Tlamatini) == binding
+                && bindingRegistry.ResolveSkillTreeForClass(ClassId.Tlamatini).Id == SkillTreeId.Tlamatini,
+                "Class should bind to a registered skill tree by stable ids.");
+        }
+
+        private static void AssertDuplicateClassSkillTreeBindingIsRejectedSafely()
+        {
+            var classRegistry = BuildTestClassRegistry();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var original = new ClassSkillTreeBinding(
+                ClassId.Tlamatini,
+                SkillTreeId.Tlamatini);
+            var duplicate = new ClassSkillTreeBinding(
+                ClassId.Tlamatini,
+                SkillTreeId.Wanderer);
+
+            bool firstRegistered = bindingRegistry.RegisterBinding(
+                original,
+                classRegistry);
+            bool duplicateRegistered = bindingRegistry.RegisterBinding(
+                duplicate,
+                classRegistry);
+
+            Assert(
+                firstRegistered
+                && !duplicateRegistered
+                && bindingRegistry.GetBindingForClass(ClassId.Tlamatini) == original
+                && bindingRegistry.ResolveSkillTreeForClass(ClassId.Tlamatini).Id == SkillTreeId.Tlamatini,
+                "Duplicate class skill tree bindings should be rejected without replacing the original binding.");
+        }
+
+        private static void AssertUnknownClassSkillTreeBindingFailsSafely()
+        {
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var binding = new ClassSkillTreeBinding(
+                "class_unknown",
+                SkillTreeId.Tlamatini);
+
+            bool registered = bindingRegistry.RegisterBinding(
+                binding,
+                BuildTestClassRegistry());
+
+            Assert(
+                !registered
+                && bindingRegistry.GetBindingForClass("class_unknown") == null,
+                "Class skill tree binding should reject unknown class ids safely.");
+        }
+
+        private static void AssertUnknownSkillTreeBindingFailsSafely()
+        {
+            var bindingRegistry = new ClassSkillTreeBindingRegistry();
+            var binding = new ClassSkillTreeBinding(
+                ClassId.Tlamatini,
+                "skill_tree_unknown");
+
+            bool registered = bindingRegistry.RegisterBinding(
+                binding,
+                BuildTestClassRegistry());
+
+            Assert(
+                !registered
+                && bindingRegistry.GetBindingForClass(ClassId.Tlamatini) == null,
+                "Class skill tree binding should reject unknown skill tree ids safely.");
+        }
+
+        private static void AssertCurrentClassCanResolveSkillTreeBinding()
+        {
+            var classRegistry = BuildTestClassRegistry();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var profile = new ClassProfile();
+
+            profile.AssignClassId(ClassId.Tlamatini, classRegistry);
+            bindingRegistry.RegisterBinding(
+                new ClassSkillTreeBinding(
+                    ClassId.Tlamatini,
+                    SkillTreeId.Tlamatini),
+                classRegistry);
+
+            var currentSkillTree = bindingRegistry.ResolveCurrentClassSkillTree(profile);
+
+            Assert(
+                currentSkillTree != null
+                && currentSkillTree.Id == SkillTreeId.Tlamatini,
+                "Current class should resolve its registered skill tree binding.");
         }
 
         private static void AssertSkillTreeSnapshotCapturesDiscoveredAndUnlockedNodes()
@@ -2431,7 +2542,12 @@ namespace Game.SmokeTests
 
         private static SkillTreeDefinition BuildTestSkillTreeDefinition()
         {
-            var skillTree = new SkillTreeDefinition();
+            return BuildTestSkillTreeDefinition("");
+        }
+
+        private static SkillTreeDefinition BuildTestSkillTreeDefinition(string skillTreeId)
+        {
+            var skillTree = new SkillTreeDefinition(skillTreeId);
             var skillRegistry = BuildTestSkillRegistry();
 
             skillTree.RegisterNode(
@@ -2448,6 +2564,16 @@ namespace Game.SmokeTests
                 skillRegistry);
 
             return skillTree;
+        }
+
+        private static ClassSkillTreeBindingRegistry BuildTestClassSkillTreeBindingRegistry()
+        {
+            var registry = new ClassSkillTreeBindingRegistry();
+
+            registry.RegisterSkillTree(BuildTestSkillTreeDefinition(SkillTreeId.Tlamatini));
+            registry.RegisterSkillTree(BuildTestSkillTreeDefinition(SkillTreeId.Wanderer));
+
+            return registry;
         }
 
         private static SkillTreeProgressProfile BuildSkillTreeProgressWithUnlockedRoot(
