@@ -29,7 +29,9 @@ namespace Game.Domain.Classes
             SkillTreeNodeDefinition node,
             SkillDefinitionRegistry skillRegistry)
         {
-            if (!IsValidNode(node, skillRegistry) || nodesById.ContainsKey(node.Id))
+            if (!IsValidNode(node, skillRegistry)
+                || nodesById.ContainsKey(node.Id)
+                || !HasRegisteredPrerequisites(node))
             {
                 return false;
             }
@@ -61,6 +63,19 @@ namespace Game.Domain.Classes
                 && !string.IsNullOrWhiteSpace(node.Id)
                 && skillRegistry != null
                 && skillRegistry.Contains(node.SkillId);
+        }
+
+        private bool HasRegisteredPrerequisites(SkillTreeNodeDefinition node)
+        {
+            foreach (var requiredNodeId in node.RequiredNodeIds)
+            {
+                if (!nodesById.ContainsKey(requiredNodeId))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }
