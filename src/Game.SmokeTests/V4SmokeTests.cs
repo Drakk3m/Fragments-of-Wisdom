@@ -104,6 +104,10 @@ namespace Game.SmokeTests
                     AssertV4RestoreCoordinatorReportsMentorFailure();
                     AssertV4RestoreCoordinatorReportsSkillTreeFailure();
                     AssertV4RestoreCoordinatorPartialFailureIsNotFullSuccess();
+                    AssertV4RestoreCoordinatorRestoresClassSkillTreeBindings();
+                    AssertV4RestoreCoordinatorReportsClassSkillTreeBindingFailure();
+                    AssertV4RestoreCoordinatorBindingFailureIsNotFullSuccess();
+                    AssertV4RestoreCoordinatorRestoredBindingResolvesCurrentClassSkillTree();
                 });
 
             RunSection(
@@ -1716,6 +1720,95 @@ namespace Game.SmokeTests
                 "V4 restore coordinator partial failure should expose enough facts for UI or debug explanations.");
         }
 
+        private static void AssertV4RestoreCoordinatorRestoresClassSkillTreeBindings()
+        {
+            var snapshot = BuildCompleteV4SnapshotWithBinding(
+                ClassId.Tlamatini,
+                SkillTreeId.Tlamatini);
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+
+            var result = RestoreCompleteV4SnapshotWithBindings(
+                snapshot,
+                bindingRegistry);
+
+            Assert(
+                result.FullyRestored
+                && result.ClassSkillTreeBindingsRestored
+                && bindingRegistry.GetBindingForClass(ClassId.Tlamatini).SkillTreeId
+                    == SkillTreeId.Tlamatini,
+                "V4 restore coordinator should restore class skill tree bindings successfully.");
+
+            Assert(
+                result.ClassSkillTreeBindingsFailureReason == V4ProgressRestoreFailureReason.None
+                && result.ClassSkillTreeBindingsFailureMessage == string.Empty,
+                "Successful binding restore should expose no binding failure details.");
+        }
+
+        private static void AssertV4RestoreCoordinatorReportsClassSkillTreeBindingFailure()
+        {
+            var result = RestoreCompleteV4SnapshotWithBindings(
+                BuildCompleteV4SnapshotWithBinding(
+                    ClassId.Tlamatini,
+                    "skill_tree_unknown"),
+                BuildTestClassSkillTreeBindingRegistry());
+
+            Assert(
+                result.ClassRestored
+                && result.MasteryRestored
+                && result.MentorRelationshipsRestored
+                && result.SkillTreeProgressRestored
+                && !result.ClassSkillTreeBindingsRestored,
+                "V4 restore coordinator should report binding restore failure separately.");
+
+            Assert(
+                result.ClassSkillTreeBindingsFailureReason
+                    == V4ProgressRestoreFailureReason.ValidationFailed
+                && result.ClassSkillTreeBindingsFailureMessage.Contains("ClassSkillTreeBindings"),
+                "V4 restore coordinator should expose binding restore failure details.");
+        }
+
+        private static void AssertV4RestoreCoordinatorBindingFailureIsNotFullSuccess()
+        {
+            var result = RestoreCompleteV4SnapshotWithBindings(
+                BuildCompleteV4SnapshotWithBinding(
+                    "class_unknown",
+                    SkillTreeId.Tlamatini),
+                BuildTestClassSkillTreeBindingRegistry());
+
+            Assert(
+                !result.FullyRestored
+                && !result.ClassSkillTreeBindingsRestored,
+                "Binding restore failure should prevent V4 coordinator full success.");
+        }
+
+        private static void AssertV4RestoreCoordinatorRestoredBindingResolvesCurrentClassSkillTree()
+        {
+            var snapshot = BuildCompleteV4SnapshotWithBinding(
+                ClassId.Tlamatini,
+                SkillTreeId.Tlamatini);
+            var classProfile = new ClassProfile();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+
+            var result = new V4ProgressRestoreCoordinator().Restore(
+                snapshot,
+                classProfile,
+                new MasteryProfile(),
+                new MentorRelationshipProfile(),
+                new SkillTreeProgressProfile(),
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                BuildTestSkillTreeDefinition(),
+                bindingRegistry);
+            var currentSkillTree = bindingRegistry.ResolveCurrentClassSkillTree(classProfile);
+
+            Assert(
+                result.FullyRestored
+                && currentSkillTree != null
+                && currentSkillTree.Id == SkillTreeId.Tlamatini,
+                "Successful coordinated restore should resolve the current class skill tree binding.");
+        }
+
         private static void AssertMentorCanBeDiscovered()
         {
             var profile = new MentorRelationshipProfile();
@@ -3077,6 +3170,51 @@ namespace Game.SmokeTests
                 BuildTestSkillRegistry(),
                 BuildTestMentorRegistry(),
                 BuildTestSkillTreeDefinition());
+        }
+
+        private static V2ProgressSnapshot BuildCompleteV4SnapshotWithBinding(
+            string bindingClassId,
+            string skillTreeId)
+        {
+            var snapshot = BuildCompleteV4Snapshot(
+                ClassId.Tlamatini,
+                "skill_deep_sight",
+                MentorId.Lyra,
+                "node_deep_sight");
+
+            return new V2ProgressSnapshot(
+                snapshot.SchemaVersion,
+                snapshot.CodexEntries,
+                snapshot.MissionLeads,
+                snapshot.ActiveMissions,
+                snapshot.Unlocks,
+                snapshot.ClassProfile,
+                snapshot.MasteryRecords,
+                snapshot.MentorRelationships,
+                snapshot.SkillTreeProgress,
+                new[]
+                {
+                    new V2ClassSkillTreeBindingSnapshot(
+                        bindingClassId,
+                        skillTreeId)
+                });
+        }
+
+        private static V4ProgressRestoreResult RestoreCompleteV4SnapshotWithBindings(
+            V2ProgressSnapshot snapshot,
+            ClassSkillTreeBindingRegistry bindingRegistry)
+        {
+            return new V4ProgressRestoreCoordinator().Restore(
+                snapshot,
+                new ClassProfile(),
+                new MasteryProfile(),
+                new MentorRelationshipProfile(),
+                new SkillTreeProgressProfile(),
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                BuildTestSkillTreeDefinition(),
+                bindingRegistry);
         }
 
         private static bool ContainsId(

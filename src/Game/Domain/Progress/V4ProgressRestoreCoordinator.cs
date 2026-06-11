@@ -34,6 +34,64 @@ namespace Game.Domain.Progress
             MentorDefinitionRegistry mentorRegistry,
             SkillTreeDefinition skillTree)
         {
+            return RestoreInternal(
+                snapshot,
+                classProfile,
+                masteryProfile,
+                mentorRelationshipProfile,
+                skillTreeProgressProfile,
+                classRegistry,
+                skillRegistry,
+                mentorRegistry,
+                skillTree,
+                null,
+                false);
+        }
+
+        public V4ProgressRestoreResult Restore(
+            V2ProgressSnapshot snapshot,
+            ClassProfile classProfile,
+            MasteryProfile masteryProfile,
+            MentorRelationshipProfile mentorRelationshipProfile,
+            SkillTreeProgressProfile skillTreeProgressProfile,
+            ClassDefinitionRegistry classRegistry,
+            SkillDefinitionRegistry skillRegistry,
+            MentorDefinitionRegistry mentorRegistry,
+            SkillTreeDefinition skillTree,
+            ClassSkillTreeBindingRegistry classSkillTreeBindingRegistry)
+        {
+            if (classSkillTreeBindingRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(classSkillTreeBindingRegistry));
+            }
+
+            return RestoreInternal(
+                snapshot,
+                classProfile,
+                masteryProfile,
+                mentorRelationshipProfile,
+                skillTreeProgressProfile,
+                classRegistry,
+                skillRegistry,
+                mentorRegistry,
+                skillTree,
+                classSkillTreeBindingRegistry,
+                true);
+        }
+
+        private V4ProgressRestoreResult RestoreInternal(
+            V2ProgressSnapshot snapshot,
+            ClassProfile classProfile,
+            MasteryProfile masteryProfile,
+            MentorRelationshipProfile mentorRelationshipProfile,
+            SkillTreeProgressProfile skillTreeProgressProfile,
+            ClassDefinitionRegistry classRegistry,
+            SkillDefinitionRegistry skillRegistry,
+            MentorDefinitionRegistry mentorRegistry,
+            SkillTreeDefinition skillTree,
+            ClassSkillTreeBindingRegistry classSkillTreeBindingRegistry,
+            bool restoreClassSkillTreeBindings)
+        {
             bool classRestored = snapshotService.RestoreClassProfile(
                 snapshot,
                 classProfile,
@@ -50,20 +108,28 @@ namespace Game.Domain.Progress
                 snapshot,
                 skillTreeProgressProfile,
                 skillTree);
+            bool classSkillTreeBindingsRestored = !restoreClassSkillTreeBindings
+                || snapshotService.RestoreClassSkillTreeBindings(
+                    snapshot,
+                    classSkillTreeBindingRegistry,
+                    classRegistry);
 
             return new V4ProgressRestoreResult(
                 classRestored,
                 masteryRestored,
                 mentorRelationshipsRestored,
                 skillTreeProgressRestored,
+                classSkillTreeBindingsRestored,
                 BuildReason(classRestored),
                 BuildReason(masteryRestored),
                 BuildReason(mentorRelationshipsRestored),
                 BuildReason(skillTreeProgressRestored),
+                BuildReason(classSkillTreeBindingsRestored),
                 BuildMessage(classRestored, "ClassProfile"),
                 BuildMessage(masteryRestored, "MasteryProfile"),
                 BuildMessage(mentorRelationshipsRestored, "MentorRelationshipProfile"),
-                BuildMessage(skillTreeProgressRestored, "SkillTreeProgressProfile"));
+                BuildMessage(skillTreeProgressRestored, "SkillTreeProgressProfile"),
+                BuildMessage(classSkillTreeBindingsRestored, "ClassSkillTreeBindings"));
         }
 
         private static V4ProgressRestoreFailureReason BuildReason(bool restored)
