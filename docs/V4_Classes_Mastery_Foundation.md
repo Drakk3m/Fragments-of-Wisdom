@@ -2,7 +2,7 @@
 
 This document describes the current Vertical Slice V4 foundation for classes,
 mentors, mastery, mentor teaching, persistence, mastered skill retention, and
-skill tree progression.
+skill tree progression with class-specific skill tree binding facts.
 
 The scope remains intentionally small and domain-first. V4 stores and evaluates
 facts; it does not execute combat skills, grant rewards, drive UI, or introduce
@@ -16,7 +16,10 @@ SkillDefinition
   -> ClassDefinition allowed skill ids
   -> ClassDefinitionRegistry
   -> ClassProfile current class id
-  -> SkillTreeDefinition node/prerequisite facts
+  -> SkillTreeId stable skill tree ids
+  -> SkillTreeDefinition id/node/prerequisite facts
+  -> ClassSkillTreeBinding class-to-skill-tree facts
+  -> ClassSkillTreeBindingRegistry
   -> SkillTreeProgressProfile discovered/unlocked facts
   -> SkillTreeUnlockPolicy
   -> MasteryProfile mastered skill facts
@@ -96,6 +99,13 @@ Rules:
 
 ## Skill Tree Progression
 
+`SkillTreeId` centralizes stable skill tree ids.
+
+Current ids:
+
+- `SkillTreeId.Tlamatini`
+- `SkillTreeId.Wanderer`
+
 `SkillTreeNodeDefinition` describes a skill tree node:
 
 - `Id`
@@ -109,8 +119,9 @@ Node rules:
 - missing prerequisite lists are treated as empty
 - prerequisite ids are copied as stable node id facts
 
-`SkillTreeDefinition` owns skill tree node lookup:
+`SkillTreeDefinition` owns a stable skill tree id and node lookup:
 
+- `Id`
 - `RegisterNode(node, skillRegistry)`
 - `Contains(nodeId)`
 - `Get(nodeId)`
@@ -118,6 +129,8 @@ Node rules:
 
 Registry rules:
 
+- stable skill tree ids are optional for standalone node/progression tests
+- stable skill tree ids are required when registering a tree for class binding
 - valid nodes register by stable node id
 - null or empty node ids are rejected safely
 - nodes with unknown skill ids are rejected safely
@@ -169,6 +182,37 @@ Unlock policy rules:
 - prerequisite node ids must already be unlocked
 - unlocked prerequisites allow dependent nodes to become unlockable
 - the policy returns facts only and does not grant skills
+
+## Class Skill Tree Binding
+
+`ClassSkillTreeBinding` stores a class-to-skill-tree fact:
+
+- `ClassId`
+- `SkillTreeId`
+
+`ClassSkillTreeBindingRegistry` owns skill tree registration and class binding
+lookup:
+
+- `RegisterSkillTree(skillTree)`
+- `RegisterBinding(binding, classRegistry)`
+- `ContainsSkillTree(skillTreeId)`
+- `GetSkillTree(skillTreeId)`
+- `GetBindingForClass(classId)`
+- `ResolveSkillTreeForClass(classId)`
+- `ResolveCurrentClassSkillTree(profile)`
+
+Binding rules:
+
+- class ids validate through `ClassDefinitionRegistry`
+- skill tree ids validate through registered `SkillTreeDefinition` values
+- null bindings, empty class ids, and empty skill tree ids are rejected safely
+- skill trees with empty ids are rejected by the binding registry
+- duplicate class bindings are rejected safely
+- duplicate class bindings do not replace the original binding
+- current class skill tree resolution reads `ClassProfile.CurrentClassId`
+- binding returns facts only
+- binding does not grant skills automatically
+- binding does not mutate `SkillTreeProgressProfile`
 
 ## Skill Tree Snapshot And Save Behavior
 
@@ -392,6 +436,7 @@ V4 smoke tests include integrated workflow coverage for:
 - class/mastery snapshot and restore
 - mastered skill retention after class switch
 - skill tree progression
+- class-specific skill tree binding
 
 The mastered skill retention workflow verifies:
 
@@ -417,6 +462,18 @@ The skill tree workflow verifies:
 - the dependent node unlocks
 - no skills are automatically granted
 - `MasteryProfile` remains unchanged
+
+The class skill tree binding workflow verifies:
+
+- two classes are registered
+- two stable skill trees are registered
+- each class binds to a different skill tree
+- the first class is assigned
+- the first class skill tree resolves
+- the profile switches to the second class
+- the second class skill tree resolves
+- bindings do not mutate `SkillTreeProgressProfile`
+- bindings do not grant skills automatically
 
 ## Boundaries
 
@@ -449,8 +506,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `253`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `158`
-- Total smoke assertions executed: `529`
+- V4 Classes / Mentors / Mastery assertions: `186`
+- Total smoke assertions executed: `557`
 
 ## Validation
 
