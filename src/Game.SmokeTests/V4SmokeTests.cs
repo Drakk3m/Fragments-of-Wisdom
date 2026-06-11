@@ -72,6 +72,7 @@ namespace Game.SmokeTests
                 delegate
                 {
                     AssertV4RestoreCoordinatorRestoresAllProfiles();
+                    AssertV4RestoreCoordinatorSuccessHasNoFailureReasons();
                     AssertV4RestoreCoordinatorReportsClassFailure();
                     AssertV4RestoreCoordinatorReportsMasteryFailure();
                     AssertV4RestoreCoordinatorReportsMentorFailure();
@@ -1256,6 +1257,31 @@ namespace Game.SmokeTests
                 "V4 restore coordinator should restore class, mastery, mentor, and skill tree state.");
         }
 
+        private static void AssertV4RestoreCoordinatorSuccessHasNoFailureReasons()
+        {
+            var result = RestoreCompleteV4Snapshot(
+                BuildCompleteV4Snapshot(
+                    ClassId.Tlamatini,
+                    "skill_deep_sight",
+                    MentorId.Lyra,
+                    "node_deep_sight"));
+
+            Assert(
+                result.FullyRestored
+                && result.ClassFailureReason == V4ProgressRestoreFailureReason.None
+                && result.MasteryFailureReason == V4ProgressRestoreFailureReason.None
+                && result.MentorRelationshipsFailureReason == V4ProgressRestoreFailureReason.None
+                && result.SkillTreeProgressFailureReason == V4ProgressRestoreFailureReason.None,
+                "Successful V4 restore should have no failure reasons.");
+
+            Assert(
+                result.ClassFailureMessage == string.Empty
+                && result.MasteryFailureMessage == string.Empty
+                && result.MentorRelationshipsFailureMessage == string.Empty
+                && result.SkillTreeProgressFailureMessage == string.Empty,
+                "Successful V4 restore should have no failure messages.");
+        }
+
         private static void AssertV4RestoreCoordinatorReportsClassFailure()
         {
             var result = RestoreCompleteV4Snapshot(
@@ -1271,6 +1297,11 @@ namespace Game.SmokeTests
                 && result.MentorRelationshipsRestored
                 && result.SkillTreeProgressRestored,
                 "V4 restore coordinator should report class restore failure separately.");
+
+            Assert(
+                result.ClassFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
+                && result.ClassFailureMessage.Contains("ClassProfile"),
+                "V4 restore coordinator should expose class restore failure details.");
         }
 
         private static void AssertV4RestoreCoordinatorReportsMasteryFailure()
@@ -1288,6 +1319,11 @@ namespace Game.SmokeTests
                 && result.MentorRelationshipsRestored
                 && result.SkillTreeProgressRestored,
                 "V4 restore coordinator should report mastery restore failure separately.");
+
+            Assert(
+                result.MasteryFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
+                && result.MasteryFailureMessage.Contains("MasteryProfile"),
+                "V4 restore coordinator should expose mastery restore failure details.");
         }
 
         private static void AssertV4RestoreCoordinatorReportsMentorFailure()
@@ -1305,6 +1341,11 @@ namespace Game.SmokeTests
                 && !result.MentorRelationshipsRestored
                 && result.SkillTreeProgressRestored,
                 "V4 restore coordinator should report mentor relationship restore failure separately.");
+
+            Assert(
+                result.MentorRelationshipsFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
+                && result.MentorRelationshipsFailureMessage.Contains("MentorRelationshipProfile"),
+                "V4 restore coordinator should expose mentor relationship restore failure details.");
         }
 
         private static void AssertV4RestoreCoordinatorReportsSkillTreeFailure()
@@ -1322,6 +1363,11 @@ namespace Game.SmokeTests
                 && result.MentorRelationshipsRestored
                 && !result.SkillTreeProgressRestored,
                 "V4 restore coordinator should report skill tree progress restore failure separately.");
+
+            Assert(
+                result.SkillTreeProgressFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
+                && result.SkillTreeProgressFailureMessage.Contains("SkillTreeProgressProfile"),
+                "V4 restore coordinator should expose skill tree progress restore failure details.");
         }
 
         private static void AssertV4RestoreCoordinatorPartialFailureIsNotFullSuccess()
@@ -1338,6 +1384,13 @@ namespace Game.SmokeTests
                 && !result.ClassRestored
                 && !result.SkillTreeProgressRestored,
                 "V4 restore coordinator partial failure should not look like full success.");
+
+            Assert(
+                result.ClassFailureReason != V4ProgressRestoreFailureReason.None
+                && result.SkillTreeProgressFailureReason != V4ProgressRestoreFailureReason.None
+                && result.ClassFailureMessage.Length > 0
+                && result.SkillTreeProgressFailureMessage.Length > 0,
+                "V4 restore coordinator partial failure should expose enough facts for UI or debug explanations.");
         }
 
         private static void AssertMentorCanBeDiscovered()
