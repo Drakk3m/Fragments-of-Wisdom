@@ -60,6 +60,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Skill tree unlock application assertions",
+                delegate
+                {
+                    AssertAllowedSkillTreeNodeUnlockMutatesProgress();
+                    AssertBlockedSkillTreePrerequisiteDoesNotMutateProgress();
+                    AssertUndiscoveredSkillTreeNodeDoesNotMutateProgress();
+                    AssertUnknownSkillTreeNodeApplicationFailsSafely();
+                    AssertDuplicateSkillTreeNodeUnlockIsSafe();
+                });
+
+            RunSection(
                 "Class skill tree binding assertions",
                 delegate
                 {
@@ -1181,6 +1192,132 @@ namespace Game.SmokeTests
                 && result.CanUnlock
                 && result.BlockReason == SkillTreeUnlockBlockReason.None,
                 "Valid multi-node tree should remain usable by SkillTreeUnlockPolicy.");
+        }
+
+        private static void AssertAllowedSkillTreeNodeUnlockMutatesProgress()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var progress = new SkillTreeProgressProfile();
+
+            progress.DiscoverNode("node_deep_sight", skillTree);
+
+            var result = new SkillTreeUnlockApplicationService().Apply(
+                "node_deep_sight",
+                skillTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            Assert(
+                result.Applied
+                && result.NodeId == "node_deep_sight"
+                && result.BlockReason == SkillTreeUnlockBlockReason.None
+                && !result.WasAlreadyUnlocked,
+                "Allowed skill tree node application should report the unlock as applied.");
+
+            Assert(
+                progress.IsUnlocked("node_deep_sight"),
+                "Allowed skill tree node application should mutate progress.");
+        }
+
+        private static void AssertBlockedSkillTreePrerequisiteDoesNotMutateProgress()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var progress = new SkillTreeProgressProfile();
+
+            progress.DiscoverNode("node_balance_ritual", skillTree);
+
+            var result = new SkillTreeUnlockApplicationService().Apply(
+                "node_balance_ritual",
+                skillTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.Applied
+                && result.BlockReason == SkillTreeUnlockBlockReason.PrerequisiteMissing,
+                "Missing prerequisite should block skill tree unlock application.");
+
+            Assert(
+                !progress.IsUnlocked("node_balance_ritual"),
+                "Blocked prerequisite should not mutate skill tree progress.");
+        }
+
+        private static void AssertUndiscoveredSkillTreeNodeDoesNotMutateProgress()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var progress = new SkillTreeProgressProfile();
+
+            var result = new SkillTreeUnlockApplicationService().Apply(
+                "node_deep_sight",
+                skillTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.Applied
+                && result.BlockReason == SkillTreeUnlockBlockReason.NodeNotDiscovered,
+                "Undiscovered skill tree node should be blocked by the unlock policy.");
+
+            Assert(
+                !progress.IsDiscovered("node_deep_sight")
+                && !progress.IsUnlocked("node_deep_sight"),
+                "Undiscovered skill tree node application should not mutate progress.");
+        }
+
+        private static void AssertUnknownSkillTreeNodeApplicationFailsSafely()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var progress = new SkillTreeProgressProfile();
+
+            var result = new SkillTreeUnlockApplicationService().Apply(
+                "node_unknown",
+                skillTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.Applied
+                && result.NodeId == "node_unknown"
+                && result.BlockReason == SkillTreeUnlockBlockReason.UnknownNode,
+                "Unknown skill tree node application should fail safely.");
+
+            Assert(
+                progress.DiscoveredNodeIds.Count == 0
+                && progress.UnlockedNodeIds.Count == 0,
+                "Unknown skill tree node application should not mutate progress.");
+        }
+
+        private static void AssertDuplicateSkillTreeNodeUnlockIsSafe()
+        {
+            var skillTree = BuildTestSkillTreeDefinition();
+            var progress = new SkillTreeProgressProfile();
+            var applicationService = new SkillTreeUnlockApplicationService();
+
+            progress.DiscoverNode("node_deep_sight", skillTree);
+
+            var firstResult = applicationService.Apply(
+                "node_deep_sight",
+                skillTree,
+                progress,
+                BuildTestSkillRegistry());
+            int unlockedCountAfterFirstApplication = progress.UnlockedNodeIds.Count;
+            var duplicateResult = applicationService.Apply(
+                "node_deep_sight",
+                skillTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            Assert(
+                firstResult.Applied
+                && !duplicateResult.Applied
+                && duplicateResult.WasAlreadyUnlocked
+                && duplicateResult.BlockReason == SkillTreeUnlockBlockReason.None,
+                "Duplicate skill tree unlock application should report an idempotent existing unlock.");
+
+            Assert(
+                progress.IsUnlocked("node_deep_sight")
+                && progress.UnlockedNodeIds.Count == unlockedCountAfterFirstApplication,
+                "Duplicate skill tree unlock application should not duplicate progress state.");
         }
 
         private static void AssertClassCanBindToSkillTree()
