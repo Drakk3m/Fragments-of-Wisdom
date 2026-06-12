@@ -104,10 +104,16 @@ namespace Game.Domain.Progress
                 snapshot,
                 mentorRelationshipProfile,
                 mentorRegistry);
-            bool skillTreeProgressRestored = snapshotService.RestoreSkillTreeProgressProfile(
-                snapshot,
-                skillTreeProgressProfile,
-                skillTree);
+            bool skillTreeProgressRestored = restoreClassSkillTreeBindings
+                && snapshot.SkillTreeProgress.Scopes.Count > 0
+                    ? snapshotService.RestoreSkillTreeProgressProfile(
+                        snapshot,
+                        skillTreeProgressProfile,
+                        classSkillTreeBindingRegistry)
+                    : snapshotService.RestoreSkillTreeProgressProfile(
+                        snapshot,
+                        skillTreeProgressProfile,
+                        skillTree);
             bool classSkillTreeBindingsRestored = !restoreClassSkillTreeBindings
                 || snapshotService.RestoreClassSkillTreeBindings(
                     snapshot,

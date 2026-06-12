@@ -76,8 +76,19 @@ namespace Game.Domain.Progress
             dto.SkillTreeProgress = new SkillTreeProgressDto
             {
                 DiscoveredNodeIds = CopyTags(snapshot.SkillTreeProgress.DiscoveredNodeIds),
-                UnlockedNodeIds = CopyTags(snapshot.SkillTreeProgress.UnlockedNodeIds)
+                UnlockedNodeIds = CopyTags(snapshot.SkillTreeProgress.UnlockedNodeIds),
+                Scopes = new List<SkillTreeProgressScopeDto>()
             };
+
+            foreach (var scope in snapshot.SkillTreeProgress.Scopes)
+            {
+                dto.SkillTreeProgress.Scopes.Add(new SkillTreeProgressScopeDto
+                {
+                    SkillTreeId = scope.SkillTreeId,
+                    DiscoveredNodeIds = CopyTags(scope.DiscoveredNodeIds),
+                    UnlockedNodeIds = CopyTags(scope.UnlockedNodeIds)
+                });
+            }
             dto.ClassProfile = snapshot.ClassProfile == null
                 ? null
                 : new ClassProfileDto
@@ -185,7 +196,8 @@ namespace Game.Domain.Progress
                 ? new V2SkillTreeProgressSnapshot(new List<string>(), new List<string>())
                 : new V2SkillTreeProgressSnapshot(
                     CopyTags(dto.SkillTreeProgress.DiscoveredNodeIds),
-                    CopyTags(dto.SkillTreeProgress.UnlockedNodeIds));
+                    CopyTags(dto.SkillTreeProgress.UnlockedNodeIds),
+                    BuildSkillTreeProgressScopes(dto.SkillTreeProgress.Scopes));
 
             if (dto.CodexEntries != null)
             {
@@ -293,6 +305,33 @@ namespace Game.Domain.Progress
                 classSkillTreeBindings);
         }
 
+        private static IReadOnlyList<V2SkillTreeProgressScopeSnapshot> BuildSkillTreeProgressScopes(
+            IReadOnlyList<SkillTreeProgressScopeDto> sourceScopes)
+        {
+            var scopes = new List<V2SkillTreeProgressScopeSnapshot>();
+
+            if (sourceScopes == null)
+            {
+                return scopes;
+            }
+
+            foreach (var scope in sourceScopes)
+            {
+                if (scope == null)
+                {
+                    scopes.Add(null);
+                    continue;
+                }
+
+                scopes.Add(new V2SkillTreeProgressScopeSnapshot(
+                    scope.SkillTreeId,
+                    CopyTags(scope.DiscoveredNodeIds),
+                    CopyTags(scope.UnlockedNodeIds)));
+            }
+
+            return scopes;
+        }
+
         private static List<string> CopyTags(IReadOnlyList<string> sourceTags)
         {
             var tags = new List<string>();
@@ -388,6 +427,14 @@ namespace Game.Domain.Progress
 
         private class SkillTreeProgressDto
         {
+            public List<string> DiscoveredNodeIds { get; set; }
+            public List<string> UnlockedNodeIds { get; set; }
+            public List<SkillTreeProgressScopeDto> Scopes { get; set; }
+        }
+
+        private class SkillTreeProgressScopeDto
+        {
+            public string SkillTreeId { get; set; }
             public List<string> DiscoveredNodeIds { get; set; }
             public List<string> UnlockedNodeIds { get; set; }
         }

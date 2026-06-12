@@ -147,15 +147,20 @@ Registry rules:
 
 `SkillTreeProgressProfile` owns progression facts:
 
-- discovered node ids
-- unlocked node ids
+- discovered node ids scoped by `SkillTreeId`
+- unlocked node ids scoped by `SkillTreeId`
 - `DiscoverNode(nodeId, skillTree)`
 - `IsDiscovered(nodeId)`
+- `IsDiscovered(nodeId, skillTree)`
 - `IsUnlocked(nodeId)`
+- `IsUnlocked(nodeId, skillTree)`
 
 Progress rules:
 
 - discovery validates node ids through `SkillTreeDefinition`
+- policy and application queries use the supplied `SkillTreeDefinition.Id`
+- identical node ids in different trees do not share progress
+- legacy node-only queries remain aggregate compatibility views
 - public unlock mutation is applied through `SkillTreeUnlockApplicationService`
 - the profile's low-level unlock recorder is internal for application and
   snapshot restoration only
@@ -254,16 +259,23 @@ Restore rules:
 Skill tree progress persistence extends `V2ProgressSnapshot` in a
 backward-compatible way.
 
-Snapshot stores:
+Scoped snapshot records store:
 
+- `SkillTreeId`
 - `DiscoveredNodeIds`
 - `UnlockedNodeIds`
 
+Legacy unscoped discovered/unlocked lists remain readable for older JSON.
+
 Restore rules:
 
-- restore validates all node ids through `SkillTreeDefinition`
-- known discovered node ids restore into `SkillTreeProgressProfile`
-- known unlocked node ids restore into `SkillTreeProgressProfile`
+- scoped skill tree ids validate through registered `SkillTreeDefinition`
+  values
+- scoped node ids validate against their matching tree
+- multi-tree restore validates all scopes before mutation
+- legacy unscoped progress restores when an explicit target tree is supplied
+- registry-based legacy restore requires exactly one target tree
+- ambiguous legacy progress with multiple target trees fails without mutation
 - unknown node ids fail safely and do not mutate the target profile
 - older JSON without skill tree progress data restores safely as empty progress
   state
@@ -271,7 +283,8 @@ Restore rules:
   optional
 
 `V2ProgressSnapshotValidationService` rejects null skill tree progress sections,
-null discovered/unlocked node id lists, and empty node ids.
+null discovered/unlocked node id lists, empty node ids, empty scoped skill tree
+ids, and duplicate skill tree scopes.
 
 ## Mastery Foundation
 
@@ -590,10 +603,10 @@ Current smoke groups:
 - V1 Legacy Slice assertions: `2`
 - V1 emitted event count: `38`
 - Shared Domain Foundations assertions: `16`
-- V2 Narrative / Progression / Persistence assertions: `254`
+- V2 Narrative / Progression / Persistence assertions: `255`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `211`
-- Total smoke assertions executed: `583`
+- V4 Classes / Mentors / Mastery assertions: `242`
+- Total smoke assertions executed: `615`
 
 ## Validation
 

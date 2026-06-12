@@ -451,30 +451,91 @@ namespace Game.Domain.Progress
                 throw new InvalidOperationException("Unsupported V2 progress snapshot schema version.");
             }
 
-            foreach (var nodeId in snapshot.SkillTreeProgress.DiscoveredNodeIds)
+            if (snapshot.SkillTreeProgress.Scopes.Count > 0)
             {
-                if (!skillTree.Contains(nodeId))
+                if (string.IsNullOrWhiteSpace(skillTree.Id)
+                    || snapshot.SkillTreeProgress.Scopes.Count != 1
+                    || snapshot.SkillTreeProgress.Scopes[0].SkillTreeId != skillTree.Id)
+                {
+                    return false;
+                }
+
+                return RestoreSkillTreeProgressScope(
+                    snapshot.SkillTreeProgress.Scopes[0],
+                    skillTreeProgressProfile,
+                    skillTree);
+            }
+
+            return RestoreLegacySkillTreeProgress(
+                snapshot.SkillTreeProgress,
+                skillTreeProgressProfile,
+                skillTree);
+        }
+
+        public bool RestoreSkillTreeProgressProfile(
+            V2ProgressSnapshot snapshot,
+            SkillTreeProgressProfile skillTreeProgressProfile,
+            ClassSkillTreeBindingRegistry skillTreeRegistry)
+        {
+            if (snapshot == null)
+            {
+                throw new ArgumentNullException(nameof(snapshot));
+            }
+
+            if (skillTreeProgressProfile == null)
+            {
+                throw new ArgumentNullException(nameof(skillTreeProgressProfile));
+            }
+
+            if (skillTreeRegistry == null)
+            {
+                throw new ArgumentNullException(nameof(skillTreeRegistry));
+            }
+
+            if (!CanRestore(snapshot))
+            {
+                throw new InvalidOperationException("Unsupported V2 progress snapshot schema version.");
+            }
+
+            if (snapshot.SkillTreeProgress.Scopes.Count == 0)
+            {
+                if (skillTreeRegistry.SkillTrees.Count != 1)
+                {
+                    return snapshot.SkillTreeProgress.DiscoveredNodeIds.Count == 0
+                        && snapshot.SkillTreeProgress.UnlockedNodeIds.Count == 0;
+                }
+
+                SkillTreeDefinition onlySkillTree = null;
+
+                foreach (var skillTree in skillTreeRegistry.SkillTrees.Values)
+                {
+                    onlySkillTree = skillTree;
+                }
+
+                return RestoreLegacySkillTreeProgress(
+                    snapshot.SkillTreeProgress,
+                    skillTreeProgressProfile,
+                    onlySkillTree);
+            }
+
+            foreach (var scope in snapshot.SkillTreeProgress.Scopes)
+            {
+                var skillTree = scope == null
+                    ? null
+                    : skillTreeRegistry.GetSkillTree(scope.SkillTreeId);
+
+                if (!CanRestoreSkillTreeProgressScope(scope, skillTree))
                 {
                     return false;
                 }
             }
 
-            foreach (var nodeId in snapshot.SkillTreeProgress.UnlockedNodeIds)
+            foreach (var scope in snapshot.SkillTreeProgress.Scopes)
             {
-                if (!skillTree.Contains(nodeId))
-                {
-                    return false;
-                }
-            }
-
-            foreach (var nodeId in snapshot.SkillTreeProgress.DiscoveredNodeIds)
-            {
-                skillTreeProgressProfile.DiscoverNode(nodeId, skillTree);
-            }
-
-            foreach (var nodeId in snapshot.SkillTreeProgress.UnlockedNodeIds)
-            {
-                skillTreeProgressProfile.RecordUnlockedNode(nodeId, skillTree);
+                RestoreSkillTreeProgressScope(
+                    scope,
+                    skillTreeProgressProfile,
+                    skillTreeRegistry.GetSkillTree(scope.SkillTreeId));
             }
 
             return true;
@@ -667,9 +728,122 @@ namespace Game.Domain.Progress
         private static V2SkillTreeProgressSnapshot BuildSkillTreeProgressSnapshot(
             SkillTreeProgressProfile skillTreeProgressProfile)
         {
+            var scopes = new List<V2SkillTreeProgressScopeSnapshot>();
+            IReadOnlyList<string> legacyDiscoveredNodeIds = new List<string>();
+            IReadOnlyList<string> legacyUnlockedNodeIds = new List<string>();
+
+            foreach (var skillTreeId in skillTreeProgressProfile.SkillTreeIds)
+            {
+                if (string.IsNullOrWhiteSpace(skillTreeId))
+                {
+                    legacyDiscoveredNodeIds = CopyIds(
+                        skillTreeProgressProfile.GetDiscoveredNodeIds(skillTreeId));
+                    legacyUnlockedNodeIds = CopyIds(
+                        skillTreeProgressProfile.GetUnlockedNodeIds(skillTreeId));
+                    continue;
+                }
+
+                scopes.Add(new V2SkillTreeProgressScopeSnapshot(
+                    skillTreeId,
+                    CopyIds(skillTreeProgressProfile.GetDiscoveredNodeIds(skillTreeId)),
+                    CopyIds(skillTreeProgressProfile.GetUnlockedNodeIds(skillTreeId))));
+            }
+
             return new V2SkillTreeProgressSnapshot(
-                CopyIds(skillTreeProgressProfile.DiscoveredNodeIds),
-                CopyIds(skillTreeProgressProfile.UnlockedNodeIds));
+                legacyDiscoveredNodeIds,
+                legacyUnlockedNodeIds,
+                scopes);
+        }
+
+        private static bool RestoreLegacySkillTreeProgress(
+            V2SkillTreeProgressSnapshot snapshot,
+            SkillTreeProgressProfile skillTreeProgressProfile,
+            SkillTreeDefinition skillTree)
+        {
+            if (!ContainsKnownNodeIds(
+                snapshot.DiscoveredNodeIds,
+                snapshot.UnlockedNodeIds,
+                skillTree))
+            {
+                return false;
+            }
+
+            foreach (var nodeId in snapshot.DiscoveredNodeIds)
+            {
+                skillTreeProgressProfile.DiscoverNode(nodeId, skillTree);
+            }
+
+            foreach (var nodeId in snapshot.UnlockedNodeIds)
+            {
+                skillTreeProgressProfile.RecordUnlockedNode(nodeId, skillTree);
+            }
+
+            return true;
+        }
+
+        private static bool RestoreSkillTreeProgressScope(
+            V2SkillTreeProgressScopeSnapshot scope,
+            SkillTreeProgressProfile skillTreeProgressProfile,
+            SkillTreeDefinition skillTree)
+        {
+            if (!CanRestoreSkillTreeProgressScope(scope, skillTree))
+            {
+                return false;
+            }
+
+            foreach (var nodeId in scope.DiscoveredNodeIds)
+            {
+                skillTreeProgressProfile.DiscoverNode(nodeId, skillTree);
+            }
+
+            foreach (var nodeId in scope.UnlockedNodeIds)
+            {
+                skillTreeProgressProfile.RecordUnlockedNode(nodeId, skillTree);
+            }
+
+            return true;
+        }
+
+        private static bool CanRestoreSkillTreeProgressScope(
+            V2SkillTreeProgressScopeSnapshot scope,
+            SkillTreeDefinition skillTree)
+        {
+            return scope != null
+                && skillTree != null
+                && scope.SkillTreeId == skillTree.Id
+                && ContainsKnownNodeIds(
+                    scope.DiscoveredNodeIds,
+                    scope.UnlockedNodeIds,
+                    skillTree);
+        }
+
+        private static bool ContainsKnownNodeIds(
+            IReadOnlyList<string> discoveredNodeIds,
+            IReadOnlyList<string> unlockedNodeIds,
+            SkillTreeDefinition skillTree)
+        {
+            if (skillTree == null)
+            {
+                return false;
+            }
+
+            foreach (var nodeId in discoveredNodeIds)
+            {
+                if (!skillTree.Contains(nodeId))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var nodeId in unlockedNodeIds)
+            {
+                if (!skillTree.Contains(nodeId))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static IReadOnlyList<V2ClassSkillTreeBindingSnapshot> BuildClassSkillTreeBindingSnapshots(

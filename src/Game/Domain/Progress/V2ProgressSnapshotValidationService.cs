@@ -181,7 +181,8 @@ namespace Game.Domain.Progress
         private static bool HasValidSkillTreeProgress(V2ProgressSnapshot snapshot)
         {
             if (snapshot.SkillTreeProgress.DiscoveredNodeIds == null
-                || snapshot.SkillTreeProgress.UnlockedNodeIds == null)
+                || snapshot.SkillTreeProgress.UnlockedNodeIds == null
+                || snapshot.SkillTreeProgress.Scopes == null)
             {
                 return false;
             }
@@ -199,6 +200,36 @@ namespace Game.Domain.Progress
                 if (string.IsNullOrWhiteSpace(nodeId))
                 {
                     return false;
+                }
+            }
+
+            var skillTreeIds = new HashSet<string>();
+
+            foreach (var scope in snapshot.SkillTreeProgress.Scopes)
+            {
+                if (scope == null
+                    || string.IsNullOrWhiteSpace(scope.SkillTreeId)
+                    || scope.DiscoveredNodeIds == null
+                    || scope.UnlockedNodeIds == null
+                    || !skillTreeIds.Add(scope.SkillTreeId))
+                {
+                    return false;
+                }
+
+                foreach (var nodeId in scope.DiscoveredNodeIds)
+                {
+                    if (string.IsNullOrWhiteSpace(nodeId))
+                    {
+                        return false;
+                    }
+                }
+
+                foreach (var nodeId in scope.UnlockedNodeIds)
+                {
+                    if (string.IsNullOrWhiteSpace(nodeId))
+                    {
+                        return false;
+                    }
                 }
             }
 
