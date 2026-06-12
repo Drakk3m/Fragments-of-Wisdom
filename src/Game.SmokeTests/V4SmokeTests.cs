@@ -218,6 +218,7 @@ namespace Game.SmokeTests
                     AssertClassMentorTeachingMasteryWorkflow();
                     AssertMasteredSkillRetentionIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
+                    AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
                     AssertClassSkillTreeBindingSaveRestoreIntegratedWorkflow();
                 });
@@ -2855,6 +2856,127 @@ namespace Game.SmokeTests
             Assert(
                 masteryProfile.Records.Count == 0,
                 "Skill tree workflow should leave mastery profile unchanged.");
+        }
+
+        private static void AssertSkillTreeUnlockApplicationIntegratedWorkflow()
+        {
+            const string rootSkillId = "skill_application_root";
+            const string prerequisiteSkillId = "skill_application_prerequisite";
+            const string dependentSkillId = "skill_application_dependent";
+            const string rootNodeId = "node_application_root";
+            const string prerequisiteNodeId = "node_application_prerequisite";
+            const string dependentNodeId = "node_application_dependent";
+
+            var skillRegistry = new SkillDefinitionRegistry();
+            bool rootSkillRegistered = skillRegistry.Register(
+                BuildTestSkillDefinition(rootSkillId, "Application Root"));
+            bool prerequisiteSkillRegistered = skillRegistry.Register(
+                BuildTestSkillDefinition(prerequisiteSkillId, "Application Prerequisite"));
+            bool dependentSkillRegistered = skillRegistry.Register(
+                BuildTestSkillDefinition(dependentSkillId, "Application Dependent"));
+
+            var skillTree = new SkillTreeDefinition();
+            bool rootNodeRegistered = skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    rootNodeId,
+                    rootSkillId,
+                    new string[0]),
+                skillRegistry);
+            bool prerequisiteNodeRegistered = skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    prerequisiteNodeId,
+                    prerequisiteSkillId,
+                    new[] { rootNodeId }),
+                skillRegistry);
+            bool dependentNodeRegistered = skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    dependentNodeId,
+                    dependentSkillId,
+                    new[] { prerequisiteNodeId }),
+                skillRegistry);
+
+            var progress = new SkillTreeProgressProfile();
+            var skillBook = new PlayerSkillBook();
+            var masteryProfile = new MasteryProfile();
+            var applicationService = new SkillTreeUnlockApplicationService(
+                new SkillTreeUnlockPolicy());
+
+            Assert(
+                rootSkillRegistered
+                && prerequisiteSkillRegistered
+                && dependentSkillRegistered,
+                "Skill tree unlock application workflow should register all skill definitions.");
+
+            Assert(
+                rootNodeRegistered
+                && prerequisiteNodeRegistered
+                && dependentNodeRegistered,
+                "Skill tree unlock application workflow should create a valid prerequisite-first tree.");
+
+            Assert(
+                progress.DiscoverNode(rootNodeId, skillTree),
+                "Skill tree unlock application workflow should discover the root node.");
+
+            var rootResult = applicationService.Apply(
+                rootNodeId,
+                skillTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                rootResult.Applied
+                && progress.IsUnlocked(rootNodeId),
+                "Skill tree unlock application workflow should unlock the root through the application service.");
+
+            Assert(
+                progress.DiscoverNode(dependentNodeId, skillTree),
+                "Skill tree unlock application workflow should discover the dependent node.");
+
+            var blockedDependentResult = applicationService.Apply(
+                dependentNodeId,
+                skillTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                !blockedDependentResult.Applied
+                && blockedDependentResult.BlockReason
+                    == SkillTreeUnlockBlockReason.PrerequisiteMissing
+                && !progress.IsUnlocked(dependentNodeId),
+                "Skill tree unlock application workflow should preserve progress when a prerequisite blocks unlock.");
+
+            progress.DiscoverNode(prerequisiteNodeId, skillTree);
+            var prerequisiteResult = applicationService.Apply(
+                prerequisiteNodeId,
+                skillTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                prerequisiteResult.Applied
+                && progress.IsUnlocked(prerequisiteNodeId),
+                "Skill tree unlock application workflow should unlock the prerequisite through the application service.");
+
+            var dependentResult = applicationService.Apply(
+                dependentNodeId,
+                skillTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                dependentResult.Applied
+                && progress.IsUnlocked(dependentNodeId),
+                "Skill tree unlock application workflow should unlock the dependent node after its prerequisite.");
+
+            Assert(
+                !skillBook.HasSkill(rootSkillId)
+                && !skillBook.HasSkill(prerequisiteSkillId)
+                && !skillBook.HasSkill(dependentSkillId),
+                "Skill tree unlock application workflow should not grant skills automatically.");
+
+            Assert(
+                masteryProfile.Records.Count == 0,
+                "Skill tree unlock application workflow should leave mastery unchanged.");
         }
 
         private static void AssertClassSkillTreeBindingIntegratedWorkflow()
