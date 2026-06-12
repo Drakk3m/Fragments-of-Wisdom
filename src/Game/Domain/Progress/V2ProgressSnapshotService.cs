@@ -474,7 +474,7 @@ namespace Game.Domain.Progress
 
             foreach (var nodeId in snapshot.SkillTreeProgress.UnlockedNodeIds)
             {
-                skillTreeProgressProfile.UnlockNode(nodeId, skillTree);
+                skillTreeProgressProfile.RecordUnlockedNode(nodeId, skillTree);
             }
 
             return true;

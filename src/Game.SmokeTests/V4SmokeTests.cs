@@ -68,6 +68,7 @@ namespace Game.SmokeTests
                     AssertUndiscoveredSkillTreeNodeDoesNotMutateProgress();
                     AssertUnknownSkillTreeNodeApplicationFailsSafely();
                     AssertDuplicateSkillTreeNodeUnlockIsSafe();
+                    AssertDirectSkillTreeUnlockMutationIsNotPublic();
                 });
 
             RunSection(
@@ -1129,16 +1130,21 @@ namespace Game.SmokeTests
         {
             var skillTree = BuildTestSkillTreeDefinition();
             var progress = new SkillTreeProgressProfile();
+            var skillRegistry = BuildTestSkillRegistry();
 
             progress.DiscoverNode("node_deep_sight", skillTree);
-            progress.UnlockNode("node_deep_sight", skillTree);
+            new SkillTreeUnlockApplicationService().Apply(
+                "node_deep_sight",
+                skillTree,
+                progress,
+                skillRegistry);
             progress.DiscoverNode("node_balance_ritual", skillTree);
 
             var result = new SkillTreeUnlockPolicy().Evaluate(
                 "node_balance_ritual",
                 skillTree,
                 progress,
-                BuildTestSkillRegistry());
+                skillRegistry);
 
             Assert(
                 result.CanUnlock
@@ -1179,7 +1185,11 @@ namespace Game.SmokeTests
             var skillRegistry = BuildTestSkillRegistry();
 
             progress.DiscoverNode("node_deep_sight", skillTree);
-            progress.UnlockNode("node_deep_sight", skillTree);
+            new SkillTreeUnlockApplicationService().Apply(
+                "node_deep_sight",
+                skillTree,
+                progress,
+                skillRegistry);
             progress.DiscoverNode("node_balance_ritual", skillTree);
 
             var result = new SkillTreeUnlockPolicy().Evaluate(
@@ -1319,6 +1329,14 @@ namespace Game.SmokeTests
                 progress.IsUnlocked("node_deep_sight")
                 && progress.UnlockedNodeIds.Count == unlockedCountAfterFirstApplication,
                 "Duplicate skill tree unlock application should not duplicate progress state.");
+        }
+
+        private static void AssertDirectSkillTreeUnlockMutationIsNotPublic()
+        {
+            Assert(
+                typeof(SkillTreeProgressProfile).GetMethod("UnlockNode") == null
+                && typeof(SkillTreeProgressProfile).GetMethod("RecordUnlockedNode") == null,
+                "Skill tree progress should not expose a public direct unlock mutation path.");
         }
 
         private static void AssertClassCanBindToSkillTree()
@@ -2779,6 +2797,7 @@ namespace Game.SmokeTests
             var skillBook = new PlayerSkillBook();
             var masteryProfile = new MasteryProfile();
             var unlockPolicy = new SkillTreeUnlockPolicy();
+            var applicationService = new SkillTreeUnlockApplicationService(unlockPolicy);
 
             Assert(
                 skillRegistry.Contains(rootSkillId)
@@ -2797,17 +2816,16 @@ namespace Game.SmokeTests
                 && progress.IsDiscovered(rootNodeId),
                 "Skill tree workflow should discover the first node.");
 
-            var rootResult = unlockPolicy.Evaluate(
+            var rootResult = applicationService.Apply(
                 rootNodeId,
                 skillTree,
                 progress,
                 skillRegistry);
 
             Assert(
-                rootResult.CanUnlock
-                && progress.UnlockNode(rootNodeId, skillTree)
+                rootResult.Applied
                 && progress.IsUnlocked(rootNodeId),
-                "Skill tree workflow should unlock the first node.");
+                "Skill tree workflow should unlock the first node through the application service.");
 
             progress.DiscoverNode(prerequisiteNodeId, skillTree);
             progress.DiscoverNode(dependentNodeId, skillTree);
@@ -2823,29 +2841,27 @@ namespace Game.SmokeTests
                 && blockedDependent.MissingPrerequisiteNodeId == prerequisiteNodeId,
                 "Skill tree workflow should block dependent node before prerequisite unlock.");
 
-            var prerequisiteResult = unlockPolicy.Evaluate(
+            var prerequisiteResult = applicationService.Apply(
                 prerequisiteNodeId,
                 skillTree,
                 progress,
                 skillRegistry);
 
             Assert(
-                prerequisiteResult.CanUnlock
-                && progress.UnlockNode(prerequisiteNodeId, skillTree)
+                prerequisiteResult.Applied
                 && progress.IsUnlocked(prerequisiteNodeId),
-                "Skill tree workflow should unlock the prerequisite node.");
+                "Skill tree workflow should unlock the prerequisite node through the application service.");
 
-            var dependentResult = unlockPolicy.Evaluate(
+            var dependentResult = applicationService.Apply(
                 dependentNodeId,
                 skillTree,
                 progress,
                 skillRegistry);
 
             Assert(
-                dependentResult.CanUnlock
-                && progress.UnlockNode(dependentNodeId, skillTree)
+                dependentResult.Applied
                 && progress.IsUnlocked(dependentNodeId),
-                "Skill tree workflow should allow and unlock the dependent node after prerequisite unlock.");
+                "Skill tree workflow should unlock the dependent node through the application service.");
 
             Assert(
                 !skillBook.HasSkill(rootSkillId)
@@ -3362,7 +3378,11 @@ namespace Game.SmokeTests
             var progress = new SkillTreeProgressProfile();
 
             progress.DiscoverNode("node_deep_sight", skillTree);
-            progress.UnlockNode("node_deep_sight", skillTree);
+            new SkillTreeUnlockApplicationService().Apply(
+                "node_deep_sight",
+                skillTree,
+                progress,
+                BuildTestSkillRegistry());
             progress.DiscoverNode("node_balance_ritual", skillTree);
 
             return progress;
