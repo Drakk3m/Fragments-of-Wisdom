@@ -150,14 +150,15 @@ Registry rules:
 - discovered node ids
 - unlocked node ids
 - `DiscoverNode(nodeId, skillTree)`
-- `UnlockNode(nodeId, skillTree)`
 - `IsDiscovered(nodeId)`
 - `IsUnlocked(nodeId)`
 
 Progress rules:
 
 - discovery validates node ids through `SkillTreeDefinition`
-- unlock validates node ids through `SkillTreeDefinition`
+- public unlock mutation is applied through `SkillTreeUnlockApplicationService`
+- the profile's low-level unlock recorder is internal for application and
+  snapshot restoration only
 - unlock records node facts only
 - unlock does not grant skills automatically
 - unlock does not mutate mastery
@@ -190,6 +191,10 @@ Unlock policy rules:
 - prerequisite node ids must already be unlocked
 - unlocked prerequisites allow dependent nodes to become unlockable
 - the policy returns facts only and does not grant skills
+
+`SkillTreeUnlockApplicationService` is the public policy-enforced mutation
+path. It evaluates `SkillTreeUnlockPolicy` before recording an unlock and does
+not mutate progress when the policy blocks the node.
 
 ## Class Skill Tree Binding
 

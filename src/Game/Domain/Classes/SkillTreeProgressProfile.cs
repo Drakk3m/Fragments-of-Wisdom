@@ -29,7 +29,8 @@ namespace Game.Domain.Classes
             return discoveredNodeIds.Add(nodeId);
         }
 
-        public bool UnlockNode(
+        // Low-level mutation for policy-enforced application and snapshot restoration.
+        internal bool RecordUnlockedNode(
             string nodeId,
             SkillTreeDefinition skillTree)
         {

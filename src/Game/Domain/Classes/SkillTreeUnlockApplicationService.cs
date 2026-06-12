@@ -47,7 +47,7 @@ namespace Game.Domain.Classes
             }
 
             bool applied = progressProfile != null
-                && progressProfile.UnlockNode(policyResult.NodeId, skillTree);
+                && progressProfile.RecordUnlockedNode(policyResult.NodeId, skillTree);
 
             return new SkillTreeUnlockApplicationResult(
                 applied,
