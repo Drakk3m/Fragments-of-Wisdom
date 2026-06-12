@@ -72,6 +72,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Scoped skill tree progress assertions",
+                delegate
+                {
+                    AssertDuplicateNodeIdsRemainScopedBySkillTree();
+                    AssertUnlockingNodeInOneTreeDoesNotUnlockAnother();
+                    AssertClassBindingUsesResolvedSkillTreeProgressScope();
+                    AssertSnapshotCapturesAndRestoresScopedSkillTreeProgress();
+                    AssertLegacyUnscopedSkillTreeJsonCompatibilityIsExplicit();
+                });
+
+            RunSection(
                 "Class skill tree binding assertions",
                 delegate
                 {
@@ -1337,6 +1348,174 @@ namespace Game.SmokeTests
                 typeof(SkillTreeProgressProfile).GetMethod("UnlockNode") == null
                 && typeof(SkillTreeProgressProfile).GetMethod("RecordUnlockedNode") == null,
                 "Skill tree progress should not expose a public direct unlock mutation path.");
+        }
+
+        private static void AssertDuplicateNodeIdsRemainScopedBySkillTree()
+        {
+            var firstTree = BuildTestSkillTreeDefinition(SkillTreeId.Tlamatini);
+            var secondTree = BuildTestSkillTreeDefinition(SkillTreeId.Wanderer);
+            var progress = new SkillTreeProgressProfile();
+
+            bool discovered = progress.DiscoverNode("node_deep_sight", firstTree);
+
+            Assert(
+                discovered
+                && progress.IsDiscovered("node_deep_sight", firstTree)
+                && !progress.IsDiscovered("node_deep_sight", secondTree),
+                "Identical node ids should remain isolated by skill tree id.");
+
+            Assert(
+                progress.IsDiscovered("node_deep_sight"),
+                "Legacy single-node lookup should remain an aggregate compatibility view.");
+        }
+
+        private static void AssertUnlockingNodeInOneTreeDoesNotUnlockAnother()
+        {
+            var firstTree = BuildTestSkillTreeDefinition(SkillTreeId.Tlamatini);
+            var secondTree = BuildTestSkillTreeDefinition(SkillTreeId.Wanderer);
+            var progress = new SkillTreeProgressProfile();
+            var applicationService = new SkillTreeUnlockApplicationService();
+
+            progress.DiscoverNode("node_deep_sight", firstTree);
+            var result = applicationService.Apply(
+                "node_deep_sight",
+                firstTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            Assert(
+                result.Applied
+                && progress.IsUnlocked("node_deep_sight", firstTree),
+                "Unlock application should record progress in the requested skill tree scope.");
+
+            Assert(
+                !progress.IsUnlocked("node_deep_sight", secondTree),
+                "Unlocking a node in one skill tree should not unlock the same node id in another tree.");
+        }
+
+        private static void AssertClassBindingUsesResolvedSkillTreeProgressScope()
+        {
+            var classRegistry = BuildTestClassRegistry();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistryWithBindings();
+            var classProfile = new ClassProfile();
+            var progress = new SkillTreeProgressProfile();
+            var applicationService = new SkillTreeUnlockApplicationService();
+
+            classProfile.AssignClassId(ClassId.Tlamatini, classRegistry);
+            var firstTree = bindingRegistry.ResolveCurrentClassSkillTree(classProfile);
+            progress.DiscoverNode("node_deep_sight", firstTree);
+            var firstResult = applicationService.Apply(
+                "node_deep_sight",
+                firstTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            classProfile.ChangeClassId(ClassId.Wanderer, classRegistry);
+            var secondTree = bindingRegistry.ResolveCurrentClassSkillTree(classProfile);
+            var secondResult = applicationService.Apply(
+                "node_deep_sight",
+                secondTree,
+                progress,
+                BuildTestSkillRegistry());
+
+            Assert(
+                firstResult.Applied
+                && firstTree.Id == SkillTreeId.Tlamatini
+                && secondTree.Id == SkillTreeId.Wanderer,
+                "Class binding should resolve the skill tree used for scoped progress.");
+
+            Assert(
+                !secondResult.Applied
+                && secondResult.BlockReason == SkillTreeUnlockBlockReason.NodeNotDiscovered
+                && !progress.IsUnlocked("node_deep_sight", secondTree),
+                "Changing class should use the resolved tree scope instead of colliding on node id.");
+        }
+
+        private static void AssertSnapshotCapturesAndRestoresScopedSkillTreeProgress()
+        {
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var firstTree = bindingRegistry.GetSkillTree(SkillTreeId.Tlamatini);
+            var secondTree = bindingRegistry.GetSkillTree(SkillTreeId.Wanderer);
+            var progress = new SkillTreeProgressProfile();
+            var applicationService = new SkillTreeUnlockApplicationService();
+
+            progress.DiscoverNode("node_deep_sight", firstTree);
+            applicationService.Apply(
+                "node_deep_sight",
+                firstTree,
+                progress,
+                BuildTestSkillRegistry());
+            progress.DiscoverNode("node_deep_sight", secondTree);
+
+            var service = new V2ProgressSnapshotService();
+            var snapshot = service.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                new ClassProfile(),
+                new MasteryProfile(),
+                new MentorRelationshipProfile(),
+                progress);
+            string json = new V2ProgressSnapshotJsonSerializer().Serialize(snapshot);
+            var deserialized = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+            var restoredProgress = new SkillTreeProgressProfile();
+            bool restored = service.RestoreSkillTreeProgressProfile(
+                deserialized,
+                restoredProgress,
+                bindingRegistry);
+
+            Assert(
+                snapshot.SkillTreeProgress.Scopes.Count == 2
+                && deserialized.SkillTreeProgress.Scopes.Count == 2,
+                "Snapshot JSON should preserve one progress record per stable skill tree id.");
+
+            Assert(
+                restored
+                && restoredProgress.IsUnlocked("node_deep_sight", firstTree)
+                && restoredProgress.IsDiscovered("node_deep_sight", secondTree)
+                && !restoredProgress.IsUnlocked("node_deep_sight", secondTree),
+                "Scoped snapshot restore should recreate each tree's independent progress.");
+        }
+
+        private static void AssertLegacyUnscopedSkillTreeJsonCompatibilityIsExplicit()
+        {
+            string json = "{"
+                + "\"SchemaVersion\":" + V2ProgressSnapshotVersions.CurrentSchemaVersion + ","
+                + "\"CodexEntries\":[],"
+                + "\"MissionLeads\":[],"
+                + "\"ActiveMissions\":[],"
+                + "\"Unlocks\":[],"
+                + "\"MasteryRecords\":[],"
+                + "\"MentorRelationships\":[],"
+                + "\"SkillTreeProgress\":{"
+                + "\"DiscoveredNodeIds\":[\"node_deep_sight\"],"
+                + "\"UnlockedNodeIds\":[\"node_deep_sight\"]"
+                + "}"
+                + "}";
+            var snapshot = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+            var explicitTree = BuildTestSkillTreeDefinition(SkillTreeId.Tlamatini);
+            var explicitProgress = new SkillTreeProgressProfile();
+            var ambiguousProgress = new SkillTreeProgressProfile();
+            var service = new V2ProgressSnapshotService();
+
+            bool explicitRestore = service.RestoreSkillTreeProgressProfile(
+                snapshot,
+                explicitProgress,
+                explicitTree);
+            bool ambiguousRestore = service.RestoreSkillTreeProgressProfile(
+                snapshot,
+                ambiguousProgress,
+                BuildTestClassSkillTreeBindingRegistry());
+
+            Assert(
+                explicitRestore
+                && explicitProgress.IsUnlocked("node_deep_sight", explicitTree),
+                "Legacy unscoped JSON should restore into an explicitly supplied skill tree.");
+
+            Assert(
+                !ambiguousRestore
+                && ambiguousProgress.UnlockedNodeIds.Count == 0,
+                "Legacy unscoped JSON should fail safely when multiple target trees make scope ambiguous.");
         }
 
         private static void AssertClassCanBindToSkillTree()

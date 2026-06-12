@@ -23,8 +23,10 @@ namespace Game.Domain.Classes
                     SkillTreeUnlockBlockReason.UnknownNode);
             }
 
-            bool isDiscovered = progressProfile != null && progressProfile.IsDiscovered(node.Id);
-            bool isAlreadyUnlocked = progressProfile != null && progressProfile.IsUnlocked(node.Id);
+            bool isDiscovered = progressProfile != null
+                && progressProfile.IsDiscovered(node.Id, skillTree);
+            bool isAlreadyUnlocked = progressProfile != null
+                && progressProfile.IsUnlocked(node.Id, skillTree);
 
             if (skillRegistry == null || !skillRegistry.Contains(node.SkillId))
             {
@@ -50,7 +52,8 @@ namespace Game.Domain.Classes
 
             foreach (var requiredNodeId in node.RequiredNodeIds)
             {
-                if (progressProfile == null || !progressProfile.IsUnlocked(requiredNodeId))
+                if (progressProfile == null
+                    || !progressProfile.IsUnlocked(requiredNodeId, skillTree))
                 {
                     return Blocked(
                         node.Id,

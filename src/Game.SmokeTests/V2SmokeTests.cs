@@ -210,6 +210,7 @@ namespace Game.SmokeTests
                     AssertV2SnapshotValidationOlderJsonWithoutMasteryDataIsSafe();
                     AssertV2SnapshotValidationRejectsInvalidMentorRelationshipId();
                     AssertV2SnapshotValidationRejectsInvalidSkillTreeNodeId();
+                    AssertV2SnapshotValidationRejectsInvalidSkillTreeScopeId();
                     AssertV2SnapshotValidationRejectsInvalidClassSkillTreeBindingIds();
                     AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots();
                 });
@@ -2445,6 +2446,31 @@ namespace Game.SmokeTests
             Assert(
                 !new V2ProgressSnapshotValidationService().IsValid(snapshot),
                 "Semantic snapshot validation should reject skill tree progress records with empty node ids.");
+        }
+
+        private static void AssertV2SnapshotValidationRejectsInvalidSkillTreeScopeId()
+        {
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new List<V2MasterySnapshot>(),
+                new List<V2MentorRelationshipSnapshot>(),
+                new V2SkillTreeProgressSnapshot(
+                    new[]
+                    {
+                        new V2SkillTreeProgressScopeSnapshot(
+                            "",
+                            new[] { "node_deep_sight" },
+                            new List<string>())
+                    }));
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(snapshot),
+                "Semantic snapshot validation should reject scoped skill tree progress with an empty tree id.");
         }
 
         private static void AssertV2SnapshotValidationRejectsInvalidClassSkillTreeBindingIds()
