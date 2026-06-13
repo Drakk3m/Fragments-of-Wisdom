@@ -262,6 +262,7 @@ namespace Game.SmokeTests
                     AssertClassMentorTeachingMasteryWorkflow();
                     AssertMasteredSkillRetentionIntegratedWorkflow();
                     AssertCombatFacingSkillAccessIntegratedWorkflow();
+                    AssertCombatSkillUseValidatorIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
@@ -3649,6 +3650,181 @@ namespace Game.SmokeTests
                 && retainedAccess.AllowedByMastery == policyResult.AllowedByMastery
                 && retainedAccess.BlockReason == policyResult.BlockReason,
                 "Combat access workflow facts should match retention policy facts.");
+        }
+
+        private static void AssertCombatSkillUseValidatorIntegratedWorkflow()
+        {
+            const string firstClassId = "class_validator_workflow_first";
+            const string secondClassId = "class_validator_workflow_second";
+            const string taughtSkillId = "skill_validator_workflow_taught";
+            const string unmasteredSkillId = "skill_validator_workflow_unmastered";
+
+            var taughtSkill = BuildTestSkillDefinition(
+                taughtSkillId,
+                "Validator Workflow Taught");
+            var unmasteredSkill = BuildTestSkillDefinition(
+                unmasteredSkillId,
+                "Validator Workflow Unmastered");
+            var skillRegistry = new SkillDefinitionRegistry();
+            bool taughtSkillRegistered = skillRegistry.Register(taughtSkill);
+            bool unmasteredSkillRegistered = skillRegistry.Register(unmasteredSkill);
+            var classRegistry = new ClassDefinitionRegistry();
+            bool firstClassRegistered = classRegistry.Register(new ClassDefinition(
+                firstClassId,
+                "Validator Workflow First",
+                new[] { taughtSkillId, unmasteredSkillId }));
+            bool secondClassRegistered = classRegistry.Register(new ClassDefinition(
+                secondClassId,
+                "Validator Workflow Second",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            var masteryProfile = new MasteryProfile();
+            var unlockProfile = new UnlockProfile();
+            var validator = new CombatSkillUseValidator();
+
+            Assert(
+                taughtSkillRegistered && unmasteredSkillRegistered,
+                "Validator workflow should register two skills.");
+
+            Assert(
+                firstClassRegistered
+                && secondClassRegistered
+                && classRegistry.Get(firstClassId).AllowsSkill(
+                    taughtSkillId,
+                    skillRegistry)
+                && !classRegistry.Get(secondClassId).AllowsSkill(
+                    taughtSkillId,
+                    skillRegistry),
+                "Validator workflow should register two distinct class access sets.");
+
+            Assert(
+                classProfile.AssignClassId(firstClassId, classRegistry),
+                "Validator workflow should assign the first class.");
+
+            var initialValidation = validator.Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(taughtSkillId),
+                    new SkillProgress(taughtSkill)),
+                true,
+                unlockProfile,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                initialValidation.IsAllowed
+                && initialValidation.V4AccessChecked
+                && initialValidation.BlockReason
+                    == CombatSkillUseBlockReason.None,
+                "First-class skill should pass integrated combat skill use validation.");
+
+            var mentorRegistry = BuildTestMentorRegistry();
+            var mentorProfile = new MentorRelationshipProfile();
+            mentorProfile.Discover(MentorId.Lyra, mentorRegistry);
+            mentorProfile.IncreaseTrust(MentorId.Lyra, 25, mentorRegistry);
+            var teachingResult = new MentorTeachingService().Evaluate(
+                new MentorTeachingDefinition(
+                    MentorId.Lyra,
+                    taughtSkillId,
+                    20,
+                    MasteryRecord.MasteredProgress),
+                mentorProfile,
+                mentorRegistry,
+                skillRegistry);
+            var applicationResult = new MentorTeachingApplicationService().Apply(
+                teachingResult,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                teachingResult.IsAvailable
+                && applicationResult.Applied
+                && masteryProfile.IsMastered(taughtSkillId),
+                "Validator workflow should mentor-teach the first-class skill to mastery.");
+
+            Assert(
+                classProfile.ChangeClassId(secondClassId, classRegistry),
+                "Validator workflow should switch to the second class.");
+
+            var retainedValidation = validator.Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(taughtSkillId),
+                    new SkillProgress(taughtSkill)),
+                true,
+                unlockProfile,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+            var blockedValidation = validator.Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(unmasteredSkillId),
+                    new SkillProgress(unmasteredSkill)),
+                true,
+                unlockProfile,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                retainedValidation.IsAllowed
+                && retainedValidation.V4AccessChecked,
+                "Mastered retained skill should pass validation after class switch.");
+
+            Assert(
+                !blockedValidation.IsAllowed
+                && blockedValidation.BlockReason
+                    == CombatSkillUseBlockReason.V4SkillBlocked
+                && blockedValidation.V4BlockReason
+                    == MasteredSkillRetentionBlockReason.SkillNotAllowed,
+                "Non-mastered cross-class skill should be blocked after class switch.");
+
+            var enemyValidation = validator.Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(unmasteredSkillId),
+                    new SkillProgress(unmasteredSkill)),
+                false,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                enemyValidation.IsAllowed
+                && !enemyValidation.IsPlayerAction
+                && !enemyValidation.V3AccessChecked
+                && !enemyValidation.V4AccessChecked,
+                "Enemy mode should allow a structurally valid skill without V4 profiles.");
+
+            var mismatchValidation = validator.Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(taughtSkillId),
+                    new SkillProgress(unmasteredSkill)),
+                true,
+                unlockProfile,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                !mismatchValidation.IsAllowed
+                && mismatchValidation.BlockReason
+                    == CombatSkillUseBlockReason.SkillProgressIdMismatch,
+                "Validator workflow should block mismatched skill and progress ids.");
         }
 
         private static void AssertSkillTreeProgressionIntegratedWorkflow()
