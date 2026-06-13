@@ -286,6 +286,17 @@ Restore rules:
 null discovered/unlocked node id lists, empty node ids, empty scoped skill tree
 ids, and duplicate skill tree scopes.
 
+Registry-aware validation additionally uses registered
+`SkillTreeDefinition` values to require:
+
+- every scoped `SkillTreeId` resolves
+- every discovered and unlocked node id exists in its scoped tree
+- every unlocked node is also discovered
+- every prerequisite of an unlocked node is also unlocked
+
+Validation without a skill tree registry remains structural-only for backward
+compatibility.
+
 ## Mastery Foundation
 
 `MasteryRecord` stores skill mastery facts:
@@ -613,10 +624,10 @@ Current smoke groups:
 - V1 Legacy Slice assertions: `2`
 - V1 emitted event count: `38`
 - Shared Domain Foundations assertions: `16`
-- V2 Narrative / Progression / Persistence assertions: `255`
+- V2 Narrative / Progression / Persistence assertions: `260`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `255`
-- Total smoke assertions executed: `628`
+- V4 Classes / Mentors / Mastery assertions: `256`
+- Total smoke assertions executed: `634`
 
 ## Validation
 

@@ -80,6 +80,7 @@ namespace Game.SmokeTests
                     AssertClassBindingUsesResolvedSkillTreeProgressScope();
                     AssertSnapshotCapturesAndRestoresScopedSkillTreeProgress();
                     AssertLegacyUnscopedSkillTreeJsonCompatibilityIsExplicit();
+                    AssertValidScopedSnapshotPassesRegistryAwareValidation();
                 });
 
             RunSection(
@@ -1517,6 +1518,27 @@ namespace Game.SmokeTests
                 !ambiguousRestore
                 && ambiguousProgress.UnlockedNodeIds.Count == 0,
                 "Legacy unscoped JSON should fail safely when multiple target trees make scope ambiguous.");
+        }
+
+        private static void AssertValidScopedSnapshotPassesRegistryAwareValidation()
+        {
+            var skillTreeRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var skillTree = skillTreeRegistry.GetSkillTree(SkillTreeId.Tlamatini);
+            var progress = BuildSkillTreeProgressWithUnlockedRoot(skillTree);
+            var snapshot = new V2ProgressSnapshotService().CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                new ClassProfile(),
+                new MasteryProfile(),
+                new MentorRelationshipProfile(),
+                progress);
+
+            Assert(
+                new V2ProgressSnapshotValidationService().IsValid(
+                    snapshot,
+                    skillTreeRegistry),
+                "Registry-aware validation should accept valid scoped skill tree progress.");
         }
 
         private static void AssertClassCanBindToSkillTree()

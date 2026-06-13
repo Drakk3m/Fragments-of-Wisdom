@@ -9,27 +9,43 @@ namespace Game.Domain.Progress
     {
         public bool IsValid(V2ProgressSnapshot snapshot)
         {
-            return IsValid(snapshot, null, null);
+            return IsValid(snapshot, null, null, null);
         }
 
         public bool IsValid(
             V2ProgressSnapshot snapshot,
             ClassDefinitionRegistry classRegistry)
         {
-            return IsValid(snapshot, classRegistry, null);
+            return IsValid(snapshot, classRegistry, null, null);
         }
 
         public bool IsValid(
             V2ProgressSnapshot snapshot,
             SkillDefinitionRegistry skillRegistry)
         {
-            return IsValid(snapshot, null, skillRegistry);
+            return IsValid(snapshot, null, skillRegistry, null);
+        }
+
+        public bool IsValid(
+            V2ProgressSnapshot snapshot,
+            ClassSkillTreeBindingRegistry skillTreeRegistry)
+        {
+            return IsValid(snapshot, null, null, skillTreeRegistry);
         }
 
         public bool IsValid(
             V2ProgressSnapshot snapshot,
             ClassDefinitionRegistry classRegistry,
             SkillDefinitionRegistry skillRegistry)
+        {
+            return IsValid(snapshot, classRegistry, skillRegistry, null);
+        }
+
+        public bool IsValid(
+            V2ProgressSnapshot snapshot,
+            ClassDefinitionRegistry classRegistry,
+            SkillDefinitionRegistry skillRegistry,
+            ClassSkillTreeBindingRegistry skillTreeRegistry)
         {
             if (snapshot == null || !snapshot.IsCurrentVersion())
             {
@@ -54,7 +70,7 @@ namespace Game.Domain.Progress
                 || !HasValidUnlocks(snapshot)
                 || !HasValidMasteryRecords(snapshot, skillRegistry)
                 || !HasValidMentorRelationships(snapshot)
-                || !HasValidSkillTreeProgress(snapshot)
+                || !HasValidSkillTreeProgress(snapshot, skillTreeRegistry)
                 || !HasValidClassSkillTreeBindings(snapshot))
             {
                 return false;
@@ -65,21 +81,28 @@ namespace Game.Domain.Progress
 
         public void ThrowIfInvalid(V2ProgressSnapshot snapshot)
         {
-            ThrowIfInvalid(snapshot, null, null);
+            ThrowIfInvalid(snapshot, null, null, null);
         }
 
         public void ThrowIfInvalid(
             V2ProgressSnapshot snapshot,
             ClassDefinitionRegistry classRegistry)
         {
-            ThrowIfInvalid(snapshot, classRegistry, null);
+            ThrowIfInvalid(snapshot, classRegistry, null, null);
         }
 
         public void ThrowIfInvalid(
             V2ProgressSnapshot snapshot,
             SkillDefinitionRegistry skillRegistry)
         {
-            ThrowIfInvalid(snapshot, null, skillRegistry);
+            ThrowIfInvalid(snapshot, null, skillRegistry, null);
+        }
+
+        public void ThrowIfInvalid(
+            V2ProgressSnapshot snapshot,
+            ClassSkillTreeBindingRegistry skillTreeRegistry)
+        {
+            ThrowIfInvalid(snapshot, null, null, skillTreeRegistry);
         }
 
         public void ThrowIfInvalid(
@@ -87,7 +110,16 @@ namespace Game.Domain.Progress
             ClassDefinitionRegistry classRegistry,
             SkillDefinitionRegistry skillRegistry)
         {
-            if (!IsValid(snapshot, classRegistry, skillRegistry))
+            ThrowIfInvalid(snapshot, classRegistry, skillRegistry, null);
+        }
+
+        public void ThrowIfInvalid(
+            V2ProgressSnapshot snapshot,
+            ClassDefinitionRegistry classRegistry,
+            SkillDefinitionRegistry skillRegistry,
+            ClassSkillTreeBindingRegistry skillTreeRegistry)
+        {
+            if (!IsValid(snapshot, classRegistry, skillRegistry, skillTreeRegistry))
             {
                 throw new InvalidOperationException("V2 progress snapshot failed semantic validation.");
             }
@@ -178,7 +210,9 @@ namespace Game.Domain.Progress
             return true;
         }
 
-        private static bool HasValidSkillTreeProgress(V2ProgressSnapshot snapshot)
+        private static bool HasValidSkillTreeProgress(
+            V2ProgressSnapshot snapshot,
+            ClassSkillTreeBindingRegistry skillTreeRegistry)
         {
             if (snapshot.SkillTreeProgress.DiscoveredNodeIds == null
                 || snapshot.SkillTreeProgress.UnlockedNodeIds == null
@@ -227,6 +261,64 @@ namespace Game.Domain.Progress
                 foreach (var nodeId in scope.UnlockedNodeIds)
                 {
                     if (string.IsNullOrWhiteSpace(nodeId))
+                    {
+                        return false;
+                    }
+                }
+
+                if (skillTreeRegistry != null
+                    && !HasValidSkillTreeProgressScope(scope, skillTreeRegistry))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasValidSkillTreeProgressScope(
+            V2SkillTreeProgressScopeSnapshot scope,
+            ClassSkillTreeBindingRegistry skillTreeRegistry)
+        {
+            var skillTree = skillTreeRegistry.GetSkillTree(scope.SkillTreeId);
+
+            if (skillTree == null)
+            {
+                return false;
+            }
+
+            var discoveredNodeIds = new HashSet<string>();
+
+            foreach (var nodeId in scope.DiscoveredNodeIds)
+            {
+                if (!skillTree.Contains(nodeId))
+                {
+                    return false;
+                }
+
+                discoveredNodeIds.Add(nodeId);
+            }
+
+            var unlockedNodeIds = new HashSet<string>();
+
+            foreach (var nodeId in scope.UnlockedNodeIds)
+            {
+                if (!skillTree.Contains(nodeId)
+                    || !discoveredNodeIds.Contains(nodeId))
+                {
+                    return false;
+                }
+
+                unlockedNodeIds.Add(nodeId);
+            }
+
+            foreach (var nodeId in unlockedNodeIds)
+            {
+                var node = skillTree.Get(nodeId);
+
+                foreach (var requiredNodeId in node.RequiredNodeIds)
+                {
+                    if (!unlockedNodeIds.Contains(requiredNodeId))
                     {
                         return false;
                     }

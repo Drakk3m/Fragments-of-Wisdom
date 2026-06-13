@@ -211,6 +211,11 @@ namespace Game.SmokeTests
                     AssertV2SnapshotValidationRejectsInvalidMentorRelationshipId();
                     AssertV2SnapshotValidationRejectsInvalidSkillTreeNodeId();
                     AssertV2SnapshotValidationRejectsInvalidSkillTreeScopeId();
+                    AssertV2SnapshotValidationRejectsUnknownSkillTreeIdWithRegistry();
+                    AssertV2SnapshotValidationRejectsUnknownSkillTreeNodeWithRegistry();
+                    AssertV2SnapshotValidationRejectsUnlockedUndiscoveredNodeWithRegistry();
+                    AssertV2SnapshotValidationRejectsMissingUnlockedPrerequisiteWithRegistry();
+                    AssertV2SnapshotValidationWithoutSkillTreeRegistryRemainsCompatible();
                     AssertV2SnapshotValidationRejectsInvalidClassSkillTreeBindingIds();
                     AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots();
                 });
@@ -2473,6 +2478,74 @@ namespace Game.SmokeTests
                 "Semantic snapshot validation should reject scoped skill tree progress with an empty tree id.");
         }
 
+        private static void AssertV2SnapshotValidationRejectsUnknownSkillTreeIdWithRegistry()
+        {
+            var snapshot = BuildV2SkillTreeValidationSnapshot(
+                "skill_tree_unknown",
+                new[] { "node_root" },
+                new[] { "node_root" });
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(
+                    snapshot,
+                    BuildV2ValidationSkillTreeRegistry()),
+                "Registry-aware validation should reject unknown skill tree scope ids.");
+        }
+
+        private static void AssertV2SnapshotValidationRejectsUnknownSkillTreeNodeWithRegistry()
+        {
+            var snapshot = BuildV2SkillTreeValidationSnapshot(
+                "skill_tree_validation",
+                new[] { "node_unknown" },
+                new List<string>());
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(
+                    snapshot,
+                    BuildV2ValidationSkillTreeRegistry()),
+                "Registry-aware validation should reject node ids missing from the scoped tree.");
+        }
+
+        private static void AssertV2SnapshotValidationRejectsUnlockedUndiscoveredNodeWithRegistry()
+        {
+            var snapshot = BuildV2SkillTreeValidationSnapshot(
+                "skill_tree_validation",
+                new List<string>(),
+                new[] { "node_root" });
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(
+                    snapshot,
+                    BuildV2ValidationSkillTreeRegistry()),
+                "Registry-aware validation should reject unlocked nodes that are not discovered.");
+        }
+
+        private static void AssertV2SnapshotValidationRejectsMissingUnlockedPrerequisiteWithRegistry()
+        {
+            var snapshot = BuildV2SkillTreeValidationSnapshot(
+                "skill_tree_validation",
+                new[] { "node_root", "node_dependent" },
+                new[] { "node_dependent" });
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(
+                    snapshot,
+                    BuildV2ValidationSkillTreeRegistry()),
+                "Registry-aware validation should reject unlocked nodes with missing unlocked prerequisites.");
+        }
+
+        private static void AssertV2SnapshotValidationWithoutSkillTreeRegistryRemainsCompatible()
+        {
+            var snapshot = BuildV2SkillTreeValidationSnapshot(
+                "skill_tree_unknown",
+                new List<string>(),
+                new[] { "node_unknown" });
+
+            Assert(
+                new V2ProgressSnapshotValidationService().IsValid(snapshot),
+                "Snapshot validation without a skill tree registry should preserve structural-only behavior.");
+        }
+
         private static void AssertV2SnapshotValidationRejectsInvalidClassSkillTreeBindingIds()
         {
             var snapshot = new V2ProgressSnapshot(
@@ -2572,6 +2645,62 @@ namespace Game.SmokeTests
                 ""));
 
             return registry;
+        }
+
+        private static ClassSkillTreeBindingRegistry BuildV2ValidationSkillTreeRegistry()
+        {
+            var skillRegistry = BuildV2ValidationSkillRegistry();
+            skillRegistry.Register(new SkillDefinition(
+                "skill_dependent",
+                "Dependent",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Utility,
+                SkillTargeting.Self,
+                SkillEffectType.Cleanse,
+                ""));
+            var skillTree = new SkillTreeDefinition("skill_tree_validation");
+
+            skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    "node_root",
+                    "skill_deep_sight",
+                    new string[0]),
+                skillRegistry);
+            skillTree.RegisterNode(
+                new SkillTreeNodeDefinition(
+                    "node_dependent",
+                    "skill_dependent",
+                    new[] { "node_root" }),
+                skillRegistry);
+
+            var registry = new ClassSkillTreeBindingRegistry();
+            registry.RegisterSkillTree(skillTree);
+            return registry;
+        }
+
+        private static V2ProgressSnapshot BuildV2SkillTreeValidationSnapshot(
+            string skillTreeId,
+            IReadOnlyList<string> discoveredNodeIds,
+            IReadOnlyList<string> unlockedNodeIds)
+        {
+            return new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new List<V2MasterySnapshot>(),
+                new List<V2MentorRelationshipSnapshot>(),
+                new V2SkillTreeProgressSnapshot(
+                    new[]
+                    {
+                        new V2SkillTreeProgressScopeSnapshot(
+                            skillTreeId,
+                            discoveredNodeIds,
+                            unlockedNodeIds)
+                    }));
         }
 
         private static void AssertV2SnapshotSerializesToJson()
