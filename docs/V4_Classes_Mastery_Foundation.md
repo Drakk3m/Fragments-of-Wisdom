@@ -506,6 +506,19 @@ Rules:
 4. `SkillTreeProgressProfile`
 5. class skill tree bindings
 
+Before mutating target state, the coordinator runs the same individual restore
+operations against temporary profiles and a temporary binding registry.
+
+Preflight rules:
+
+- class, mastery, mentor, skill tree progress, and binding feasibility are all
+  evaluated
+- any failed subsystem returns before target mutation begins
+- successful preflight applies the existing individual restore operations in
+  the documented order
+- per-subsystem success facts, failure reasons, and messages remain available
+- individual restore methods remain unchanged and independently callable
+
 The binding-aware coordinator overload receives:
 
 - `ClassDefinitionRegistry`
@@ -635,8 +648,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `256`
-- Total smoke assertions executed: `638`
+- V4 Classes / Mentors / Mastery assertions: `262`
+- Total smoke assertions executed: `644`
 
 ## Validation
 

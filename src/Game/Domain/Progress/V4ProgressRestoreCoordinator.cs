@@ -92,34 +92,111 @@ namespace Game.Domain.Progress
             ClassSkillTreeBindingRegistry classSkillTreeBindingRegistry,
             bool restoreClassSkillTreeBindings)
         {
+            var preflightBindingRegistry = restoreClassSkillTreeBindings
+                ? BuildPreflightBindingRegistry(
+                    classSkillTreeBindingRegistry,
+                    classRegistry)
+                : null;
             bool classRestored = snapshotService.RestoreClassProfile(
                 snapshot,
-                classProfile,
+                new ClassProfile(),
                 classRegistry);
             bool masteryRestored = snapshotService.RestoreMasteryProfile(
                 snapshot,
-                masteryProfile,
+                new MasteryProfile(),
                 skillRegistry);
             bool mentorRelationshipsRestored = snapshotService.RestoreMentorRelationshipProfile(
                 snapshot,
-                mentorRelationshipProfile,
+                new MentorRelationshipProfile(),
                 mentorRegistry);
             bool skillTreeProgressRestored = restoreClassSkillTreeBindings
                 && snapshot.SkillTreeProgress.Scopes.Count > 0
                     ? snapshotService.RestoreSkillTreeProgressProfile(
                         snapshot,
-                        skillTreeProgressProfile,
+                        new SkillTreeProgressProfile(),
                         classSkillTreeBindingRegistry)
                     : snapshotService.RestoreSkillTreeProgressProfile(
                         snapshot,
-                        skillTreeProgressProfile,
+                        new SkillTreeProgressProfile(),
                         skillTree);
             bool classSkillTreeBindingsRestored = !restoreClassSkillTreeBindings
                 || snapshotService.RestoreClassSkillTreeBindings(
                     snapshot,
-                    classSkillTreeBindingRegistry,
+                    preflightBindingRegistry,
                     classRegistry);
 
+            var preflightResult = BuildResult(
+                classRestored,
+                masteryRestored,
+                mentorRelationshipsRestored,
+                skillTreeProgressRestored,
+                classSkillTreeBindingsRestored);
+
+            if (!preflightResult.FullyRestored)
+            {
+                return preflightResult;
+            }
+
+            snapshotService.RestoreClassProfile(snapshot, classProfile, classRegistry);
+            snapshotService.RestoreMasteryProfile(snapshot, masteryProfile, skillRegistry);
+            snapshotService.RestoreMentorRelationshipProfile(
+                snapshot,
+                mentorRelationshipProfile,
+                mentorRegistry);
+
+            if (restoreClassSkillTreeBindings
+                && snapshot.SkillTreeProgress.Scopes.Count > 0)
+            {
+                snapshotService.RestoreSkillTreeProgressProfile(
+                    snapshot,
+                    skillTreeProgressProfile,
+                    classSkillTreeBindingRegistry);
+            }
+            else
+            {
+                snapshotService.RestoreSkillTreeProgressProfile(
+                    snapshot,
+                    skillTreeProgressProfile,
+                    skillTree);
+            }
+
+            if (restoreClassSkillTreeBindings)
+            {
+                snapshotService.RestoreClassSkillTreeBindings(
+                    snapshot,
+                    classSkillTreeBindingRegistry,
+                    classRegistry);
+            }
+
+            return preflightResult;
+        }
+
+        private static ClassSkillTreeBindingRegistry BuildPreflightBindingRegistry(
+            ClassSkillTreeBindingRegistry sourceRegistry,
+            ClassDefinitionRegistry classRegistry)
+        {
+            var preflightRegistry = new ClassSkillTreeBindingRegistry();
+
+            foreach (var skillTree in sourceRegistry.SkillTrees.Values)
+            {
+                preflightRegistry.RegisterSkillTree(skillTree);
+            }
+
+            foreach (var binding in sourceRegistry.Bindings.Values)
+            {
+                preflightRegistry.RegisterBinding(binding, classRegistry);
+            }
+
+            return preflightRegistry;
+        }
+
+        private static V4ProgressRestoreResult BuildResult(
+            bool classRestored,
+            bool masteryRestored,
+            bool mentorRelationshipsRestored,
+            bool skillTreeProgressRestored,
+            bool classSkillTreeBindingsRestored)
+        {
             return new V4ProgressRestoreResult(
                 classRestored,
                 masteryRestored,
