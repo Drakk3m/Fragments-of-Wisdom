@@ -248,6 +248,7 @@ namespace Game.SmokeTests
                 {
                     AssertClassMentorTeachingMasteryWorkflow();
                     AssertMasteredSkillRetentionIntegratedWorkflow();
+                    AssertCombatFacingSkillAccessIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
@@ -3255,6 +3256,145 @@ namespace Game.SmokeTests
                 && !unmasteredResult.AllowedByCurrentClass
                 && !unmasteredResult.AllowedByMastery,
                 "Retention workflow should block non-mastered first-class skill after class switch.");
+        }
+
+        private static void AssertCombatFacingSkillAccessIntegratedWorkflow()
+        {
+            const string firstClassId = "class_combat_memory";
+            const string secondClassId = "class_combat_empty";
+            const string taughtSkillId = "skill_combat_memory";
+            const string unmasteredSkillId = "skill_combat_unmastered";
+
+            var skillRegistry = new SkillDefinitionRegistry();
+            bool taughtSkillRegistered = skillRegistry.Register(
+                BuildTestSkillDefinition(taughtSkillId, "Combat Memory"));
+            bool unmasteredSkillRegistered = skillRegistry.Register(
+                BuildTestSkillDefinition(unmasteredSkillId, "Combat Unmastered"));
+            var classRegistry = new ClassDefinitionRegistry();
+            bool firstClassRegistered = classRegistry.Register(new ClassDefinition(
+                firstClassId,
+                "Combat Memory Class",
+                new[] { taughtSkillId, unmasteredSkillId }));
+            bool secondClassRegistered = classRegistry.Register(new ClassDefinition(
+                secondClassId,
+                "Combat Empty Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            var masteryProfile = new MasteryProfile();
+            var mentorRegistry = BuildTestMentorRegistry();
+            var mentorProfile = new MentorRelationshipProfile();
+            var accessService = new CombatSkillAccessService();
+
+            Assert(
+                taughtSkillRegistered
+                && unmasteredSkillRegistered,
+                "Combat access workflow should register two skills.");
+
+            Assert(
+                firstClassRegistered
+                && secondClassRegistered
+                && classRegistry.Get(firstClassId).AllowsSkill(taughtSkillId, skillRegistry)
+                && !classRegistry.Get(secondClassId).AllowsSkill(taughtSkillId, skillRegistry),
+                "Combat access workflow should register classes with different allowed skills.");
+
+            Assert(
+                classProfile.AssignClassId(firstClassId, classRegistry),
+                "Combat access workflow should assign the first class.");
+
+            var initialAccess = accessService.Evaluate(
+                taughtSkillId,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                initialAccess.IsUsable
+                && initialAccess.AllowedByCurrentClass
+                && !initialAccess.AllowedByMastery,
+                "First-class skill should initially be combat-usable through class access.");
+
+            Assert(
+                mentorProfile.Discover(MentorId.Lyra, mentorRegistry)
+                && mentorProfile.IncreaseTrust(MentorId.Lyra, 25, mentorRegistry),
+                "Combat access workflow should establish sufficient mentor trust.");
+
+            var teachingResult = new MentorTeachingService().Evaluate(
+                new MentorTeachingDefinition(
+                    MentorId.Lyra,
+                    taughtSkillId,
+                    20,
+                    MasteryRecord.MasteredProgress),
+                mentorProfile,
+                mentorRegistry,
+                skillRegistry);
+            var applicationResult = new MentorTeachingApplicationService().Apply(
+                teachingResult,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                teachingResult.IsAvailable
+                && applicationResult.Applied
+                && masteryProfile.IsMastered(taughtSkillId),
+                "Combat access workflow should mentor-teach the first-class skill to mastery.");
+
+            Assert(
+                classProfile.ChangeClassId(secondClassId, classRegistry),
+                "Combat access workflow should switch to the second class.");
+
+            var retainedAccess = accessService.Evaluate(
+                taughtSkillId,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+            var blockedAccess = accessService.Evaluate(
+                unmasteredSkillId,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+            var unknownAccess = accessService.Evaluate(
+                "skill_unknown",
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                retainedAccess.IsUsable
+                && !retainedAccess.AllowedByCurrentClass
+                && retainedAccess.AllowedByMastery,
+                "Mastered first-class skill should remain combat-usable after class switch.");
+
+            Assert(
+                !blockedAccess.IsUsable
+                && blockedAccess.BlockReason
+                    == MasteredSkillRetentionBlockReason.SkillNotAllowed,
+                "Non-mastered first-class skill should be blocked after class switch.");
+
+            Assert(
+                !unknownAccess.IsUsable
+                && unknownAccess.BlockReason
+                    == MasteredSkillRetentionBlockReason.UnknownSkill,
+                "Unknown skill should be blocked by combat-facing access.");
+
+            var policyResult = new MasteredSkillRetentionPolicy().Evaluate(
+                taughtSkillId,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                retainedAccess.SkillId == policyResult.SkillId
+                && retainedAccess.IsUsable == policyResult.IsUsable
+                && retainedAccess.AllowedByCurrentClass
+                    == policyResult.AllowedByCurrentClass
+                && retainedAccess.AllowedByMastery == policyResult.AllowedByMastery
+                && retainedAccess.BlockReason == policyResult.BlockReason,
+                "Combat access workflow facts should match retention policy facts.");
         }
 
         private static void AssertSkillTreeProgressionIntegratedWorkflow()

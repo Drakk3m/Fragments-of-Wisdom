@@ -584,6 +584,7 @@ V4 smoke tests include integrated workflow coverage for:
 - class + mentor + teaching + mastery
 - class/mastery snapshot and restore
 - mastered skill retention after class switch
+- combat-facing skill access after mentor teaching and class switch
 - skill tree progression
 - class-specific skill tree binding
 - class skill tree binding snapshot, JSON round-trip, and restore
@@ -600,6 +601,17 @@ The mastered skill retention workflow verifies:
 - the mastered first-class skill remains usable through
   `MasteredSkillRetentionPolicy`
 - a non-mastered first-class skill is not usable after the class switch
+
+The combat-facing skill access workflow verifies:
+
+- two skills and two classes with different allowed skills are registered
+- the first class is assigned and its skill is combat-usable
+- a mentor teaches that skill to mastery
+- the profile switches to the second class
+- the mastered first-class skill remains combat-usable
+- the non-mastered first-class skill and an unknown skill are blocked
+- `CombatSkillAccessService` facts match `MasteredSkillRetentionPolicy`
+- no combat execution behavior is changed
 
 The skill tree workflow verifies:
 
@@ -656,7 +668,7 @@ Allowed:
 
 Not included:
 
-- combat integration
+- combat engine integration
 - skill execution changes
 - automatic skill unlock grants
 - mentor rewards
@@ -675,8 +687,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `267`
-- Total smoke assertions executed: `649`
+- V4 Classes / Mentors / Mastery assertions: `278`
+- Total smoke assertions executed: `660`
 
 ## Validation
 
