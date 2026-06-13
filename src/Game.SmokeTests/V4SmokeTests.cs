@@ -132,6 +132,12 @@ namespace Game.SmokeTests
                     AssertV4RestoreCoordinatorReportsClassSkillTreeBindingFailure();
                     AssertV4RestoreCoordinatorBindingFailureIsNotFullSuccess();
                     AssertV4RestoreCoordinatorRestoredBindingResolvesCurrentClassSkillTree();
+                    AssertV4RestoreCoordinatorClassPreflightPreventsAllMutation();
+                    AssertV4RestoreCoordinatorMasteryPreflightPreventsAllMutation();
+                    AssertV4RestoreCoordinatorMentorPreflightPreventsAllMutation();
+                    AssertV4RestoreCoordinatorSkillTreePreflightPreventsAllMutation();
+                    AssertV4RestoreCoordinatorBindingPreflightPreventsAllMutation();
+                    AssertV4RestoreCoordinatorPreflightPreservesFailureDetails();
                 });
 
             RunSection(
@@ -2165,6 +2171,163 @@ namespace Game.SmokeTests
                 && currentSkillTree != null
                 && currentSkillTree.Id == SkillTreeId.Tlamatini,
                 "Successful coordinated restore should resolve the current class skill tree binding.");
+        }
+
+        private static void AssertV4RestoreCoordinatorClassPreflightPreventsAllMutation()
+        {
+            AssertV4PreflightFailurePreventsProfileMutation(
+                BuildCompleteV4Snapshot(
+                    "class_unknown",
+                    "skill_deep_sight",
+                    MentorId.Lyra,
+                    "node_deep_sight"),
+                delegate(V4ProgressRestoreResult result)
+                {
+                    return !result.ClassRestored;
+                },
+                "Class preflight failure should prevent all V4 profile mutation.");
+        }
+
+        private static void AssertV4RestoreCoordinatorMasteryPreflightPreventsAllMutation()
+        {
+            AssertV4PreflightFailurePreventsProfileMutation(
+                BuildCompleteV4Snapshot(
+                    ClassId.Tlamatini,
+                    "skill_unknown",
+                    MentorId.Lyra,
+                    "node_deep_sight"),
+                delegate(V4ProgressRestoreResult result)
+                {
+                    return !result.MasteryRestored;
+                },
+                "Mastery preflight failure should prevent all V4 profile mutation.");
+        }
+
+        private static void AssertV4RestoreCoordinatorMentorPreflightPreventsAllMutation()
+        {
+            AssertV4PreflightFailurePreventsProfileMutation(
+                BuildCompleteV4Snapshot(
+                    ClassId.Tlamatini,
+                    "skill_deep_sight",
+                    "mentor_unknown",
+                    "node_deep_sight"),
+                delegate(V4ProgressRestoreResult result)
+                {
+                    return !result.MentorRelationshipsRestored;
+                },
+                "Mentor preflight failure should prevent all V4 profile mutation.");
+        }
+
+        private static void AssertV4RestoreCoordinatorSkillTreePreflightPreventsAllMutation()
+        {
+            AssertV4PreflightFailurePreventsProfileMutation(
+                BuildCompleteV4Snapshot(
+                    ClassId.Tlamatini,
+                    "skill_deep_sight",
+                    MentorId.Lyra,
+                    "node_unknown"),
+                delegate(V4ProgressRestoreResult result)
+                {
+                    return !result.SkillTreeProgressRestored;
+                },
+                "Skill tree preflight failure should prevent all V4 profile mutation.");
+        }
+
+        private static void AssertV4RestoreCoordinatorBindingPreflightPreventsAllMutation()
+        {
+            var snapshot = BuildCompleteV4SnapshotWithBinding(
+                ClassId.Tlamatini,
+                "skill_tree_unknown");
+            var classProfile = new ClassProfile();
+            var masteryProfile = new MasteryProfile();
+            var mentorProfile = new MentorRelationshipProfile();
+            var skillTreeProgress = new SkillTreeProgressProfile();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+
+            var result = new V4ProgressRestoreCoordinator().Restore(
+                snapshot,
+                classProfile,
+                masteryProfile,
+                mentorProfile,
+                skillTreeProgress,
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                BuildTestSkillTreeDefinition(),
+                bindingRegistry);
+
+            Assert(
+                !result.ClassSkillTreeBindingsRestored
+                && HasNoRestoredV4State(
+                    classProfile,
+                    masteryProfile,
+                    mentorProfile,
+                    skillTreeProgress)
+                && bindingRegistry.Bindings.Count == 0,
+                "Binding preflight failure should prevent all profile and binding mutation.");
+        }
+
+        private static void AssertV4RestoreCoordinatorPreflightPreservesFailureDetails()
+        {
+            var result = RestoreCompleteV4Snapshot(
+                BuildCompleteV4Snapshot(
+                    ClassId.Tlamatini,
+                    "skill_unknown",
+                    MentorId.Lyra,
+                    "node_deep_sight"));
+
+            Assert(
+                result.MasteryFailureReason
+                    == V4ProgressRestoreFailureReason.ValidationFailed
+                && result.MasteryFailureMessage.Contains("MasteryProfile")
+                && result.ClassFailureReason == V4ProgressRestoreFailureReason.None
+                && result.MentorRelationshipsFailureReason
+                    == V4ProgressRestoreFailureReason.None,
+                "Preflight failure should preserve per-subsystem result details.");
+        }
+
+        private static void AssertV4PreflightFailurePreventsProfileMutation(
+            V2ProgressSnapshot snapshot,
+            System.Func<V4ProgressRestoreResult, bool> failedSubsystemAssertion,
+            string message)
+        {
+            var classProfile = new ClassProfile();
+            var masteryProfile = new MasteryProfile();
+            var mentorProfile = new MentorRelationshipProfile();
+            var skillTreeProgress = new SkillTreeProgressProfile();
+
+            var result = new V4ProgressRestoreCoordinator().Restore(
+                snapshot,
+                classProfile,
+                masteryProfile,
+                mentorProfile,
+                skillTreeProgress,
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                BuildTestSkillTreeDefinition());
+
+            Assert(
+                failedSubsystemAssertion(result)
+                && HasNoRestoredV4State(
+                    classProfile,
+                    masteryProfile,
+                    mentorProfile,
+                    skillTreeProgress),
+                message);
+        }
+
+        private static bool HasNoRestoredV4State(
+            ClassProfile classProfile,
+            MasteryProfile masteryProfile,
+            MentorRelationshipProfile mentorProfile,
+            SkillTreeProgressProfile skillTreeProgress)
+        {
+            return string.IsNullOrWhiteSpace(classProfile.CurrentClassId)
+                && masteryProfile.Records.Count == 0
+                && mentorProfile.DiscoveredMentorIds.Count == 0
+                && skillTreeProgress.DiscoveredNodeIds.Count == 0
+                && skillTreeProgress.UnlockedNodeIds.Count == 0;
         }
 
         private static void AssertMentorCanBeDiscovered()
