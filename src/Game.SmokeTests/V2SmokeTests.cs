@@ -216,6 +216,10 @@ namespace Game.SmokeTests
                     AssertV2SnapshotValidationRejectsUnlockedUndiscoveredNodeWithRegistry();
                     AssertV2SnapshotValidationRejectsMissingUnlockedPrerequisiteWithRegistry();
                     AssertV2SnapshotValidationWithoutSkillTreeRegistryRemainsCompatible();
+                    AssertV2SnapshotValidationAcceptsLegacyOnlySkillTreeProgress();
+                    AssertV2SnapshotValidationAcceptsScopedOnlySkillTreeProgress();
+                    AssertV2SnapshotValidationRejectsMixedSkillTreeProgressFormats();
+                    AssertV2SnapshotValidationAcceptsOlderJsonWithoutSkillTreeProgress();
                     AssertV2SnapshotValidationRejectsInvalidClassSkillTreeBindingIds();
                     AssertV2SnapshotSemanticValidationRejectsInvalidSnapshots();
                 });
@@ -2544,6 +2548,84 @@ namespace Game.SmokeTests
             Assert(
                 new V2ProgressSnapshotValidationService().IsValid(snapshot),
                 "Snapshot validation without a skill tree registry should preserve structural-only behavior.");
+        }
+
+        private static void AssertV2SnapshotValidationAcceptsLegacyOnlySkillTreeProgress()
+        {
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new List<V2MasterySnapshot>(),
+                new List<V2MentorRelationshipSnapshot>(),
+                new V2SkillTreeProgressSnapshot(
+                    new[] { "node_legacy" },
+                    new[] { "node_legacy" }));
+
+            Assert(
+                new V2ProgressSnapshotValidationService().IsValid(snapshot),
+                "Legacy-only skill tree progress should remain structurally valid.");
+        }
+
+        private static void AssertV2SnapshotValidationAcceptsScopedOnlySkillTreeProgress()
+        {
+            var snapshot = BuildV2SkillTreeValidationSnapshot(
+                "skill_tree_validation",
+                new[] { "node_root" },
+                new[] { "node_root" });
+
+            Assert(
+                new V2ProgressSnapshotValidationService().IsValid(
+                    snapshot,
+                    BuildV2ValidationSkillTreeRegistry()),
+                "Scoped-only skill tree progress should remain valid with registered tree definitions.");
+        }
+
+        private static void AssertV2SnapshotValidationRejectsMixedSkillTreeProgressFormats()
+        {
+            var snapshot = new V2ProgressSnapshot(
+                V2ProgressSnapshotVersions.CurrentSchemaVersion,
+                new List<V2CodexEntrySnapshot>(),
+                new List<V2MissionLeadSnapshot>(),
+                new List<V2ActiveMissionSnapshot>(),
+                new List<V2UnlockSnapshot>(),
+                null,
+                new List<V2MasterySnapshot>(),
+                new List<V2MentorRelationshipSnapshot>(),
+                new V2SkillTreeProgressSnapshot(
+                    new[] { "node_legacy" },
+                    new[] { "node_legacy" },
+                    new[]
+                    {
+                        new V2SkillTreeProgressScopeSnapshot(
+                            "skill_tree_validation",
+                            new[] { "node_root" },
+                            new[] { "node_root" })
+                    }));
+
+            Assert(
+                !new V2ProgressSnapshotValidationService().IsValid(snapshot),
+                "Snapshots mixing legacy and scoped skill tree progress should be rejected.");
+        }
+
+        private static void AssertV2SnapshotValidationAcceptsOlderJsonWithoutSkillTreeProgress()
+        {
+            string json = "{"
+                + "\"SchemaVersion\":" + V2ProgressSnapshotVersions.CurrentSchemaVersion + ","
+                + "\"CodexEntries\":[],"
+                + "\"MissionLeads\":[]"
+                + "}";
+            var snapshot = new V2ProgressSnapshotJsonSerializer().Deserialize(json);
+
+            Assert(
+                new V2ProgressSnapshotValidationService().IsValid(snapshot)
+                && snapshot.SkillTreeProgress.DiscoveredNodeIds.Count == 0
+                && snapshot.SkillTreeProgress.UnlockedNodeIds.Count == 0
+                && snapshot.SkillTreeProgress.Scopes.Count == 0,
+                "Older JSON without skill tree progress should remain valid as empty progress.");
         }
 
         private static void AssertV2SnapshotValidationRejectsInvalidClassSkillTreeBindingIds()

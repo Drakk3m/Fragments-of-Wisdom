@@ -267,6 +267,15 @@ Scoped snapshot records store:
 
 Legacy unscoped discovered/unlocked lists remain readable for older JSON.
 
+Compatibility policy:
+
+- legacy-only progress is valid
+- scoped-only progress is valid
+- empty legacy lists may accompany scoped progress
+- snapshots containing both non-empty legacy progress and scoped progress are
+  rejected as ambiguous
+- older JSON without skill tree progress remains valid as empty progress
+
 Restore rules:
 
 - scoped skill tree ids validate through registered `SkillTreeDefinition`
@@ -624,10 +633,10 @@ Current smoke groups:
 - V1 Legacy Slice assertions: `2`
 - V1 emitted event count: `38`
 - Shared Domain Foundations assertions: `16`
-- V2 Narrative / Progression / Persistence assertions: `260`
+- V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
 - V4 Classes / Mentors / Mastery assertions: `256`
-- Total smoke assertions executed: `634`
+- Total smoke assertions executed: `638`
 
 ## Validation
 

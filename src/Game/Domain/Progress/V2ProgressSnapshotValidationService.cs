@@ -221,6 +221,14 @@ namespace Game.Domain.Progress
                 return false;
             }
 
+            bool hasLegacyProgress = snapshot.SkillTreeProgress.DiscoveredNodeIds.Count > 0
+                || snapshot.SkillTreeProgress.UnlockedNodeIds.Count > 0;
+
+            if (hasLegacyProgress && snapshot.SkillTreeProgress.Scopes.Count > 0)
+            {
+                return false;
+            }
+
             foreach (var nodeId in snapshot.SkillTreeProgress.DiscoveredNodeIds)
             {
                 if (string.IsNullOrWhiteSpace(nodeId))
