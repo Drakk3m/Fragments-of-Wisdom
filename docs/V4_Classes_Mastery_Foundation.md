@@ -496,6 +496,29 @@ Rules:
 - the policy does not mutate `ClassProfile` or `MasteryProfile`
 - the policy does not execute skills or integrate with combat
 
+## Combat-Facing Skill Access
+
+`CombatSkillAccessService` is a read-only adapter from combat-facing callers to
+`MasteredSkillRetentionPolicy`.
+
+It returns `CombatSkillAccessResult` facts:
+
+- `SkillId`
+- `IsUsable`
+- `AllowedByCurrentClass`
+- `AllowedByMastery`
+- `BlockReason`
+
+Access rules:
+
+- current-class skills are usable
+- mastered retained skills remain usable after a class switch
+- non-mastered cross-class skills are blocked
+- unknown skill ids fail safely
+- output facts are copied directly from `MasteredSkillRetentionPolicy`
+- no profile, registry, combat engine, or skill execution state is mutated
+- `TurnBasedCombatEngine` does not consume the service yet
+
 ## Unified V4 Restore Coordinator
 
 `V4ProgressRestoreCoordinator` restores V4 state in this defined order:
@@ -652,8 +675,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `262`
-- Total smoke assertions executed: `644`
+- V4 Classes / Mentors / Mastery assertions: `267`
+- Total smoke assertions executed: `649`
 
 ## Validation
 

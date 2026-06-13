@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json;
 using Game.Domain.Classes;
+using Game.Domain.Combat;
 using Game.Domain.Codex;
 using Game.Domain.Missions;
 using Game.Domain.Player;
@@ -171,6 +172,17 @@ namespace Game.SmokeTests
                     AssertNonClassNonMasteredSkillIsBlockedByRetentionPolicy();
                     AssertUnknownSkillRetentionFailsSafely();
                     AssertMasteredSkillRetentionWorksWithoutCurrentClass();
+                });
+
+            RunSection(
+                "Combat-facing skill access assertions",
+                delegate
+                {
+                    AssertCurrentClassSkillIsCombatUsable();
+                    AssertMasteredRetainedSkillIsCombatUsableAfterClassSwitch();
+                    AssertNonMasteredCrossClassSkillIsBlockedForCombat();
+                    AssertUnknownCombatSkillAccessFailsSafely();
+                    AssertCombatSkillAccessMatchesRetentionPolicyFacts();
                 });
 
             RunSection(
@@ -950,6 +962,127 @@ namespace Game.SmokeTests
                 && !result.AllowedByCurrentClass
                 && result.AllowedByMastery,
                 "Mastered registered skill should remain usable even without a current class.");
+        }
+
+        private static void AssertCurrentClassSkillIsCombatUsable()
+        {
+            var classProfile = new ClassProfile();
+            var classRegistry = BuildTestClassRegistry();
+
+            classProfile.AssignClassId(ClassId.Tlamatini, classRegistry);
+
+            var result = new CombatSkillAccessService().Evaluate(
+                "skill_deep_sight",
+                classProfile,
+                classRegistry,
+                new MasteryProfile(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                result.IsUsable
+                && result.AllowedByCurrentClass
+                && !result.AllowedByMastery
+                && result.BlockReason == MasteredSkillRetentionBlockReason.None,
+                "Current-class skill should be combat-usable.");
+        }
+
+        private static void AssertMasteredRetainedSkillIsCombatUsableAfterClassSwitch()
+        {
+            var classProfile = new ClassProfile();
+            var classRegistry = BuildTestClassRegistry();
+            var skillRegistry = BuildTestSkillRegistry();
+            var masteryProfile = new MasteryProfile();
+
+            classProfile.AssignClassId(ClassId.Tlamatini, classRegistry);
+            masteryProfile.IncreaseProgress(
+                "skill_deep_sight",
+                MasteryRecord.MasteredProgress,
+                skillRegistry);
+            classProfile.ChangeClassId(ClassId.Wanderer, classRegistry);
+
+            var result = new CombatSkillAccessService().Evaluate(
+                "skill_deep_sight",
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                result.IsUsable
+                && !result.AllowedByCurrentClass
+                && result.AllowedByMastery,
+                "Mastered retained skill should remain combat-usable after class switch.");
+        }
+
+        private static void AssertNonMasteredCrossClassSkillIsBlockedForCombat()
+        {
+            var classProfile = new ClassProfile();
+            var classRegistry = BuildTestClassRegistry();
+
+            classProfile.AssignClassId(ClassId.Tlamatini, classRegistry);
+
+            var result = new CombatSkillAccessService().Evaluate(
+                "skill_minor_cleanse",
+                classProfile,
+                classRegistry,
+                new MasteryProfile(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.IsUsable
+                && !result.AllowedByCurrentClass
+                && !result.AllowedByMastery
+                && result.BlockReason == MasteredSkillRetentionBlockReason.SkillNotAllowed,
+                "Non-mastered cross-class skill should be blocked for combat.");
+        }
+
+        private static void AssertUnknownCombatSkillAccessFailsSafely()
+        {
+            var result = new CombatSkillAccessService().Evaluate(
+                "skill_unknown",
+                new ClassProfile(),
+                BuildTestClassRegistry(),
+                new MasteryProfile(),
+                BuildTestSkillRegistry());
+
+            Assert(
+                !result.IsUsable
+                && result.SkillId == "skill_unknown"
+                && result.BlockReason == MasteredSkillRetentionBlockReason.UnknownSkill,
+                "Unknown skill id should fail safely for combat access.");
+        }
+
+        private static void AssertCombatSkillAccessMatchesRetentionPolicyFacts()
+        {
+            var classProfile = new ClassProfile();
+            var classRegistry = BuildTestClassRegistry();
+            var skillRegistry = BuildTestSkillRegistry();
+            var masteryProfile = new MasteryProfile();
+            var policy = new MasteredSkillRetentionPolicy();
+
+            classProfile.AssignClassId(ClassId.Tlamatini, classRegistry);
+
+            var policyResult = policy.Evaluate(
+                "skill_deep_sight",
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+            var accessResult = new CombatSkillAccessService(policy).Evaluate(
+                "skill_deep_sight",
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                accessResult.SkillId == policyResult.SkillId
+                && accessResult.IsUsable == policyResult.IsUsable
+                && accessResult.AllowedByCurrentClass
+                    == policyResult.AllowedByCurrentClass
+                && accessResult.AllowedByMastery == policyResult.AllowedByMastery
+                && accessResult.BlockReason == policyResult.BlockReason,
+                "Combat skill access should expose the exact retention policy facts.");
         }
 
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
