@@ -186,6 +186,19 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Combat skill use validator assertions",
+                delegate
+                {
+                    AssertValidPlayerCombatSkillUsePassesValidation();
+                    AssertLockedV3CombatSkillUseIsBlocked();
+                    AssertNonMasteredCrossClassCombatSkillUseIsBlocked();
+                    AssertMasteredRetainedCombatSkillUsePassesValidation();
+                    AssertEnemyCombatSkillUsePassesWithoutV4Profiles();
+                    AssertCombatSkillUseIdMismatchIsBlocked();
+                    AssertNullCombatSkillUseInputsFailSafely();
+                });
+
+            RunSection(
                 "Mentor foundation assertions",
                 delegate
                 {
@@ -1084,6 +1097,247 @@ namespace Game.SmokeTests
                 && accessResult.AllowedByMastery == policyResult.AllowedByMastery
                 && accessResult.BlockReason == policyResult.BlockReason,
                 "Combat skill access should expose the exact retention policy facts.");
+        }
+
+        private static void AssertValidPlayerCombatSkillUsePassesValidation()
+        {
+            const string skillId = "skill_validator_player";
+            const string classId = "class_validator_player";
+            var definition = BuildTestSkillDefinition(skillId, "Validator Player");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Validator Player Class",
+                new[] { skillId }));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                true,
+                new UnlockProfile(),
+                classProfile,
+                classRegistry,
+                new MasteryProfile(),
+                skillRegistry);
+
+            Assert(
+                result.IsAllowed
+                && result.SkillId == skillId
+                && result.IsPlayerAction
+                && result.V4AccessChecked
+                && result.BlockReason == CombatSkillUseBlockReason.None,
+                "Valid player skill should pass composed combat skill use validation.");
+        }
+
+        private static void AssertLockedV3CombatSkillUseIsBlocked()
+        {
+            const string skillId = "skill_validator_locked";
+            var definition = BuildValidatorSkillDefinition(
+                skillId,
+                CodexUnlockIds.ForbiddenPracticeCount);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                true,
+                new UnlockProfile(),
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                !result.IsAllowed
+                && result.V3AccessChecked
+                && !result.V4AccessChecked
+                && result.BlockReason == CombatSkillUseBlockReason.V3SkillLocked
+                && result.V3BlockReason == SkillAccessPolicy.MissingUnlockBlockReason,
+                "Locked V3 skill should be blocked with stable validator facts.");
+        }
+
+        private static void AssertNonMasteredCrossClassCombatSkillUseIsBlocked()
+        {
+            const string skillId = "skill_validator_cross_class";
+            const string classId = "class_validator_cross_class";
+            var definition = BuildTestSkillDefinition(skillId, "Validator Cross Class");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Validator Empty Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                true,
+                new UnlockProfile(),
+                classProfile,
+                classRegistry,
+                new MasteryProfile(),
+                skillRegistry);
+
+            Assert(
+                !result.IsAllowed
+                && result.V4AccessChecked
+                && result.BlockReason == CombatSkillUseBlockReason.V4SkillBlocked
+                && result.V4BlockReason
+                    == MasteredSkillRetentionBlockReason.SkillNotAllowed,
+                "Non-mastered cross-class skill should be blocked by V4 access validation.");
+        }
+
+        private static void AssertMasteredRetainedCombatSkillUsePassesValidation()
+        {
+            const string skillId = "skill_validator_mastered";
+            const string classId = "class_validator_mastered";
+            var definition = BuildTestSkillDefinition(skillId, "Validator Mastered");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Validator Other Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            var masteryProfile = new MasteryProfile();
+            masteryProfile.IncreaseProgress(
+                skillId,
+                MasteryRecord.MasteredProgress,
+                skillRegistry);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                true,
+                new UnlockProfile(),
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry);
+
+            Assert(
+                result.IsAllowed
+                && result.V4AccessChecked
+                && result.BlockReason == CombatSkillUseBlockReason.None,
+                "Mastered retained skill should pass V4 combat skill use validation.");
+        }
+
+        private static void AssertEnemyCombatSkillUsePassesWithoutV4Profiles()
+        {
+            const string skillId = "skill_validator_enemy";
+            var definition = BuildValidatorSkillDefinition(
+                skillId,
+                CodexUnlockIds.ForbiddenPracticeCount);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                false,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                result.IsAllowed
+                && !result.IsPlayerAction
+                && !result.V3AccessChecked
+                && !result.V4AccessChecked,
+                "Explicit enemy mode should not require player unlock or V4 profiles.");
+        }
+
+        private static void AssertCombatSkillUseIdMismatchIsBlocked()
+        {
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill("skill_validator_runtime"),
+                    new SkillProgress(BuildTestSkillDefinition(
+                        "skill_validator_progress",
+                        "Validator Progress"))),
+                true,
+                new UnlockProfile(),
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                !result.IsAllowed
+                && result.BlockReason
+                    == CombatSkillUseBlockReason.SkillProgressIdMismatch,
+                "Skill and progress definition id mismatch should be blocked safely.");
+        }
+
+        private static void AssertNullCombatSkillUseInputsFailSafely()
+        {
+            var validator = new CombatSkillUseValidator();
+            var missingRequest = validator.Validate(
+                null,
+                true,
+                null,
+                null,
+                null,
+                null,
+                null);
+            var missingSkill = validator.Validate(
+                TurnRequest.SkillAction(null, null, null, null),
+                true,
+                null,
+                null,
+                null,
+                null,
+                null);
+            var missingProgress = validator.Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill("skill_validator_null"),
+                    null),
+                true,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                !missingRequest.IsAllowed
+                && missingRequest.BlockReason
+                    == CombatSkillUseBlockReason.RequestMissing
+                && missingRequest.SkillId == string.Empty
+                && !missingSkill.IsAllowed
+                && missingSkill.BlockReason
+                    == CombatSkillUseBlockReason.SkillMissing
+                && !missingProgress.IsAllowed
+                && missingProgress.BlockReason
+                    == CombatSkillUseBlockReason.SkillProgressMissing,
+                "Null combat skill use inputs should return stable failure facts.");
         }
 
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
@@ -4291,6 +4545,42 @@ namespace Game.SmokeTests
                 SkillTargeting.Self,
                 SkillEffectType.Cleanse,
                 "");
+        }
+
+        private static SkillDefinition BuildValidatorSkillDefinition(
+            string skillId,
+            string requiredUnlockId)
+        {
+            return new SkillDefinition(
+                skillId,
+                "Validator Skill",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                requiredUnlockId);
+        }
+
+        private class V4ValidatorCombatSkill : ICombatSkill
+        {
+            public string Id { get; private set; }
+
+            public string Name
+            {
+                get { return "Validator Combat Skill"; }
+            }
+
+            public V4ValidatorCombatSkill(string id)
+            {
+                Id = id;
+            }
+
+            public void Apply(
+                CombatContext context,
+                SkillProgress progress)
+            {
+            }
         }
     }
 }

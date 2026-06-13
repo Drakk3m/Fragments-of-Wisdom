@@ -1,0 +1,18 @@
+namespace Game.Domain.Combat
+{
+    public enum CombatSkillUseBlockReason
+    {
+        None,
+        RequestMissing,
+        NotSkillAction,
+        SkillMissing,
+        SkillProgressMissing,
+        SkillDefinitionMissing,
+        SkillIdMissing,
+        SkillProgressIdMismatch,
+        V3UnlockProfileMissing,
+        V3SkillLocked,
+        V4ContextIncomplete,
+        V4SkillBlocked
+    }
+}
