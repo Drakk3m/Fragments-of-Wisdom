@@ -519,6 +519,37 @@ Access rules:
 - no profile, registry, combat engine, or skill execution state is mutated
 - `TurnBasedCombatEngine` does not consume the service yet
 
+## Combat Skill Use Validation
+
+`CombatSkillUseValidator` composes structural request validation with the
+existing V3 `SkillAccessPolicy` and V4 `CombatSkillAccessService`.
+
+Validation rules:
+
+- the request, skill, progress, and progress definition must exist
+- `ICombatSkill.Id` must match `SkillProgress.Definition.Id`
+- player skills with a required unlock are checked through
+  `SkillAccessPolicy`
+- V4 access is checked only when a complete class/mastery registry context is
+  supplied
+- partial V4 context is rejected explicitly
+- enemy mode skips player unlock and class/mastery checks
+- enemy requests still require valid skill/progress facts and matching ids
+
+`CombatSkillUseValidationResult` returns stable facts including:
+
+- `IsAllowed`
+- `SkillId`
+- `IsPlayerAction`
+- `V3AccessChecked`
+- `V4AccessChecked`
+- `CombatSkillUseBlockReason`
+- underlying V3 and V4 block reasons when applicable
+
+The validator is read-only. It does not emit events, spend resources, advance
+turns, apply skills, grant experience, or modify combat state.
+`TurnBasedCombatEngine` does not consume the validator yet.
+
 ## Unified V4 Restore Coordinator
 
 `V4ProgressRestoreCoordinator` restores V4 state in this defined order:
@@ -687,8 +718,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `278`
-- Total smoke assertions executed: `660`
+- V4 Classes / Mentors / Mastery assertions: `285`
+- Total smoke assertions executed: `667`
 
 ## Validation
 
