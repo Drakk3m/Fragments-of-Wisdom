@@ -507,7 +507,10 @@ Rules:
 5. class skill tree bindings
 
 Before mutating target state, the coordinator runs the same individual restore
-operations against temporary profiles and a temporary binding registry.
+operations against temporary `ClassProfile`, `MasteryProfile`,
+`MentorRelationshipProfile`, and `SkillTreeProgressProfile` instances. Binding
+restore feasibility is checked against a temporary
+`ClassSkillTreeBindingRegistry`.
 
 Preflight rules:
 
@@ -518,6 +521,7 @@ Preflight rules:
   the documented order
 - per-subsystem success facts, failure reasons, and messages remain available
 - individual restore methods remain unchanged and independently callable
+- snapshot DTOs, JSON shape, and schema version remain unchanged
 
 The binding-aware coordinator overload receives:
 
