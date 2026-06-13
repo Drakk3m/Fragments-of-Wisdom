@@ -233,6 +233,7 @@ namespace Game.SmokeTests
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
                     AssertClassSkillTreeBindingSaveRestoreIntegratedWorkflow();
+                    AssertScopedSkillTreeProgressIntegratedWorkflow();
                 });
         }
 
@@ -3322,6 +3323,124 @@ namespace Game.SmokeTests
                 !skillBook.HasSkill("skill_deep_sight")
                 && !skillBook.HasSkill("skill_minor_cleanse"),
                 "Restored bindings should not automatically grant skills.");
+        }
+
+        private static void AssertScopedSkillTreeProgressIntegratedWorkflow()
+        {
+            const string sharedNodeId = "node_deep_sight";
+            const string firstTreeOnlyNodeId = "node_balance_ritual";
+
+            var classRegistry = BuildTestClassRegistry();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistryWithBindings();
+            var classProfile = new ClassProfile();
+            var progress = new SkillTreeProgressProfile();
+            var skillRegistry = BuildTestSkillRegistry();
+            var applicationService = new SkillTreeUnlockApplicationService();
+
+            Assert(
+                classRegistry.Contains(ClassId.Tlamatini)
+                && classRegistry.Contains(ClassId.Wanderer),
+                "Scoped progress workflow should register two classes.");
+
+            Assert(
+                bindingRegistry.ContainsSkillTree(SkillTreeId.Tlamatini)
+                && bindingRegistry.ContainsSkillTree(SkillTreeId.Wanderer)
+                && bindingRegistry.GetSkillTree(SkillTreeId.Tlamatini).Contains(sharedNodeId)
+                && bindingRegistry.GetSkillTree(SkillTreeId.Wanderer).Contains(sharedNodeId),
+                "Scoped progress workflow should register two trees containing the same node id.");
+
+            Assert(
+                bindingRegistry.GetBindingForClass(ClassId.Tlamatini).SkillTreeId
+                    == SkillTreeId.Tlamatini
+                && bindingRegistry.GetBindingForClass(ClassId.Wanderer).SkillTreeId
+                    == SkillTreeId.Wanderer,
+                "Scoped progress workflow should bind each class to a different tree.");
+
+            Assert(
+                classProfile.AssignClassId(ClassId.Tlamatini, classRegistry),
+                "Scoped progress workflow should assign the first class.");
+
+            var firstTree = bindingRegistry.ResolveCurrentClassSkillTree(classProfile);
+
+            Assert(
+                progress.DiscoverNode(sharedNodeId, firstTree),
+                "Scoped progress workflow should discover the shared node in the first tree.");
+
+            var firstUnlock = applicationService.Apply(
+                sharedNodeId,
+                firstTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                firstUnlock.Applied
+                && progress.IsUnlocked(sharedNodeId, firstTree),
+                "Scoped progress workflow should unlock the shared node in the first tree.");
+
+            progress.DiscoverNode(firstTreeOnlyNodeId, firstTree);
+
+            Assert(
+                classProfile.ChangeClassId(ClassId.Wanderer, classRegistry),
+                "Scoped progress workflow should switch to the second class.");
+
+            var secondTree = bindingRegistry.ResolveCurrentClassSkillTree(classProfile);
+
+            Assert(
+                secondTree.Id == SkillTreeId.Wanderer
+                && !progress.IsUnlocked(sharedNodeId, secondTree),
+                "The shared node id should remain locked in the second tree after class switch.");
+
+            Assert(
+                progress.DiscoverNode(sharedNodeId, secondTree),
+                "Scoped progress workflow should discover the shared node independently in the second tree.");
+
+            var secondUnlock = applicationService.Apply(
+                sharedNodeId,
+                secondTree,
+                progress,
+                skillRegistry);
+
+            Assert(
+                secondUnlock.Applied
+                && progress.IsUnlocked(sharedNodeId, secondTree),
+                "Scoped progress workflow should unlock the shared node independently in the second tree.");
+
+            var snapshotService = new V2ProgressSnapshotService();
+            var snapshot = snapshotService.CreateSnapshot(
+                new CodexProfile(),
+                new MissionJournalProfile(),
+                new UnlockProfile(),
+                classProfile,
+                new MasteryProfile(),
+                new MentorRelationshipProfile(),
+                progress);
+            var serializer = new V2ProgressSnapshotJsonSerializer();
+            string json = serializer.Serialize(snapshot);
+            var deserializedSnapshot = serializer.Deserialize(json);
+
+            Assert(
+                deserializedSnapshot.SkillTreeProgress.Scopes.Count == 2,
+                "Scoped progress workflow should preserve both tree scopes through JSON.");
+
+            var restoredRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var restoredFirstTree = restoredRegistry.GetSkillTree(SkillTreeId.Tlamatini);
+            var restoredSecondTree = restoredRegistry.GetSkillTree(SkillTreeId.Wanderer);
+            var restoredProgress = new SkillTreeProgressProfile();
+            bool restored = snapshotService.RestoreSkillTreeProgressProfile(
+                deserializedSnapshot,
+                restoredProgress,
+                restoredRegistry);
+
+            Assert(
+                restored
+                && restoredProgress.IsUnlocked(sharedNodeId, restoredFirstTree)
+                && restoredProgress.IsUnlocked(sharedNodeId, restoredSecondTree),
+                "Scoped progress workflow should restore the shared unlock independently in both trees.");
+
+            Assert(
+                restoredProgress.IsDiscovered(firstTreeOnlyNodeId, restoredFirstTree)
+                && !restoredProgress.IsDiscovered(firstTreeOnlyNodeId, restoredSecondTree),
+                "Scoped progress workflow restore should preserve facts that belong to only one tree.");
         }
 
         private static MentorDefinition BuildLyraMentor(bool isAvailable)

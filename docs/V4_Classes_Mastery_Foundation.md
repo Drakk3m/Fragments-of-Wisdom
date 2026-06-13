@@ -527,6 +527,7 @@ V4 smoke tests include integrated workflow coverage for:
 - skill tree progression
 - class-specific skill tree binding
 - class skill tree binding snapshot, JSON round-trip, and restore
+- scoped skill tree progress across class switching and JSON restore
 
 The mastered skill retention workflow verifies:
 
@@ -569,6 +570,15 @@ The binding save workflow additionally verifies:
 
 - both bindings are captured in the progress snapshot
 - bindings survive JSON serialization and deserialization
+
+The scoped skill tree progress workflow verifies:
+
+- two classes bind to different trees containing the same node id
+- unlocking the shared node in the first tree does not unlock it in the second
+- the shared node can be discovered and unlocked independently after switching
+  classes
+- both scopes survive snapshot creation and JSON round-trip
+- restore preserves shared unlocks and tree-specific discovery facts
 - bindings restore into a fresh registry
 - restored bindings resolve after assigning and switching classes
 - restored bindings do not mutate skill tree progress
@@ -605,8 +615,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `255`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `242`
-- Total smoke assertions executed: `615`
+- V4 Classes / Mentors / Mastery assertions: `255`
+- Total smoke assertions executed: `628`
 
 ## Validation
 
