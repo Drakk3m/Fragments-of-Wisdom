@@ -524,6 +524,19 @@ Access rules:
 `CombatSkillUseValidator` composes structural request validation with the
 existing V3 `SkillAccessPolicy` and V4 `CombatSkillAccessService`.
 
+`CombatSkillUseValidationContext` provides explicit validation modes:
+
+- `LegacyBypass` validates request structure and matching skill ids while
+  bypassing V3/V4 progression rules
+- `Enemy` validates request structure and matching skill ids without requiring
+  player progression profiles
+- `Player` requires `UnlockProfile`, `ClassProfile`, `MasteryProfile`,
+  `ClassDefinitionRegistry`, and `SkillDefinitionRegistry`
+
+Static context factories create each mode. Partial player context fails with
+the stable `PlayerContextIncomplete` block reason. A missing context fails with
+`ValidationContextMissing`.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
@@ -549,6 +562,10 @@ Validation rules:
 The validator is read-only. It does not emit events, spend resources, advance
 turns, apply skills, grant experience, or modify combat state.
 `TurnBasedCombatEngine` does not consume the validator yet.
+
+The previous parameter-based validator overload remains compatible. New engine
+integration should use the context-based overload so legacy, player, and enemy
+behavior cannot be inferred from null parameters.
 
 ## Unified V4 Restore Coordinator
 
@@ -732,8 +749,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `295`
-- Total smoke assertions executed: `677`
+- V4 Classes / Mentors / Mastery assertions: `301`
+- Total smoke assertions executed: `683`
 
 ## Validation
 

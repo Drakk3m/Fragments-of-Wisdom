@@ -10,6 +10,8 @@ namespace Game.Domain.Combat
         SkillDefinitionMissing,
         SkillIdMissing,
         SkillProgressIdMismatch,
+        ValidationContextMissing,
+        PlayerContextIncomplete,
         V3UnlockProfileMissing,
         V3SkillLocked,
         V4ContextIncomplete,

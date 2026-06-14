@@ -27,6 +27,29 @@ namespace Game.Domain.Combat
 
         public CombatSkillUseValidationResult Validate(
             TurnRequest request,
+            CombatSkillUseValidationContext validationContext)
+        {
+            if (validationContext == null)
+            {
+                return Block(
+                    string.Empty,
+                    false,
+                    CombatSkillUseBlockReason.ValidationContextMissing);
+            }
+
+            return Validate(
+                request,
+                validationContext.Mode,
+                validationContext.UnlockProfile,
+                validationContext.ClassProfile,
+                validationContext.ClassRegistry,
+                validationContext.MasteryProfile,
+                validationContext.SkillRegistry,
+                true);
+        }
+
+        public CombatSkillUseValidationResult Validate(
+            TurnRequest request,
             bool isPlayerAction,
             UnlockProfile unlockProfile,
             ClassProfile classProfile,
@@ -34,6 +57,31 @@ namespace Game.Domain.Combat
             MasteryProfile masteryProfile,
             SkillDefinitionRegistry skillRegistry)
         {
+            return Validate(
+                request,
+                isPlayerAction
+                    ? CombatSkillUseValidationMode.Player
+                    : CombatSkillUseValidationMode.Enemy,
+                unlockProfile,
+                classProfile,
+                classRegistry,
+                masteryProfile,
+                skillRegistry,
+                false);
+        }
+
+        private CombatSkillUseValidationResult Validate(
+            TurnRequest request,
+            CombatSkillUseValidationMode mode,
+            UnlockProfile unlockProfile,
+            ClassProfile classProfile,
+            ClassDefinitionRegistry classRegistry,
+            MasteryProfile masteryProfile,
+            SkillDefinitionRegistry skillRegistry,
+            bool requireCompletePlayerContext)
+        {
+            bool isPlayerAction = mode != CombatSkillUseValidationMode.Enemy;
+
             if (request == null)
             {
                 return Block(
@@ -93,9 +141,23 @@ namespace Game.Domain.Combat
                     CombatSkillUseBlockReason.SkillProgressIdMismatch);
             }
 
-            if (!isPlayerAction)
+            if (mode == CombatSkillUseValidationMode.LegacyBypass
+                || mode == CombatSkillUseValidationMode.Enemy)
             {
-                return Allow(skillId, false, false, false);
+                return Allow(skillId, isPlayerAction, false, false);
+            }
+
+            if (requireCompletePlayerContext
+                && (unlockProfile == null
+                    || classProfile == null
+                    || classRegistry == null
+                    || masteryProfile == null
+                    || skillRegistry == null))
+            {
+                return Block(
+                    skillId,
+                    true,
+                    CombatSkillUseBlockReason.PlayerContextIncomplete);
             }
 
             bool v3AccessChecked = !string.IsNullOrEmpty(
