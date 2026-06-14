@@ -537,6 +537,15 @@ Static context factories create each mode. Partial player context fails with
 the stable `PlayerContextIncomplete` block reason. A missing context fails with
 `ValidationContextMissing`.
 
+`CombatSkillUseValidationContextProvider` centralizes context creation:
+
+- `CreateLegacyBypass` creates only the explicit legacy mode
+- `CreateEnemy` creates enemy mode without player progression dependencies
+- `TryCreatePlayer` requires all five player profiles and registries
+- missing player dependencies return `false` with a null context
+- failed player creation never falls back to legacy or enemy mode
+- produced contexts are directly consumable by `CombatSkillUseValidator`
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
@@ -761,8 +770,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `308`
-- Total smoke assertions executed: `690`
+- V4 Classes / Mentors / Mastery assertions: `313`
+- Total smoke assertions executed: `695`
 
 ## Validation
 
