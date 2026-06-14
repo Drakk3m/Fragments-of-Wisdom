@@ -561,6 +561,29 @@ Classification rules:
 - classification uses actor identity from `CombatRuntimeContext`
 - `TurnBasedCombatEngine` does not consume the classifier yet
 
+`CombatSkillValidationOrchestrator` composes the production validation flow:
+
+1. classify the actor
+2. create the matching validation context
+3. run `CombatSkillUseValidator`
+4. return combined classification and validation facts
+
+`CombatSkillValidationOrchestrationResult` exposes whether orchestration
+reached validation, whether the skill is allowed, whether a context was
+created, the selected mode, the original classification, the validator result,
+and a stable failure stage.
+
+Failure behavior:
+
+- classification failures preserve the classifier reason and do not create a
+  context
+- context creation failures preserve the selected classification mode
+- blocked skills complete orchestration but report the `Validation` failure
+  stage and preserve V3/V4 validator reasons
+- successful validation reports no failure stage
+- the orchestrator is read-only and does not emit events or execute combat
+- `TurnBasedCombatEngine` does not consume the orchestrator yet
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
@@ -810,8 +833,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `332`
-- Total smoke assertions executed: `714`
+- V4 Classes / Mentors / Mastery assertions: `339`
+- Total smoke assertions executed: `721`
 
 ## Validation
 

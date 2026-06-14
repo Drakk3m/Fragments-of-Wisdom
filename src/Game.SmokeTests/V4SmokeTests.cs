@@ -233,6 +233,19 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Combat skill validation orchestration assertions",
+                delegate
+                {
+                    AssertLegacyActorValidatesThroughOrchestrator();
+                    AssertEnemyActorValidatesThroughOrchestrator();
+                    AssertPlayerClassSkillValidatesThroughOrchestrator();
+                    AssertPlayerRetainedSkillValidatesThroughOrchestrator();
+                    AssertPlayerCrossClassSkillIsBlockedThroughOrchestrator();
+                    AssertIncompletePlayerOrchestrationFailsClearly();
+                    AssertForeignActorOrchestrationFailsSafely();
+                });
+
+            RunSection(
                 "Mentor foundation assertions",
                 delegate
                 {
@@ -1886,6 +1899,395 @@ namespace Game.SmokeTests
                 && result.FailureReason
                     == CombatActorValidationClassificationFailureReason.UnknownActor,
                 "Actor outside the combat runtime should fail classification safely.");
+        }
+
+        private static void AssertLegacyActorValidatesThroughOrchestrator()
+        {
+            const string skillId = "skill_orchestrator_legacy";
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Orchestrator Legacy");
+            var request = TurnRequest.SkillAction(
+                null,
+                null,
+                new V4ValidatorCombatSkill(skillId),
+                new SkillProgress(definition));
+
+            var result = new CombatSkillValidationOrchestrator().Validate(
+                request,
+                null,
+                null,
+                true,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                result.IsOrchestrated
+                && result.IsAllowed
+                && result.ContextCreated
+                && result.ValidationMode
+                    == CombatSkillUseValidationMode.LegacyBypass
+                && result.Classification.Kind
+                    == CombatActorValidationKind.LegacyBypass
+                && result.Validation.IsAllowed
+                && result.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.None,
+                "Legacy actor should validate through the full orchestration flow.");
+        }
+
+        private static void AssertEnemyActorValidatesThroughOrchestrator()
+        {
+            const string skillId = "skill_orchestrator_enemy";
+            var player = BuildCombatEntity(
+                "orchestrator_enemy_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "orchestrator_enemy_actor",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Orchestrator Enemy");
+            var request = TurnRequest.SkillAction(
+                enemy,
+                player,
+                new V4ValidatorCombatSkill(skillId),
+                new SkillProgress(definition));
+
+            var result = new CombatSkillValidationOrchestrator().Validate(
+                request,
+                enemy,
+                runtime,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                result.IsOrchestrated
+                && result.IsAllowed
+                && result.ValidationMode == CombatSkillUseValidationMode.Enemy
+                && result.Classification.Kind
+                    == CombatActorValidationKind.Enemy
+                && !result.Validation.IsPlayerAction,
+                "Enemy actor should validate through orchestration without player dependencies.");
+        }
+
+        private static void AssertPlayerClassSkillValidatesThroughOrchestrator()
+        {
+            const string skillId = "skill_orchestrator_class";
+            const string classId = "class_orchestrator_class";
+            var player = BuildCombatEntity(
+                "orchestrator_class_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "orchestrator_class_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Orchestrator Class");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Orchestrator Class",
+                new[] { skillId }));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+
+            var result = new CombatSkillValidationOrchestrator().Validate(
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                player,
+                runtime,
+                false,
+                new UnlockProfile(),
+                classProfile,
+                new MasteryProfile(),
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                result.IsOrchestrated
+                && result.IsAllowed
+                && result.ValidationMode == CombatSkillUseValidationMode.Player
+                && result.Validation.V4AccessChecked,
+                "Player current-class skill should validate through orchestration.");
+        }
+
+        private static void AssertPlayerRetainedSkillValidatesThroughOrchestrator()
+        {
+            const string skillId = "skill_orchestrator_retained";
+            const string classId = "class_orchestrator_retained";
+            var player = BuildCombatEntity(
+                "orchestrator_retained_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "orchestrator_retained_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Orchestrator Retained");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Orchestrator Empty Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            var masteryProfile = new MasteryProfile();
+            masteryProfile.IncreaseProgress(
+                skillId,
+                MasteryRecord.MasteredProgress,
+                skillRegistry);
+
+            var result = new CombatSkillValidationOrchestrator().Validate(
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                player,
+                runtime,
+                false,
+                new UnlockProfile(),
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                result.IsOrchestrated
+                && result.IsAllowed
+                && result.Validation.V4AccessChecked
+                && result.Validation.V4BlockReason
+                    == MasteredSkillRetentionBlockReason.None,
+                "Player retained mastered skill should validate through orchestration.");
+        }
+
+        private static void AssertPlayerCrossClassSkillIsBlockedThroughOrchestrator()
+        {
+            const string skillId = "skill_orchestrator_blocked";
+            const string classId = "class_orchestrator_blocked";
+            var player = BuildCombatEntity(
+                "orchestrator_blocked_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "orchestrator_blocked_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Orchestrator Blocked");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Orchestrator Blocked Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+
+            var result = new CombatSkillValidationOrchestrator().Validate(
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                player,
+                runtime,
+                false,
+                new UnlockProfile(),
+                classProfile,
+                new MasteryProfile(),
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                result.IsOrchestrated
+                && !result.IsAllowed
+                && result.ContextCreated
+                && result.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.Validation
+                && result.Validation.BlockReason
+                    == CombatSkillUseBlockReason.V4SkillBlocked
+                && result.Validation.V4BlockReason
+                    == MasteredSkillRetentionBlockReason.SkillNotAllowed,
+                "Blocked cross-class skill should preserve validator failure facts through orchestration.");
+        }
+
+        private static void AssertIncompletePlayerOrchestrationFailsClearly()
+        {
+            var player = BuildCombatEntity(
+                "orchestrator_incomplete_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "orchestrator_incomplete_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+
+            var result = new CombatSkillValidationOrchestrator().Validate(
+                null,
+                player,
+                runtime,
+                false,
+                new UnlockProfile(),
+                new ClassProfile(),
+                null,
+                new ClassDefinitionRegistry(),
+                new SkillDefinitionRegistry());
+
+            Assert(
+                !result.IsOrchestrated
+                && !result.IsAllowed
+                && !result.ContextCreated
+                && result.Validation == null
+                && result.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.Classification
+                && result.Classification.FailureReason
+                    == CombatActorValidationClassificationFailureReason
+                        .IncompletePlayerDependencies,
+                "Incomplete player orchestration should expose classification failure facts.");
+        }
+
+        private static void AssertForeignActorOrchestrationFailsSafely()
+        {
+            var player = BuildCombatEntity(
+                "orchestrator_foreign_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "orchestrator_foreign_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var foreign = BuildCombatEntity(
+                "orchestrator_foreign_actor",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+
+            var result = new CombatSkillValidationOrchestrator().Validate(
+                null,
+                foreign,
+                runtime,
+                false,
+                new UnlockProfile(),
+                new ClassProfile(),
+                new MasteryProfile(),
+                new ClassDefinitionRegistry(),
+                new SkillDefinitionRegistry());
+
+            Assert(
+                !result.IsOrchestrated
+                && !result.ContextCreated
+                && result.Validation == null
+                && result.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.Classification
+                && result.Classification.FailureReason
+                    == CombatActorValidationClassificationFailureReason.UnknownActor,
+                "Foreign actor should fail orchestration safely at classification.");
         }
 
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
