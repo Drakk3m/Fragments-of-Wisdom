@@ -684,6 +684,7 @@ V4 smoke tests include integrated workflow coverage for:
 - combat skill use validation context modes across class switching
 - combat skill use validation context provider across class switching
 - combat actor classification through context creation and validation
+- combat skill validation orchestration across class switching and failures
 - skill tree progression
 - class-specific skill tree binding
 - class skill tree binding snapshot, JSON round-trip, and restore
@@ -757,6 +758,18 @@ The combat actor classification workflow verifies:
 - an actor outside the runtime fails classification safely
 - the classified player mode requests the matching context from the provider
 - the produced player context is accepted by `CombatSkillUseValidator`
+- `TurnBasedCombatEngine` is not invoked or changed
+
+The combat skill validation orchestrator workflow verifies:
+
+- legacy and enemy actors complete orchestration successfully
+- a player current-class skill completes orchestration successfully
+- a mastered retained skill remains valid after a class switch
+- a non-mastered cross-class skill fails at the `Validation` stage
+- incomplete player dependencies fail at the `Classification` stage
+- a foreign actor fails safely at the `Classification` stage
+- mismatched skill and progress ids fail at the `Validation` stage
+- successful orchestration reports no failure stage
 - `TurnBasedCombatEngine` is not invoked or changed
 
 The skill tree workflow verifies:
@@ -833,8 +846,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `339`
-- Total smoke assertions executed: `721`
+- V4 Classes / Mentors / Mastery assertions: `347`
+- Total smoke assertions executed: `729`
 
 ## Validation
 
