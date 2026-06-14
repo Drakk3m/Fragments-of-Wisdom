@@ -222,6 +222,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Combat actor validation classification assertions",
+                delegate
+                {
+                    AssertPlayerActorClassifiesWithCompleteDependencies();
+                    AssertPlayerActorClassificationRejectsIncompleteDependencies();
+                    AssertEnemyActorClassifiesWithoutPlayerDependencies();
+                    AssertLegacyActorPathClassifiesExplicitly();
+                    AssertUnknownActorClassificationFailsSafely();
+                });
+
+            RunSection(
                 "Mentor foundation assertions",
                 delegate
                 {
@@ -1671,6 +1682,209 @@ namespace Game.SmokeTests
                 && playerResult.IsAllowed
                 && playerResult.V4AccessChecked,
                 "Provider contexts should work with combat skill use validation.");
+        }
+
+        private static void AssertPlayerActorClassifiesWithCompleteDependencies()
+        {
+            var player = BuildCombatEntity(
+                "classification_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "classification_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+
+            var result = new CombatActorValidationClassifier().Classify(
+                player,
+                runtime,
+                false,
+                new UnlockProfile(),
+                new ClassProfile(),
+                new MasteryProfile(),
+                new ClassDefinitionRegistry(),
+                new SkillDefinitionRegistry());
+
+            Assert(
+                result.IsClassified
+                && result.Kind == CombatActorValidationKind.Player
+                && result.ValidationMode
+                    == CombatSkillUseValidationMode.Player
+                && result.FailureReason
+                    == CombatActorValidationClassificationFailureReason.None,
+                "Player actor should classify as Player when dependencies exist.");
+        }
+
+        private static void AssertPlayerActorClassificationRejectsIncompleteDependencies()
+        {
+            var player = BuildCombatEntity(
+                "classification_incomplete_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "classification_incomplete_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+
+            var result = new CombatActorValidationClassifier().Classify(
+                player,
+                runtime,
+                false,
+                new UnlockProfile(),
+                new ClassProfile(),
+                null,
+                new ClassDefinitionRegistry(),
+                new SkillDefinitionRegistry());
+
+            Assert(
+                !result.IsClassified
+                && result.Kind == CombatActorValidationKind.Unknown
+                && !result.ValidationMode.HasValue
+                && result.FailureReason
+                    == CombatActorValidationClassificationFailureReason
+                        .IncompletePlayerDependencies,
+                "Incomplete player dependencies should fail classification safely.");
+        }
+
+        private static void AssertEnemyActorClassifiesWithoutPlayerDependencies()
+        {
+            var player = BuildCombatEntity(
+                "classification_enemy_mode_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "classification_enemy_mode_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+
+            var result = new CombatActorValidationClassifier().Classify(
+                enemy,
+                runtime,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                result.IsClassified
+                && result.Kind == CombatActorValidationKind.Enemy
+                && result.ValidationMode
+                    == CombatSkillUseValidationMode.Enemy,
+                "Enemy actor should classify without player progression dependencies.");
+        }
+
+        private static void AssertLegacyActorPathClassifiesExplicitly()
+        {
+            var result = new CombatActorValidationClassifier().Classify(
+                null,
+                null,
+                true,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                result.IsClassified
+                && result.Kind == CombatActorValidationKind.LegacyBypass
+                && result.ValidationMode
+                    == CombatSkillUseValidationMode.LegacyBypass,
+                "Legacy bypass should classify only through the explicit legacy path.");
+        }
+
+        private static void AssertUnknownActorClassificationFailsSafely()
+        {
+            var player = BuildCombatEntity(
+                "classification_unknown_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "classification_unknown_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var unknown = BuildCombatEntity(
+                "classification_unknown_actor",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+
+            var result = new CombatActorValidationClassifier().Classify(
+                unknown,
+                runtime,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                !result.IsClassified
+                && result.Kind == CombatActorValidationKind.Unknown
+                && !result.ValidationMode.HasValue
+                && result.FailureReason
+                    == CombatActorValidationClassificationFailureReason.UnknownActor,
+                "Actor outside the combat runtime should fail classification safely.");
         }
 
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
