@@ -211,6 +211,17 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Combat skill use validation context provider assertions",
+                delegate
+                {
+                    AssertValidationContextProviderCreatesLegacyBypass();
+                    AssertValidationContextProviderCreatesEnemy();
+                    AssertValidationContextProviderCreatesPlayer();
+                    AssertValidationContextProviderRejectsMissingPlayerDependencies();
+                    AssertValidationContextProviderContextsWorkWithValidator();
+                });
+
+            RunSection(
                 "Mentor foundation assertions",
                 delegate
                 {
@@ -1536,6 +1547,129 @@ namespace Game.SmokeTests
                 && result.V4BlockReason
                     == MasteredSkillRetentionBlockReason.SkillNotAllowed,
                 "Complete player context should preserve blocked V4 access facts.");
+        }
+
+        private static void AssertValidationContextProviderCreatesLegacyBypass()
+        {
+            var context = new CombatSkillUseValidationContextProvider()
+                .CreateLegacyBypass();
+
+            Assert(
+                context != null
+                && context.Mode == CombatSkillUseValidationMode.LegacyBypass
+                && !context.HasCompletePlayerState,
+                "Context provider should create an explicit legacy bypass context.");
+        }
+
+        private static void AssertValidationContextProviderCreatesEnemy()
+        {
+            var context = new CombatSkillUseValidationContextProvider()
+                .CreateEnemy();
+
+            Assert(
+                context != null
+                && context.Mode == CombatSkillUseValidationMode.Enemy
+                && !context.HasCompletePlayerState,
+                "Context provider should create an enemy context without player progression state.");
+        }
+
+        private static void AssertValidationContextProviderCreatesPlayer()
+        {
+            var provider = new CombatSkillUseValidationContextProvider();
+            var unlockProfile = new UnlockProfile();
+            var classProfile = new ClassProfile();
+            var masteryProfile = new MasteryProfile();
+            var classRegistry = new ClassDefinitionRegistry();
+            var skillRegistry = new SkillDefinitionRegistry();
+            CombatSkillUseValidationContext context;
+
+            bool created = provider.TryCreatePlayer(
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry,
+                out context);
+
+            Assert(
+                created
+                && context != null
+                && context.Mode == CombatSkillUseValidationMode.Player
+                && context.HasCompletePlayerState
+                && context.UnlockProfile == unlockProfile
+                && context.ClassProfile == classProfile
+                && context.MasteryProfile == masteryProfile
+                && context.ClassRegistry == classRegistry
+                && context.SkillRegistry == skillRegistry,
+                "Context provider should preserve all required player dependencies.");
+        }
+
+        private static void AssertValidationContextProviderRejectsMissingPlayerDependencies()
+        {
+            var provider = new CombatSkillUseValidationContextProvider();
+            CombatSkillUseValidationContext context;
+
+            bool created = provider.TryCreatePlayer(
+                new UnlockProfile(),
+                new ClassProfile(),
+                null,
+                new ClassDefinitionRegistry(),
+                new SkillDefinitionRegistry(),
+                out context);
+
+            Assert(
+                !created && context == null,
+                "Context provider should fail safely when a player dependency is missing.");
+        }
+
+        private static void AssertValidationContextProviderContextsWorkWithValidator()
+        {
+            const string skillId = "skill_context_provider";
+            const string classId = "class_context_provider";
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Context Provider Skill");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Context Provider Class",
+                new[] { skillId }));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            var provider = new CombatSkillUseValidationContextProvider();
+            CombatSkillUseValidationContext playerContext;
+            provider.TryCreatePlayer(
+                new UnlockProfile(),
+                classProfile,
+                new MasteryProfile(),
+                classRegistry,
+                skillRegistry,
+                out playerContext);
+            var request = TurnRequest.SkillAction(
+                null,
+                null,
+                new V4ValidatorCombatSkill(skillId),
+                new SkillProgress(definition));
+            var validator = new CombatSkillUseValidator();
+
+            var legacyResult = validator.Validate(
+                request,
+                provider.CreateLegacyBypass());
+            var enemyResult = validator.Validate(
+                request,
+                provider.CreateEnemy());
+            var playerResult = validator.Validate(
+                request,
+                playerContext);
+
+            Assert(
+                legacyResult.IsAllowed
+                && enemyResult.IsAllowed
+                && playerResult.IsAllowed
+                && playerResult.V4AccessChecked,
+                "Provider contexts should work with combat skill use validation.");
         }
 
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
