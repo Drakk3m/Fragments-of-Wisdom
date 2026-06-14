@@ -275,6 +275,7 @@ namespace Game.SmokeTests
                     AssertMasteredSkillRetentionIntegratedWorkflow();
                     AssertCombatFacingSkillAccessIntegratedWorkflow();
                     AssertCombatSkillUseValidatorIntegratedWorkflow();
+                    AssertCombatSkillUseValidationContextIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
@@ -4021,6 +4022,146 @@ namespace Game.SmokeTests
                 && mismatchValidation.BlockReason
                     == CombatSkillUseBlockReason.SkillProgressIdMismatch,
                 "Validator workflow should block mismatched skill and progress ids.");
+        }
+
+        private static void AssertCombatSkillUseValidationContextIntegratedWorkflow()
+        {
+            const string firstClassId = "class_context_workflow_first";
+            const string secondClassId = "class_context_workflow_second";
+            const string retainedSkillId = "skill_context_workflow_retained";
+            const string unmasteredSkillId = "skill_context_workflow_unmastered";
+
+            var retainedSkill = BuildTestSkillDefinition(
+                retainedSkillId,
+                "Context Workflow Retained");
+            var unmasteredSkill = BuildTestSkillDefinition(
+                unmasteredSkillId,
+                "Context Workflow Unmastered");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(retainedSkill);
+            skillRegistry.Register(unmasteredSkill);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                firstClassId,
+                "Context Workflow First",
+                new[] { retainedSkillId, unmasteredSkillId }));
+            classRegistry.Register(new ClassDefinition(
+                secondClassId,
+                "Context Workflow Second",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(firstClassId, classRegistry);
+            var masteryProfile = new MasteryProfile();
+            var unlockProfile = new UnlockProfile();
+            var validator = new CombatSkillUseValidator();
+            var retainedRequest = TurnRequest.SkillAction(
+                null,
+                null,
+                new V4ValidatorCombatSkill(retainedSkillId),
+                new SkillProgress(retainedSkill));
+            var unmasteredRequest = TurnRequest.SkillAction(
+                null,
+                null,
+                new V4ValidatorCombatSkill(unmasteredSkillId),
+                new SkillProgress(unmasteredSkill));
+
+            var legacyResult = validator.Validate(
+                retainedRequest,
+                CombatSkillUseValidationContext.LegacyBypass());
+
+            Assert(
+                legacyResult.IsAllowed
+                && legacyResult.IsPlayerAction
+                && !legacyResult.V3AccessChecked
+                && !legacyResult.V4AccessChecked,
+                "Context workflow should allow a structurally valid legacy skill without V4 profiles.");
+
+            var enemyResult = validator.Validate(
+                unmasteredRequest,
+                CombatSkillUseValidationContext.Enemy());
+
+            Assert(
+                enemyResult.IsAllowed
+                && !enemyResult.IsPlayerAction
+                && !enemyResult.V3AccessChecked
+                && !enemyResult.V4AccessChecked,
+                "Context workflow should allow a structurally valid enemy skill without player profiles.");
+
+            var partialPlayerResult = validator.Validate(
+                retainedRequest,
+                CombatSkillUseValidationContext.Player(
+                    unlockProfile,
+                    classProfile,
+                    masteryProfile,
+                    classRegistry,
+                    null));
+
+            Assert(
+                !partialPlayerResult.IsAllowed
+                && partialPlayerResult.BlockReason
+                    == CombatSkillUseBlockReason.PlayerContextIncomplete,
+                "Context workflow should reject partial player context.");
+
+            var firstClassPlayerContext = CombatSkillUseValidationContext.Player(
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+            var firstClassResult = validator.Validate(
+                retainedRequest,
+                firstClassPlayerContext);
+
+            Assert(
+                firstClassResult.IsAllowed
+                && firstClassResult.V4AccessChecked,
+                "Context workflow should allow a current-class player skill.");
+
+            masteryProfile.IncreaseProgress(
+                retainedSkillId,
+                MasteryRecord.MasteredProgress,
+                skillRegistry);
+            classProfile.ChangeClassId(secondClassId, classRegistry);
+            var secondClassPlayerContext = CombatSkillUseValidationContext.Player(
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+            var retainedResult = validator.Validate(
+                retainedRequest,
+                secondClassPlayerContext);
+
+            Assert(
+                retainedResult.IsAllowed
+                && retainedResult.V4AccessChecked,
+                "Context workflow should allow a mastered retained skill after class switch.");
+
+            var blockedResult = validator.Validate(
+                unmasteredRequest,
+                secondClassPlayerContext);
+
+            Assert(
+                !blockedResult.IsAllowed
+                && blockedResult.BlockReason
+                    == CombatSkillUseBlockReason.V4SkillBlocked
+                && blockedResult.V4BlockReason
+                    == MasteredSkillRetentionBlockReason.SkillNotAllowed,
+                "Context workflow should reject a non-mastered cross-class skill.");
+
+            var mismatchResult = validator.Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(retainedSkillId),
+                    new SkillProgress(unmasteredSkill)),
+                secondClassPlayerContext);
+
+            Assert(
+                !mismatchResult.IsAllowed
+                && mismatchResult.BlockReason
+                    == CombatSkillUseBlockReason.SkillProgressIdMismatch,
+                "Context workflow should reject mismatched skill and progress ids.");
         }
 
         private static void AssertSkillTreeProgressionIntegratedWorkflow()
