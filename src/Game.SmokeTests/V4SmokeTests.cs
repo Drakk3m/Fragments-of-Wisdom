@@ -199,6 +199,18 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Combat skill use validation context assertions",
+                delegate
+                {
+                    AssertLegacyValidationContextBypassesProgressionRules();
+                    AssertEnemyValidationContextBypassesPlayerProgressionRules();
+                    AssertPlayerValidationContextRequiresCompleteState();
+                    AssertPartialPlayerValidationContextFailsSafely();
+                    AssertCompletePlayerValidationContextAllowsValidAccess();
+                    AssertCompletePlayerValidationContextBlocksInvalidAccess();
+                });
+
+            RunSection(
                 "Mentor foundation assertions",
                 delegate
                 {
@@ -1339,6 +1351,190 @@ namespace Game.SmokeTests
                 && missingProgress.BlockReason
                     == CombatSkillUseBlockReason.SkillProgressMissing,
                 "Null combat skill use inputs should return stable failure facts.");
+        }
+
+        private static void AssertLegacyValidationContextBypassesProgressionRules()
+        {
+            const string skillId = "skill_context_legacy";
+            var definition = BuildValidatorSkillDefinition(
+                skillId,
+                CodexUnlockIds.ForbiddenPracticeCount);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                CombatSkillUseValidationContext.LegacyBypass());
+
+            Assert(
+                result.IsAllowed
+                && result.IsPlayerAction
+                && !result.V3AccessChecked
+                && !result.V4AccessChecked,
+                "Legacy bypass context should allow structurally valid skills without progression profiles.");
+        }
+
+        private static void AssertEnemyValidationContextBypassesPlayerProgressionRules()
+        {
+            const string skillId = "skill_context_enemy";
+            var definition = BuildValidatorSkillDefinition(
+                skillId,
+                CodexUnlockIds.ForbiddenPracticeCount);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                CombatSkillUseValidationContext.Enemy());
+
+            Assert(
+                result.IsAllowed
+                && !result.IsPlayerAction
+                && !result.V3AccessChecked
+                && !result.V4AccessChecked,
+                "Enemy context should allow structurally valid skills without player progression profiles.");
+        }
+
+        private static void AssertPlayerValidationContextRequiresCompleteState()
+        {
+            const string skillId = "skill_context_player_required";
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Context Player Required");
+            var context = CombatSkillUseValidationContext.Player(
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                context);
+
+            Assert(
+                context.Mode == CombatSkillUseValidationMode.Player
+                && !context.HasCompletePlayerState
+                && !result.IsAllowed
+                && result.BlockReason
+                    == CombatSkillUseBlockReason.PlayerContextIncomplete,
+                "Player context should require all progression profiles and registries.");
+        }
+
+        private static void AssertPartialPlayerValidationContextFailsSafely()
+        {
+            const string skillId = "skill_context_player_partial";
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Context Player Partial");
+            var context = CombatSkillUseValidationContext.Player(
+                new UnlockProfile(),
+                new ClassProfile(),
+                null,
+                new ClassDefinitionRegistry(),
+                new SkillDefinitionRegistry());
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                context);
+
+            Assert(
+                !result.IsAllowed
+                && result.IsPlayerAction
+                && result.BlockReason
+                    == CombatSkillUseBlockReason.PlayerContextIncomplete,
+                "Partial player validation context should fail safely.");
+        }
+
+        private static void AssertCompletePlayerValidationContextAllowsValidAccess()
+        {
+            const string skillId = "skill_context_player_allowed";
+            const string classId = "class_context_player_allowed";
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Context Player Allowed");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Context Player Allowed Class",
+                new[] { skillId }));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            var context = CombatSkillUseValidationContext.Player(
+                new UnlockProfile(),
+                classProfile,
+                new MasteryProfile(),
+                classRegistry,
+                skillRegistry);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                context);
+
+            Assert(
+                context.HasCompletePlayerState
+                && result.IsAllowed
+                && result.V4AccessChecked
+                && result.BlockReason == CombatSkillUseBlockReason.None,
+                "Complete player context should allow valid current-class access.");
+        }
+
+        private static void AssertCompletePlayerValidationContextBlocksInvalidAccess()
+        {
+            const string skillId = "skill_context_player_blocked";
+            const string classId = "class_context_player_blocked";
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Context Player Blocked");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Context Player Empty Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            var context = CombatSkillUseValidationContext.Player(
+                new UnlockProfile(),
+                classProfile,
+                new MasteryProfile(),
+                classRegistry,
+                skillRegistry);
+
+            var result = new CombatSkillUseValidator().Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                context);
+
+            Assert(
+                !result.IsAllowed
+                && result.V4AccessChecked
+                && result.BlockReason == CombatSkillUseBlockReason.V4SkillBlocked
+                && result.V4BlockReason
+                    == MasteredSkillRetentionBlockReason.SkillNotAllowed,
+                "Complete player context should preserve blocked V4 access facts.");
         }
 
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
