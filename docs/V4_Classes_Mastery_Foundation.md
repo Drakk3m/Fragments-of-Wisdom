@@ -546,6 +546,21 @@ the stable `PlayerContextIncomplete` block reason. A missing context fails with
 - failed player creation never falls back to legacy or enemy mode
 - produced contexts are directly consumable by `CombatSkillUseValidator`
 
+`CombatActorValidationClassifier` determines the validation mode for a combat
+actor without creating contexts or mutating combat state.
+
+Classification rules:
+
+- an explicitly requested legacy path classifies as `LegacyBypass`
+- the runtime enemy classifies as `Enemy` without player dependencies
+- the runtime player classifies as `Player` only when all five player
+  dependencies are present
+- null runtime, null actor, incomplete player dependencies, and actors outside
+  the runtime fail with stable classification reasons
+- failed classification returns `Unknown` with no validation mode
+- classification uses actor identity from `CombatRuntimeContext`
+- `TurnBasedCombatEngine` does not consume the classifier yet
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
@@ -782,8 +797,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `320`
-- Total smoke assertions executed: `702`
+- V4 Classes / Mentors / Mastery assertions: `325`
+- Total smoke assertions executed: `707`
 
 ## Validation
 
