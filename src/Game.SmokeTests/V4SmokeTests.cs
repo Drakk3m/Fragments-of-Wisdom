@@ -313,6 +313,7 @@ namespace Game.SmokeTests
                     AssertCombatSkillUseValidationContextIntegratedWorkflow();
                     AssertCombatSkillUseValidationContextProviderIntegratedWorkflow();
                     AssertCombatActorValidationClassificationIntegratedWorkflow();
+                    AssertCombatSkillValidationOrchestratorIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
@@ -5229,6 +5230,246 @@ namespace Game.SmokeTests
                 && playerResult.IsPlayerAction
                 && playerResult.V4AccessChecked,
                 "Actor classification workflow should produce a context accepted by the validator.");
+        }
+
+        private static void AssertCombatSkillValidationOrchestratorIntegratedWorkflow()
+        {
+            const string firstClassId = "class_orchestration_workflow_first";
+            const string secondClassId = "class_orchestration_workflow_second";
+            const string retainedSkillId = "skill_orchestration_workflow_retained";
+            const string unmasteredSkillId = "skill_orchestration_workflow_unmastered";
+            var player = BuildCombatEntity(
+                "orchestration_workflow_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "orchestration_workflow_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var foreignActor = BuildCombatEntity(
+                "orchestration_workflow_foreign",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var retainedSkill = BuildTestSkillDefinition(
+                retainedSkillId,
+                "Orchestration Workflow Retained");
+            var unmasteredSkill = BuildTestSkillDefinition(
+                unmasteredSkillId,
+                "Orchestration Workflow Unmastered");
+            var retainedRequest = TurnRequest.SkillAction(
+                player,
+                enemy,
+                new V4ValidatorCombatSkill(retainedSkillId),
+                new SkillProgress(retainedSkill));
+            var unmasteredRequest = TurnRequest.SkillAction(
+                player,
+                enemy,
+                new V4ValidatorCombatSkill(unmasteredSkillId),
+                new SkillProgress(unmasteredSkill));
+            var unlockProfile = new UnlockProfile();
+            var classProfile = new ClassProfile();
+            var masteryProfile = new MasteryProfile();
+            var classRegistry = new ClassDefinitionRegistry();
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(retainedSkill);
+            skillRegistry.Register(unmasteredSkill);
+            classRegistry.Register(new ClassDefinition(
+                firstClassId,
+                "Orchestration Workflow First",
+                new[] { retainedSkillId, unmasteredSkillId }));
+            classRegistry.Register(new ClassDefinition(
+                secondClassId,
+                "Orchestration Workflow Second",
+                new string[0]));
+            classProfile.AssignClassId(firstClassId, classRegistry);
+            var orchestrator = new CombatSkillValidationOrchestrator();
+
+            var legacyResult = orchestrator.Validate(
+                retainedRequest,
+                null,
+                null,
+                true,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                legacyResult.IsOrchestrated
+                && legacyResult.IsAllowed
+                && legacyResult.ValidationMode
+                    == CombatSkillUseValidationMode.LegacyBypass
+                && legacyResult.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.None,
+                "Orchestrator workflow should validate an explicit legacy actor.");
+
+            var enemyResult = orchestrator.Validate(
+                TurnRequest.SkillAction(
+                    enemy,
+                    player,
+                    new V4ValidatorCombatSkill(unmasteredSkillId),
+                    new SkillProgress(unmasteredSkill)),
+                enemy,
+                runtime,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+            Assert(
+                enemyResult.IsOrchestrated
+                && enemyResult.IsAllowed
+                && enemyResult.ValidationMode
+                    == CombatSkillUseValidationMode.Enemy
+                && !enemyResult.Validation.IsPlayerAction,
+                "Orchestrator workflow should validate an enemy actor without player profiles.");
+
+            var classAllowedResult = orchestrator.Validate(
+                retainedRequest,
+                player,
+                runtime,
+                false,
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                classAllowedResult.IsOrchestrated
+                && classAllowedResult.IsAllowed
+                && classAllowedResult.ValidationMode
+                    == CombatSkillUseValidationMode.Player
+                && classAllowedResult.Validation.V4AccessChecked,
+                "Orchestrator workflow should validate a current-class player skill.");
+
+            masteryProfile.IncreaseProgress(
+                retainedSkillId,
+                MasteryRecord.MasteredProgress,
+                skillRegistry);
+            classProfile.ChangeClassId(secondClassId, classRegistry);
+            var retainedResult = orchestrator.Validate(
+                retainedRequest,
+                player,
+                runtime,
+                false,
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                retainedResult.IsOrchestrated
+                && retainedResult.IsAllowed
+                && retainedResult.Validation.V4AccessChecked,
+                "Orchestrator workflow should validate mastered retention after class switch.");
+
+            var blockedResult = orchestrator.Validate(
+                unmasteredRequest,
+                player,
+                runtime,
+                false,
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                blockedResult.IsOrchestrated
+                && !blockedResult.IsAllowed
+                && blockedResult.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.Validation
+                && blockedResult.Validation.BlockReason
+                    == CombatSkillUseBlockReason.V4SkillBlocked,
+                "Orchestrator workflow should block a non-mastered cross-class skill at validation.");
+
+            var incompleteResult = orchestrator.Validate(
+                retainedRequest,
+                player,
+                runtime,
+                false,
+                unlockProfile,
+                classProfile,
+                null,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                !incompleteResult.IsOrchestrated
+                && incompleteResult.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.Classification
+                && incompleteResult.Classification.FailureReason
+                    == CombatActorValidationClassificationFailureReason
+                        .IncompletePlayerDependencies
+                && incompleteResult.Validation == null,
+                "Orchestrator workflow should expose incomplete player classification failure.");
+
+            var foreignResult = orchestrator.Validate(
+                retainedRequest,
+                foreignActor,
+                runtime,
+                false,
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                !foreignResult.IsOrchestrated
+                && foreignResult.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.Classification
+                && foreignResult.Classification.FailureReason
+                    == CombatActorValidationClassificationFailureReason.UnknownActor,
+                "Orchestrator workflow should fail safely for a foreign actor.");
+
+            var mismatchResult = orchestrator.Validate(
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    new V4ValidatorCombatSkill(retainedSkillId),
+                    new SkillProgress(unmasteredSkill)),
+                player,
+                runtime,
+                false,
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                mismatchResult.IsOrchestrated
+                && !mismatchResult.IsAllowed
+                && mismatchResult.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.Validation
+                && mismatchResult.Validation.BlockReason
+                    == CombatSkillUseBlockReason.SkillProgressIdMismatch,
+                "Orchestrator workflow should report id mismatch at validation.");
         }
 
         private static void AssertSkillTreeProgressionIntegratedWorkflow()
