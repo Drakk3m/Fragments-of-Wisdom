@@ -299,6 +299,7 @@ namespace Game.SmokeTests
                     AssertCombatSkillUseValidatorIntegratedWorkflow();
                     AssertCombatSkillUseValidationContextIntegratedWorkflow();
                     AssertCombatSkillUseValidationContextProviderIntegratedWorkflow();
+                    AssertCombatActorValidationClassificationIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
@@ -4639,6 +4640,193 @@ namespace Game.SmokeTests
                 && blockedResult.V4BlockReason
                     == MasteredSkillRetentionBlockReason.SkillNotAllowed,
                 "Provider-created player context should block non-mastered cross-class skills.");
+        }
+
+        private static void AssertCombatActorValidationClassificationIntegratedWorkflow()
+        {
+            const string classId = "class_actor_workflow";
+            const string skillId = "skill_actor_workflow";
+            var player = BuildCombatEntity(
+                "actor_workflow_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "actor_workflow_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var foreignActor = BuildCombatEntity(
+                "actor_workflow_foreign",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Actor Workflow Skill");
+            var request = TurnRequest.SkillAction(
+                player,
+                enemy,
+                new V4ValidatorCombatSkill(skillId),
+                new SkillProgress(definition));
+            var unlockProfile = new UnlockProfile();
+            var classProfile = new ClassProfile();
+            var masteryProfile = new MasteryProfile();
+            var classRegistry = new ClassDefinitionRegistry();
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Actor Workflow Class",
+                new[] { skillId }));
+            classProfile.AssignClassId(classId, classRegistry);
+            var classifier = new CombatActorValidationClassifier();
+            var provider = new CombatSkillUseValidationContextProvider();
+            var validator = new CombatSkillUseValidator();
+
+            var legacyClassification = classifier.Classify(
+                null,
+                null,
+                true,
+                null,
+                null,
+                null,
+                null,
+                null);
+            var legacyResult = validator.Validate(
+                request,
+                provider.CreateLegacyBypass());
+
+            Assert(
+                legacyClassification.IsClassified
+                && legacyClassification.Kind
+                    == CombatActorValidationKind.LegacyBypass
+                && legacyClassification.ValidationMode
+                    == CombatSkillUseValidationMode.LegacyBypass
+                && legacyResult.IsAllowed,
+                "Actor classification workflow should map explicit legacy classification to a valid legacy context.");
+
+            var enemyClassification = classifier.Classify(
+                enemy,
+                runtime,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null);
+            var enemyResult = validator.Validate(
+                TurnRequest.SkillAction(
+                    enemy,
+                    player,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                provider.CreateEnemy());
+
+            Assert(
+                enemyClassification.IsClassified
+                && enemyClassification.Kind == CombatActorValidationKind.Enemy
+                && enemyClassification.ValidationMode
+                    == CombatSkillUseValidationMode.Enemy
+                && enemyResult.IsAllowed
+                && !enemyResult.IsPlayerAction,
+                "Actor classification workflow should map enemy classification to a valid enemy context.");
+
+            var playerClassification = classifier.Classify(
+                player,
+                runtime,
+                false,
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                playerClassification.IsClassified
+                && playerClassification.Kind == CombatActorValidationKind.Player
+                && playerClassification.ValidationMode
+                    == CombatSkillUseValidationMode.Player,
+                "Actor classification workflow should classify a complete player actor.");
+
+            var incompletePlayerClassification = classifier.Classify(
+                player,
+                runtime,
+                false,
+                unlockProfile,
+                classProfile,
+                null,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                !incompletePlayerClassification.IsClassified
+                && !incompletePlayerClassification.ValidationMode.HasValue
+                && incompletePlayerClassification.FailureReason
+                    == CombatActorValidationClassificationFailureReason
+                        .IncompletePlayerDependencies,
+                "Actor classification workflow should fail safely for incomplete player dependencies.");
+
+            var unknownClassification = classifier.Classify(
+                foreignActor,
+                runtime,
+                false,
+                unlockProfile,
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry);
+
+            Assert(
+                !unknownClassification.IsClassified
+                && unknownClassification.Kind == CombatActorValidationKind.Unknown
+                && unknownClassification.FailureReason
+                    == CombatActorValidationClassificationFailureReason.UnknownActor,
+                "Actor classification workflow should fail safely for a foreign actor.");
+
+            CombatSkillUseValidationContext playerContext = null;
+            bool playerContextCreated = playerClassification.ValidationMode
+                    == CombatSkillUseValidationMode.Player
+                && provider.TryCreatePlayer(
+                    unlockProfile,
+                    classProfile,
+                    masteryProfile,
+                    classRegistry,
+                    skillRegistry,
+                    out playerContext);
+
+            Assert(
+                playerContextCreated
+                && playerContext != null
+                && playerContext.Mode
+                    == playerClassification.ValidationMode.Value,
+                "Actor classification workflow should request the matching player context from the provider.");
+
+            var playerResult = validator.Validate(
+                request,
+                playerContext);
+
+            Assert(
+                playerResult.IsAllowed
+                && playerResult.IsPlayerAction
+                && playerResult.V4AccessChecked,
+                "Actor classification workflow should produce a context accepted by the validator.");
         }
 
         private static void AssertSkillTreeProgressionIntegratedWorkflow()
