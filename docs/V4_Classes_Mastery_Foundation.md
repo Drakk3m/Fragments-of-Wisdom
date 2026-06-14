@@ -634,6 +634,7 @@ V4 smoke tests include integrated workflow coverage for:
 - mastered skill retention after class switch
 - combat-facing skill access after mentor teaching and class switch
 - combat skill use validation across teaching and class switching
+- combat skill use validation context modes across class switching
 - skill tree progression
 - class-specific skill tree binding
 - class skill tree binding snapshot, JSON round-trip, and restore
@@ -673,6 +674,17 @@ The combat skill use validator workflow verifies:
 - a non-mastered cross-class skill is blocked
 - enemy mode accepts a structurally valid skill without V4 profiles
 - mismatched skill and progress ids are blocked
+- `TurnBasedCombatEngine` is not invoked or changed
+
+The combat skill use validation context workflow verifies:
+
+- `LegacyBypass` accepts a structurally valid skill without V4 profiles
+- `Enemy` accepts a structurally valid skill without player profiles
+- `Player` rejects partial context
+- `Player` accepts a current-class skill
+- `Player` accepts a mastered retained skill after a class switch
+- `Player` rejects a non-mastered cross-class skill
+- `Player` rejects mismatched skill and progress ids
 - `TurnBasedCombatEngine` is not invoked or changed
 
 The skill tree workflow verifies:
@@ -749,8 +761,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `301`
-- Total smoke assertions executed: `683`
+- V4 Classes / Mentors / Mastery assertions: `308`
+- Total smoke assertions executed: `690`
 
 ## Validation
 
