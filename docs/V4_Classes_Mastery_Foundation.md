@@ -644,7 +644,7 @@ engine fails closed before `SkillSeal` and resource processing. It emits one
 the turn through `EndTurn`, and does not spend resources, grant experience,
 execute skill effects, or emit `ResourceNotEnough`.
 
-`CombatSkillTurnValidationComposition` owns the explicit V4 construction path
+`CombatSkillTurnValidationComposition` owns the explicit progression-aware construction path
 without moving dependency graphs into the combat engine. No production
 bootstrap call site uses that path yet.
 
@@ -658,7 +658,7 @@ ICombatSkillTurnValidator CreateValidator(
     ClassDefinitionRegistry classRegistry,
     SkillDefinitionRegistry skillRegistry);
 
-TurnBasedCombatEngine CreateV4EnabledEngine(
+TurnBasedCombatEngine CreateProgressionAwareEngine(
     IRandomSource random,
     CombatPassivePipeline pipeline,
     UnlockProfile unlockProfile,
@@ -669,7 +669,7 @@ TurnBasedCombatEngine CreateV4EnabledEngine(
 ```
 
 `CreateValidator` constructs the existing
-`CombatSkillTurnValidatorGateway`. `CreateV4EnabledEngine` passes that
+`CombatSkillTurnValidatorGateway`. `CreateProgressionAwareEngine` passes that
 validator through the existing optional engine constructor. The composition
 helper does not duplicate classification, context creation, validation, or
 engine behavior.
@@ -712,7 +712,7 @@ singleton. That owner should:
   session
 - restore snapshots into those same live profile instances before combat
 - provide the same profile and registry references to progression services,
-  save/snapshot services, and `CreateV4EnabledEngine`
+  save/snapshot services, and `CreateProgressionAwareEngine`
 - keep combat entities, turn order, passive pipelines, resonance, and the
   combat engine scoped to an individual combat
 
@@ -728,7 +728,7 @@ constructor use without changing the legacy slice.
 
 The earliest safe integration point is the future application-level
 per-combat creation method, after session state has been created or restored
-and the canonical registries are available. `CreateV4EnabledEngine` should be
+and the canonical registries are available. `CreateProgressionAwareEngine` should be
 called there immediately before constructing the matching
 `CombatRuntimeContext`.
 
@@ -747,11 +747,11 @@ Unresolved risks before integration:
 Recommended next atomic step:
 
 - decide the application/bootstrap integration owner and migrate one explicit
-  V4-enabled engine creation path without changing the legacy V1 slice
+  progression-aware engine creation path without changing the legacy V1 slice
 
 ## V4 Runtime State Ownership Foundation
 
-`Game.Application.Runtime.V4RuntimeState` is the application-layer owner for
+`Game.Application.Runtime.PlayerProgressionRuntimeState` is the application-layer owner for
 one loaded player's live V4 progression state.
 
 It creates and retains these session/player-scoped mutable profiles:
@@ -786,7 +786,7 @@ current binding registry must not be treated as an unrestricted process-wide
 singleton.
 
 Restore coordinators and progression services should mutate the profiles held
-by `V4RuntimeState` directly. Future validation composition should receive
+by `PlayerProgressionRuntimeState` directly. Future validation composition should receive
 those same profile and registry references, ensuring combat validation reads
 the state restored and changed during the loaded session.
 
@@ -816,7 +816,7 @@ The runtime-state ownership smoke coverage verifies:
 The dedicated runtime-state/combat-validation workflow further verifies that:
 
 - `V4ProgressRestoreCoordinator` restores into the live profile instances
-  owned by `V4RuntimeState`
+  owned by `PlayerProgressionRuntimeState`
 - progression and class changes remain visible through those same instances
 - `CombatSkillTurnValidationComposition` can create per-combat engines from
   the runtime state's live profiles and canonical registries
@@ -840,7 +840,7 @@ or runtime-state foundation is required before that step.
 
 The audit confirms:
 
-- `V4RuntimeState` owns one stable set of mutable profiles for a loaded player
+- `PlayerProgressionRuntimeState` owns one stable set of mutable profiles for a loaded player
 - restore preflights into temporary profiles, then mutates the owned live
   profiles only after all restore checks pass
 - the validator gateway retains references to the supplied live profiles and
@@ -856,7 +856,7 @@ The audit confirms:
 
 Remaining ownership risks are outside the validated combat path:
 
-- the APIs cannot prevent a caller from creating a second `V4RuntimeState`
+- the APIs cannot prevent a caller from creating a second `PlayerProgressionRuntimeState`
   for the same loaded player
 - callers can still rebuild definition registries or provide registries that
   do not match the definitions used to create combat requests
@@ -872,9 +872,9 @@ Remaining ownership risks are outside the validated combat path:
 The earliest safe next atomic item is one application-owned combat creation
 method that:
 
-- receives the single loaded `V4RuntimeState`
+- receives the single loaded `PlayerProgressionRuntimeState`
 - creates a fresh passive pipeline and engine per combat
-- calls `CreateV4EnabledEngine` with the runtime state's existing profile and
+- calls `CreateProgressionAwareEngine` with the runtime state's existing profile and
   registry references
 - prevents direct legacy engine construction in that V4 application path
 - leaves `FoundationVerticalSlice` unchanged as the V1 compatibility path
@@ -887,24 +887,24 @@ stale validators, or accidental legacy construction.
 
 ## Application-Owned V4 Combat Creation
 
-`Game.Application.Integration.V4ApplicationCombatFactory` provides one
+`Game.Application.Integration.ProgressionAwareCombatEngineFactory` provides one
 explicit application-layer method:
 
 ```csharp
 TurnBasedCombatEngine CreateEngine(
-    V4RuntimeState runtimeState,
+    PlayerProgressionRuntimeState runtimeState,
     IRandomSource random,
     IReadOnlyList<ICombatPassiveEffect> passives);
 ```
 
-The caller must supply the already-loaded `V4RuntimeState`. The factory rejects
+The caller must supply the already-loaded `PlayerProgressionRuntimeState`. The factory rejects
 a null runtime state and never creates, stores, clones, or replaces one. Live
 profiles, canonical definition registries, and the session-scoped mutable
 binding registry remain owned outside the combat factory.
 
 For each call, the factory creates a fresh `CombatPassivePipeline` from the
 provided per-combat passive list and delegates engine construction to
-`CombatSkillTurnValidationComposition.CreateV4EnabledEngine`. The existing
+`CombatSkillTurnValidationComposition.CreateProgressionAwareEngine`. The existing
 composition path receives the runtime state's current:
 
 - `UnlockProfile`
@@ -924,7 +924,7 @@ continue to provide the V1 pass-through path.
 Application combat creation smoke coverage verifies:
 
 - null runtime state is rejected
-- the factory has no owned `V4RuntimeState` field
+- the factory has no owned `PlayerProgressionRuntimeState` field
 - the created engine uses the existing gateway-backed composition path
 - current-class and mastered retained skills read the supplied live state
 - non-mastered cross-class skills block with one `ActionBlocked`
@@ -936,7 +936,7 @@ Application combat creation smoke coverage verifies:
 
 The dedicated application-owned combat creation workflow verifies:
 
-- one loaded `V4RuntimeState` is reused across restore, progression, and three
+- one loaded `PlayerProgressionRuntimeState` is reused across restore, progression, and three
   separate combat engine creations
 - restore mutates the same live profiles and preserves canonical registry
   references
@@ -960,9 +960,8 @@ close while recording full bootstrap migration as later application work.
 
 ## Final V4 Closure Audit
 
-The V4 foundations are behaviorally complete, but V4 should not close until
-one naming cleanup branch removes version-prefixed names from active
-application-facing production APIs.
+The V4 foundations are behaviorally complete, and the active
+application-facing production APIs have been neutralized for V5 readiness.
 
 Closure findings:
 
@@ -984,8 +983,6 @@ Closure findings:
 
 Remaining risks:
 
-- active application APIs named with `V4` will become misleading once V5 work
-  begins
 - callers can still bypass validation by directly using the legacy
   two-argument `TurnBasedCombatEngine` constructor outside the explicit V4
   application path
@@ -996,7 +993,7 @@ Remaining risks:
 - the mutable `ClassSkillTreeBindingRegistry` must stay scoped to the loaded
   session or be guarded from cross-player sharing
 
-Version-prefixed name classification:
+Version-prefixed name classification after neutralization:
 
 - safe to keep for tests, documentation, and history:
   `RunV4SmokeTests`, V4 assertion labels, V4 documentation headings, and test
@@ -1014,24 +1011,21 @@ Version-prefixed name classification:
   `V4AccessChecked`, `V4BlockReason`, `V4ContextIncomplete`, and
   `V4SkillBlocked`, because they distinguish V3 unlock checks from class and
   mastery access checks in diagnostic results
-- should rename before V4 closure:
-  `V4RuntimeState`, `V4ApplicationCombatFactory`, and
-  `CreateV4EnabledEngine`, because they are active application/composition
-  APIs that future work will call after the V4 milestone ends
+- neutralized active application/composition APIs:
+  `PlayerProgressionRuntimeState`, `ProgressionAwareCombatEngineFactory`, and
+  `CreateProgressionAwareEngine`
 
-Recommended rename cleanup:
+Completed neutral renames:
 
-- `V4RuntimeState` -> `ApplicationRuntimeState` or
-  `PlayerSessionRuntimeState`
-- `V4ApplicationCombatFactory` -> `ApplicationCombatFactory` or
-  `CombatCreationService`
-- `CreateV4EnabledEngine` -> `CreateValidatedEngine` or
-  `CreateSkillValidatedEngine`
+- `V4RuntimeState` -> `PlayerProgressionRuntimeState`
+- `V4ApplicationCombatFactory` -> `ProgressionAwareCombatEngineFactory`
+- `CreateV4EnabledEngine` -> `CreateProgressionAwareEngine`
 
-After that cleanup and its smoke/doc verification pass, V4 can close. The
-first V5 objective should then be an application/bootstrap integration design
-slice that wires the neutral runtime-state and combat-creation APIs into one
-real loaded-session path without changing gameplay rules.
+With these names neutralized, V4 is ready for a final close decision after
+this branch's smoke/doc verification pass. The first V5 objective should then
+be an application/bootstrap integration design slice that wires the neutral
+runtime-state and combat-creation APIs into one real loaded-session path
+without changing gameplay rules.
 
 Validation rules:
 

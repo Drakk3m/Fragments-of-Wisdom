@@ -7,10 +7,10 @@ using Game.Domain.Combat.Passives;
 
 namespace Game.Application.Integration
 {
-    public class V4ApplicationCombatFactory
+    public class ProgressionAwareCombatEngineFactory
     {
         public TurnBasedCombatEngine CreateEngine(
-            V4RuntimeState runtimeState,
+            PlayerProgressionRuntimeState runtimeState,
             IRandomSource random,
             IReadOnlyList<ICombatPassiveEffect> passives)
         {
@@ -31,7 +31,7 @@ namespace Game.Application.Integration
 
             var pipeline = new CombatPassivePipeline(passives);
 
-            return CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            return CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 random,
                 pipeline,
                 runtimeState.UnlockProfile,

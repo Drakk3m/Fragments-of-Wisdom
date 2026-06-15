@@ -23,7 +23,7 @@ namespace Game.Domain.Combat
                 skillRegistry);
         }
 
-        public static TurnBasedCombatEngine CreateV4EnabledEngine(
+        public static TurnBasedCombatEngine CreateProgressionAwareEngine(
             IRandomSource random,
             CombatPassivePipeline pipeline,
             UnlockProfile unlockProfile,

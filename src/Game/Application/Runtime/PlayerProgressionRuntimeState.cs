@@ -5,7 +5,7 @@ using Game.Domain.Skills;
 
 namespace Game.Application.Runtime
 {
-    public class V4RuntimeState
+    public class PlayerProgressionRuntimeState
     {
         public UnlockProfile UnlockProfile { get; private set; }
         public ClassProfile ClassProfile { get; private set; }
@@ -18,7 +18,7 @@ namespace Game.Application.Runtime
         public MentorDefinitionRegistry MentorRegistry { get; private set; }
         public ClassSkillTreeBindingRegistry ClassSkillTreeBindingRegistry { get; private set; }
 
-        public V4RuntimeState(
+        public PlayerProgressionRuntimeState(
             ClassDefinitionRegistry classRegistry,
             SkillDefinitionRegistry skillRegistry,
             MentorDefinitionRegistry mentorRegistry,
