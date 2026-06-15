@@ -584,6 +584,38 @@ Failure behavior:
 - the orchestrator is read-only and does not emit events or execute combat
 - `TurnBasedCombatEngine` does not consume the orchestrator yet
 
+`ICombatSkillTurnValidator` is the engine-facing validation boundary. It
+exposes only:
+
+```csharp
+CombatSkillTurnValidationResult Validate(
+    TurnRequest request,
+    CombatRuntimeContext runtime);
+```
+
+`CombatSkillTurnValidatorGateway` implements that boundary and owns the
+configuration needed by `CombatSkillValidationOrchestrator`. The default
+constructor selects explicit `LegacyBypass`. Strict runtime classification can
+be configured without player dependencies for enemy actions, while the player
+constructor receives the complete unlock, class, mastery, and registry state
+once at composition time.
+
+`CombatSkillTurnValidationResult` flattens the engine-relevant facts:
+
+- whether the skill is allowed
+- selected validation mode
+- orchestration failure stage
+- actor classification failure reason
+- skill-use block reason
+- underlying V3 and V4 block reasons
+
+The gateway derives the actor from `TurnRequest.Attacker`. Engine-facing
+callers do not receive or pass the orchestrator, classifier, context provider,
+validator, profiles, or registries per turn. The gateway remains read-only and
+does not emit events, advance turns, spend resources, apply skills, grant
+experience, or modify combat state. `TurnBasedCombatEngine` does not consume
+the gateway yet.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
@@ -772,6 +804,17 @@ The combat skill validation orchestrator workflow verifies:
 - successful orchestration reports no failure stage
 - `TurnBasedCombatEngine` is not invoked or changed
 
+The combat skill turn validator gateway workflow verifies:
+
+- legacy mode allows a structurally valid skill
+- enemy mode allows a structurally valid skill without player dependencies
+- player mode allows a current-class skill
+- player mode allows a mastered retained skill
+- player mode blocks a non-mastered cross-class skill
+- missing player dependencies return clear classification failure facts
+- the engine-facing interface accepts only the turn request and runtime
+- `TurnBasedCombatEngine` is not invoked or changed
+
 The skill tree workflow verifies:
 
 - skills are registered
@@ -846,8 +889,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `347`
-- Total smoke assertions executed: `729`
+- V4 Classes / Mentors / Mastery assertions: `354`
+- Total smoke assertions executed: `736`
 
 ## Validation
 
