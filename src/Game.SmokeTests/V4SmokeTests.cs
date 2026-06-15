@@ -294,12 +294,12 @@ namespace Game.SmokeTests
                 "V4 runtime state ownership assertions",
                 delegate
                 {
-                    AssertV4RuntimeStateExposesLiveProfiles();
-                    AssertV4RuntimeStateKeepsProfileIdentity();
-                    AssertV4RuntimeStateExposesCanonicalRegistries();
-                    AssertV4RuntimeStateRestoreMutatesOwnedProfiles();
-                    AssertV4RuntimeStateFeedsLiveProfilesToValidation();
-                    AssertV4RuntimeStateDoesNotOwnCombatEngines();
+                    AssertPlayerProgressionRuntimeStateExposesLiveProfiles();
+                    AssertPlayerProgressionRuntimeStateKeepsProfileIdentity();
+                    AssertPlayerProgressionRuntimeStateExposesCanonicalRegistries();
+                    AssertPlayerProgressionRuntimeStateRestoreMutatesOwnedProfiles();
+                    AssertPlayerProgressionRuntimeStateFeedsLiveProfilesToValidation();
+                    AssertPlayerProgressionRuntimeStateDoesNotOwnCombatEngines();
                 });
 
             RunSection(
@@ -382,7 +382,7 @@ namespace Game.SmokeTests
                     AssertCombatSkillUseValidationContextProviderIntegratedWorkflow();
                     AssertCombatActorValidationClassificationIntegratedWorkflow();
                     AssertCombatSkillValidationOrchestratorIntegratedWorkflow();
-                    AssertV4RuntimeStateCombatValidationIntegratedWorkflow();
+                    AssertPlayerProgressionRuntimeStateCombatValidationIntegratedWorkflow();
                     AssertApplicationCombatCreationIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
@@ -3202,7 +3202,7 @@ namespace Game.SmokeTests
             var progress = new SkillProgress(definition);
 
             TurnBasedCombatEngine engine =
-                CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                     new FixedRandomSource(0.0, 0.99),
                     BuildEmptyPassivePipeline(),
                     new UnlockProfile(),
@@ -3301,7 +3301,7 @@ namespace Game.SmokeTests
             var runtime = BuildCombatRuntime(player, enemy);
             var skill = new TrackingCombatSkill(skillId);
 
-            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 new FixedRandomSource(0.0, 0.99),
                 BuildEmptyPassivePipeline(),
                 null,
@@ -3359,7 +3359,7 @@ namespace Game.SmokeTests
             var runtime = BuildCombatRuntime(player, enemy);
             var skill = new TrackingCombatSkill(skillId);
 
-            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 new FixedRandomSource(0.0, 0.99),
                 BuildEmptyPassivePipeline(),
                 null,
@@ -3428,7 +3428,7 @@ namespace Game.SmokeTests
                 skillRegistry);
             var skill = new TrackingCombatSkill(skillId);
 
-            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 new FixedRandomSource(0.0, 0.99),
                 BuildEmptyPassivePipeline(),
                 new UnlockProfile(),
@@ -3499,7 +3499,7 @@ namespace Game.SmokeTests
             var progress = new SkillProgress(definition);
             var skill = new TrackingCombatSkill(skillId);
 
-            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 new FixedRandomSource(0.0, 0.99),
                 BuildEmptyPassivePipeline(),
                 new UnlockProfile(),
@@ -3550,7 +3550,7 @@ namespace Game.SmokeTests
 
             try
             {
-                new V4ApplicationCombatFactory().CreateEngine(
+                new ProgressionAwareCombatEngineFactory().CreateEngine(
                     null,
                     new FixedRandomSource(0.0, 0.99),
                     new List<ICombatPassiveEffect>());
@@ -3567,20 +3567,20 @@ namespace Game.SmokeTests
 
         private static void AssertApplicationCombatCreationUsesProvidedRuntimeState()
         {
-            var state = BuildTestV4RuntimeState();
-            var factory = new V4ApplicationCombatFactory();
+            var state = BuildTestPlayerProgressionRuntimeState();
+            var factory = new ProgressionAwareCombatEngineFactory();
             TurnBasedCombatEngine engine = factory.CreateEngine(
                 state,
                 new FixedRandomSource(0.0, 0.99),
                 new List<ICombatPassiveEffect>());
             bool ownsRuntimeState = false;
 
-            foreach (var field in typeof(V4ApplicationCombatFactory).GetFields(
+            foreach (var field in typeof(ProgressionAwareCombatEngineFactory).GetFields(
                 System.Reflection.BindingFlags.Instance
                 | System.Reflection.BindingFlags.Public
                 | System.Reflection.BindingFlags.NonPublic))
             {
-                if (field.FieldType == typeof(V4RuntimeState))
+                if (field.FieldType == typeof(PlayerProgressionRuntimeState))
                 {
                     ownsRuntimeState = true;
                 }
@@ -3644,9 +3644,9 @@ namespace Game.SmokeTests
 
         private static void AssertApplicationCombatCreationAllowsMasteredRetainedSkill()
         {
-            var state = BuildTestV4RuntimeState();
+            var state = BuildTestPlayerProgressionRuntimeState();
             TurnBasedCombatEngine engine =
-                new V4ApplicationCombatFactory().CreateEngine(
+                new ProgressionAwareCombatEngineFactory().CreateEngine(
                     state,
                     new FixedRandomSource(0.0, 0.99),
                     new List<ICombatPassiveEffect>());
@@ -3700,7 +3700,7 @@ namespace Game.SmokeTests
 
         private static void AssertApplicationCombatCreationBlocksCrossClassSkillSafely()
         {
-            var state = BuildTestV4RuntimeState();
+            var state = BuildTestPlayerProgressionRuntimeState();
             state.ClassProfile.AssignClassId(
                 ClassId.Wanderer,
                 state.ClassRegistry);
@@ -3742,7 +3742,7 @@ namespace Game.SmokeTests
             var progress = new SkillProgress(definition);
             var skill = new TrackingCombatSkill(definition.Id);
 
-            new V4ApplicationCombatFactory().CreateEngine(
+            new ProgressionAwareCombatEngineFactory().CreateEngine(
                 state,
                 new FixedRandomSource(0.0, 0.99),
                 new List<ICombatPassiveEffect>()).ExecuteTurn(
@@ -3789,9 +3789,9 @@ namespace Game.SmokeTests
                 "Application-owned V4 combat creation should leave the legacy slice pass-through unchanged.");
         }
 
-        private static void AssertV4RuntimeStateExposesLiveProfiles()
+        private static void AssertPlayerProgressionRuntimeStateExposesLiveProfiles()
         {
-            var state = BuildTestV4RuntimeState();
+            var state = BuildTestPlayerProgressionRuntimeState();
 
             Assert(
                 state.UnlockProfile != null
@@ -3803,9 +3803,9 @@ namespace Game.SmokeTests
                 "V4 runtime state should expose all required live progression and binding state.");
         }
 
-        private static void AssertV4RuntimeStateKeepsProfileIdentity()
+        private static void AssertPlayerProgressionRuntimeStateKeepsProfileIdentity()
         {
-            var state = BuildTestV4RuntimeState();
+            var state = BuildTestPlayerProgressionRuntimeState();
             var unlockProfile = state.UnlockProfile;
             var classProfile = state.ClassProfile;
             var masteryProfile = state.MasteryProfile;
@@ -3825,13 +3825,13 @@ namespace Game.SmokeTests
                 "Repeated V4 runtime state access should return the same live profile instances.");
         }
 
-        private static void AssertV4RuntimeStateExposesCanonicalRegistries()
+        private static void AssertPlayerProgressionRuntimeStateExposesCanonicalRegistries()
         {
             var classRegistry = BuildTestClassRegistry();
             var skillRegistry = BuildTestSkillRegistry();
             var mentorRegistry = BuildTestMentorRegistry();
             var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
-            var state = new V4RuntimeState(
+            var state = new PlayerProgressionRuntimeState(
                 classRegistry,
                 skillRegistry,
                 mentorRegistry,
@@ -3847,9 +3847,9 @@ namespace Game.SmokeTests
                 "V4 runtime state should expose injected canonical registries without rebuilding them.");
         }
 
-        private static void AssertV4RuntimeStateRestoreMutatesOwnedProfiles()
+        private static void AssertPlayerProgressionRuntimeStateRestoreMutatesOwnedProfiles()
         {
-            var state = BuildTestV4RuntimeState();
+            var state = BuildTestPlayerProgressionRuntimeState();
             var classProfile = state.ClassProfile;
             var masteryProfile = state.MasteryProfile;
             var mentorProfile = state.MentorRelationshipProfile;
@@ -3898,9 +3898,9 @@ namespace Game.SmokeTests
                 "V4 restore should populate all owned progression and binding state.");
         }
 
-        private static void AssertV4RuntimeStateFeedsLiveProfilesToValidation()
+        private static void AssertPlayerProgressionRuntimeStateFeedsLiveProfilesToValidation()
         {
-            var state = BuildTestV4RuntimeState();
+            var state = BuildTestPlayerProgressionRuntimeState();
             ICombatSkillTurnValidator validator =
                 CombatSkillTurnValidationComposition.CreateValidator(
                     state.UnlockProfile,
@@ -3949,10 +3949,10 @@ namespace Game.SmokeTests
                 "Future validation composition should observe the runtime state's live profile instances without cloning.");
         }
 
-        private static void AssertV4RuntimeStateDoesNotOwnCombatEngines()
+        private static void AssertPlayerProgressionRuntimeStateDoesNotOwnCombatEngines()
         {
             bool ownsEngine = false;
-            var runtimeStateType = typeof(V4RuntimeState);
+            var runtimeStateType = typeof(PlayerProgressionRuntimeState);
 
             foreach (var property in runtimeStateType.GetProperties())
             {
@@ -3978,9 +3978,9 @@ namespace Game.SmokeTests
                 "V4 runtime state should leave engines and combat runtime objects per-combat.");
         }
 
-        private static V4RuntimeState BuildTestV4RuntimeState()
+        private static PlayerProgressionRuntimeState BuildTestPlayerProgressionRuntimeState()
         {
-            return new V4RuntimeState(
+            return new PlayerProgressionRuntimeState(
                 BuildTestClassRegistry(),
                 BuildTestSkillRegistry(),
                 BuildTestMentorRegistry(),
@@ -7239,9 +7239,9 @@ namespace Game.SmokeTests
                 "Orchestrator workflow should report id mismatch at validation.");
         }
 
-        private static void AssertV4RuntimeStateCombatValidationIntegratedWorkflow()
+        private static void AssertPlayerProgressionRuntimeStateCombatValidationIntegratedWorkflow()
         {
-            var state = BuildTestV4RuntimeState();
+            var state = BuildTestPlayerProgressionRuntimeState();
             var classProfile = state.ClassProfile;
             var masteryProfile = state.MasteryProfile;
             var skillTree = state.ClassSkillTreeBindingRegistry.GetSkillTree(
@@ -7295,7 +7295,7 @@ namespace Game.SmokeTests
                 classSkillPlayer,
                 classSkillEnemy);
 
-            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 new FixedRandomSource(0.0, 0.99),
                 BuildEmptyPassivePipeline(),
                 state.UnlockProfile,
@@ -7355,7 +7355,7 @@ namespace Game.SmokeTests
                 1f,
                 10);
 
-            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 new FixedRandomSource(0.0, 0.99),
                 BuildEmptyPassivePipeline(),
                 state.UnlockProfile,
@@ -7414,7 +7414,7 @@ namespace Game.SmokeTests
             var blockedProgress = new SkillProgress(blockedDefinition);
             var blockedSkill = new TrackingCombatSkill(blockedDefinition.Id);
 
-            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 new FixedRandomSource(0.0, 0.99),
                 BuildEmptyPassivePipeline(),
                 state.UnlockProfile,
@@ -7482,7 +7482,7 @@ namespace Game.SmokeTests
             var missingSkill = new TrackingCombatSkill(
                 classSkillDefinition.Id);
 
-            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 new FixedRandomSource(0.0, 0.99),
                 BuildEmptyPassivePipeline(),
                 null,
@@ -7530,7 +7530,7 @@ namespace Game.SmokeTests
             var enemyPathSkill = new TrackingCombatSkill(
                 classSkillDefinition.Id);
 
-            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+            CombatSkillTurnValidationComposition.CreateProgressionAwareEngine(
                 new FixedRandomSource(0.0, 0.99),
                 BuildEmptyPassivePipeline(),
                 null,
@@ -7596,7 +7596,7 @@ namespace Game.SmokeTests
 
         private static void AssertApplicationCombatCreationIntegratedWorkflow()
         {
-            var state = BuildTestV4RuntimeState();
+            var state = BuildTestPlayerProgressionRuntimeState();
             var classProfile = state.ClassProfile;
             var masteryProfile = state.MasteryProfile;
             var classRegistry = state.ClassRegistry;
@@ -7625,7 +7625,7 @@ namespace Game.SmokeTests
                 && object.ReferenceEquals(skillRegistry, state.SkillRegistry),
                 "Application combat workflow should restore one loaded runtime state without replacing its live dependencies.");
 
-            var factory = new V4ApplicationCombatFactory();
+            var factory = new ProgressionAwareCombatEngineFactory();
             var firstRandom = new FixedRandomSource(0.0, 0.99);
             var firstPassives = new List<ICombatPassiveEffect>();
             TurnBasedCombatEngine firstEngine = factory.CreateEngine(
