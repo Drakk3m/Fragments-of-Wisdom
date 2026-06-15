@@ -246,6 +246,19 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Combat skill turn validator gateway assertions",
+                delegate
+                {
+                    AssertTurnValidatorGatewayAllowsLegacySkill();
+                    AssertTurnValidatorGatewayAllowsEnemySkill();
+                    AssertTurnValidatorGatewayAllowsPlayerClassSkill();
+                    AssertTurnValidatorGatewayAllowsMasteredRetainedSkill();
+                    AssertTurnValidatorGatewayBlocksNonMasteredCrossClassSkill();
+                    AssertTurnValidatorGatewayReportsMissingPlayerContext();
+                    AssertTurnValidatorGatewayExposesSmallEngineFacingContract();
+                });
+
+            RunSection(
                 "Mentor foundation assertions",
                 delegate
                 {
@@ -2289,6 +2302,333 @@ namespace Game.SmokeTests
                 && result.Classification.FailureReason
                     == CombatActorValidationClassificationFailureReason.UnknownActor,
                 "Foreign actor should fail orchestration safely at classification.");
+        }
+
+        private static void AssertTurnValidatorGatewayAllowsLegacySkill()
+        {
+            const string skillId = "skill_turn_gateway_legacy";
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Turn Gateway Legacy");
+            ICombatSkillTurnValidator gateway =
+                new CombatSkillTurnValidatorGateway();
+
+            var result = gateway.Validate(
+                TurnRequest.SkillAction(
+                    null,
+                    null,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                null);
+
+            Assert(
+                result.IsAllowed
+                && result.ValidationMode
+                    == CombatSkillUseValidationMode.LegacyBypass
+                && result.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.None,
+                "Turn validator gateway should allow a structurally valid legacy skill.");
+        }
+
+        private static void AssertTurnValidatorGatewayAllowsEnemySkill()
+        {
+            const string skillId = "skill_turn_gateway_enemy";
+            var player = BuildCombatEntity(
+                "turn_gateway_enemy_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "turn_gateway_enemy_actor",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Turn Gateway Enemy");
+            ICombatSkillTurnValidator gateway =
+                new CombatSkillTurnValidatorGateway(false);
+
+            var result = gateway.Validate(
+                TurnRequest.SkillAction(
+                    enemy,
+                    player,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                runtime);
+
+            Assert(
+                result.IsAllowed
+                && result.ValidationMode == CombatSkillUseValidationMode.Enemy
+                && result.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.None,
+                "Turn validator gateway should allow a structurally valid enemy skill.");
+        }
+
+        private static void AssertTurnValidatorGatewayAllowsPlayerClassSkill()
+        {
+            const string skillId = "skill_turn_gateway_class";
+            const string classId = "class_turn_gateway_class";
+            var player = BuildCombatEntity(
+                "turn_gateway_class_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "turn_gateway_class_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Turn Gateway Class");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Turn Gateway Class",
+                new[] { skillId }));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            ICombatSkillTurnValidator gateway =
+                new CombatSkillTurnValidatorGateway(
+                    new UnlockProfile(),
+                    classProfile,
+                    new MasteryProfile(),
+                    classRegistry,
+                    skillRegistry);
+
+            var result = gateway.Validate(
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                runtime);
+
+            Assert(
+                result.IsAllowed
+                && result.ValidationMode == CombatSkillUseValidationMode.Player
+                && result.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.None,
+                "Turn validator gateway should allow a current-class player skill.");
+        }
+
+        private static void AssertTurnValidatorGatewayAllowsMasteredRetainedSkill()
+        {
+            const string skillId = "skill_turn_gateway_retained";
+            const string classId = "class_turn_gateway_retained";
+            var player = BuildCombatEntity(
+                "turn_gateway_retained_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "turn_gateway_retained_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Turn Gateway Retained");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Turn Gateway Retained Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            var masteryProfile = new MasteryProfile();
+            masteryProfile.IncreaseProgress(
+                skillId,
+                MasteryRecord.MasteredProgress,
+                skillRegistry);
+            ICombatSkillTurnValidator gateway =
+                new CombatSkillTurnValidatorGateway(
+                    new UnlockProfile(),
+                    classProfile,
+                    masteryProfile,
+                    classRegistry,
+                    skillRegistry);
+
+            var result = gateway.Validate(
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                runtime);
+
+            Assert(
+                result.IsAllowed
+                && result.ValidationMode == CombatSkillUseValidationMode.Player
+                && result.V4BlockReason
+                    == MasteredSkillRetentionBlockReason.None,
+                "Turn validator gateway should allow a mastered retained skill.");
+        }
+
+        private static void AssertTurnValidatorGatewayBlocksNonMasteredCrossClassSkill()
+        {
+            const string skillId = "skill_turn_gateway_blocked";
+            const string classId = "class_turn_gateway_blocked";
+            var player = BuildCombatEntity(
+                "turn_gateway_blocked_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "turn_gateway_blocked_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Turn Gateway Blocked");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Turn Gateway Blocked Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            ICombatSkillTurnValidator gateway =
+                new CombatSkillTurnValidatorGateway(
+                    new UnlockProfile(),
+                    classProfile,
+                    new MasteryProfile(),
+                    classRegistry,
+                    skillRegistry);
+
+            var result = gateway.Validate(
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                runtime);
+
+            Assert(
+                !result.IsAllowed
+                && result.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.Validation
+                && result.BlockReason
+                    == CombatSkillUseBlockReason.V4SkillBlocked
+                && result.V4BlockReason
+                    == MasteredSkillRetentionBlockReason.SkillNotAllowed,
+                "Turn validator gateway should preserve cross-class validation failure facts.");
+        }
+
+        private static void AssertTurnValidatorGatewayReportsMissingPlayerContext()
+        {
+            const string skillId = "skill_turn_gateway_incomplete";
+            var player = BuildCombatEntity(
+                "turn_gateway_incomplete_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                10);
+            var enemy = BuildCombatEntity(
+                "turn_gateway_incomplete_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Turn Gateway Incomplete");
+            ICombatSkillTurnValidator gateway =
+                new CombatSkillTurnValidatorGateway(false);
+
+            var result = gateway.Validate(
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    new V4ValidatorCombatSkill(skillId),
+                    new SkillProgress(definition)),
+                BuildCombatRuntime(player, enemy));
+
+            Assert(
+                !result.IsAllowed
+                && !result.ValidationMode.HasValue
+                && result.FailureStage
+                    == CombatSkillValidationOrchestrationFailureStage.Classification
+                && result.ClassificationFailureReason
+                    == CombatActorValidationClassificationFailureReason
+                        .IncompletePlayerDependencies,
+                "Turn validator gateway should report incomplete player dependencies clearly.");
+        }
+
+        private static void AssertTurnValidatorGatewayExposesSmallEngineFacingContract()
+        {
+            var method = typeof(ICombatSkillTurnValidator).GetMethod("Validate");
+            var parameters = method == null
+                ? new System.Reflection.ParameterInfo[0]
+                : method.GetParameters();
+
+            Assert(
+                method != null
+                && method.ReturnType == typeof(CombatSkillTurnValidationResult)
+                && parameters.Length == 2
+                && parameters[0].ParameterType == typeof(TurnRequest)
+                && parameters[1].ParameterType == typeof(CombatRuntimeContext),
+                "Turn validator gateway should expose only request and runtime to engine-facing callers.");
         }
 
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
