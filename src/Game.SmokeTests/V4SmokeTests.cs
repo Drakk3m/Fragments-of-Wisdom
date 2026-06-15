@@ -269,6 +269,7 @@ namespace Game.SmokeTests
                     AssertAllowedTurnValidatorPreservesSkillExecution();
                     AssertBlockedTurnValidatorStopsSkillBeforeCosts();
                     AssertTurnValidationRunsBeforeSkillSeal();
+                    AssertBasicAttackSkipsSkillTurnValidation();
                 });
 
             RunSection(
@@ -2960,6 +2961,56 @@ namespace Game.SmokeTests
                     CombatSkillUseBlockReason.V4SkillBlocked.ToString())
                 && !blockedMessage.Contains("sealed"),
                 "Turn validation should run before and preempt the SkillSeal check.");
+        }
+
+        private static void AssertBasicAttackSkipsSkillTurnValidation()
+        {
+            var player = BuildCombatEntity(
+                "engine_validation_basic_attack_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "engine_validation_basic_attack_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            int startingHealth = enemy.Stats.CurrentHealth;
+            var runtime = BuildCombatRuntime(player, enemy);
+            var validator = new TrackingSkillTurnValidator(
+                BuildTurnValidationResult(false));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                validator).ExecuteTurn(
+                    runtime,
+                    TurnRequest.BasicAttack(player, enemy));
+
+            Assert(
+                validator.CallCount == 0,
+                "Basic attacks should not invoke combat skill turn validation.");
+
+            Assert(
+                CountEvents(
+                    runtime.EventLog,
+                    GameEventType.BasicAttackUsed) == 1
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 0
+                && enemy.Stats.CurrentHealth < startingHealth
+                && runtime.TurnNumber == 2,
+                "Basic attacks should retain their existing execution behavior.");
         }
 
         private static void AssertCompositionCreatesTurnValidator()
