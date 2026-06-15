@@ -746,11 +746,61 @@ Unresolved risks before integration:
 
 Recommended next atomic step:
 
-- add an application-layer V4 runtime-state ownership foundation that holds the
-  live mutable profiles and canonical registries without migrating combat call
-  sites
-- follow it with a dedicated combat-validation workflow-verification iteration
-  before wiring any production/bootstrap engine creation
+- follow the runtime-state ownership foundation with a dedicated
+  combat-validation workflow-verification iteration before wiring any
+  production/bootstrap engine creation
+
+## V4 Runtime State Ownership Foundation
+
+`Game.Application.Runtime.V4RuntimeState` is the application-layer owner for
+one loaded player's live V4 progression state.
+
+It creates and retains these session/player-scoped mutable profiles:
+
+- `UnlockProfile`
+- `ClassProfile`
+- `MasteryProfile`
+- `MentorRelationshipProfile`
+- `SkillTreeProgressProfile`
+
+It receives and retains these application-content-scoped canonical registries:
+
+- `ClassDefinitionRegistry`
+- `SkillDefinitionRegistry`
+- `MentorDefinitionRegistry`
+- `ClassSkillTreeBindingRegistry`
+
+All registry constructor arguments are required. The runtime state returns the
+same profile and registry references on every access. It does not clone,
+rebuild, or replace them.
+
+Restore coordinators and progression services should mutate the profiles held
+by `V4RuntimeState` directly. Future validation composition should receive
+those same profile and registry references, ensuring combat validation reads
+the state restored and changed during the loaded session.
+
+The runtime state intentionally does not own or create:
+
+- `TurnBasedCombatEngine`
+- `CombatRuntimeContext`
+- combat entities
+- passive pipelines
+- turn order
+- resonance state
+
+Those objects remain per-combat. Application/bootstrap migration and engine
+call-site changes remain deferred.
+
+The runtime-state ownership smoke coverage verifies:
+
+- all required live profiles and binding state are exposed
+- repeated access preserves profile identity
+- injected registries remain canonical by reference
+- `V4ProgressRestoreCoordinator` mutates the owned profile instances in place
+- future validator composition observes later mutations to those live profiles
+- the runtime state exposes no engine or combat-runtime creation path
+- the legacy `FoundationVerticalSlice` remains unchanged through its existing
+  V1 event-count guard
 
 Validation rules:
 
@@ -1053,8 +1103,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `388`
-- Total smoke assertions executed: `770`
+- V4 Classes / Mentors / Mastery assertions: `395`
+- Total smoke assertions executed: `777`
 
 ## Validation
 
