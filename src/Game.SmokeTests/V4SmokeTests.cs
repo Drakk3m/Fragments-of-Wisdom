@@ -383,6 +383,7 @@ namespace Game.SmokeTests
                     AssertCombatActorValidationClassificationIntegratedWorkflow();
                     AssertCombatSkillValidationOrchestratorIntegratedWorkflow();
                     AssertV4RuntimeStateCombatValidationIntegratedWorkflow();
+                    AssertApplicationCombatCreationIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
@@ -7591,6 +7592,263 @@ namespace Game.SmokeTests
                     legacyRuntime.EventLog,
                     GameEventType.ActionBlocked) == 0,
                 "Runtime-state workflow should preserve legacy no-validator pass-through behavior.");
+        }
+
+        private static void AssertApplicationCombatCreationIntegratedWorkflow()
+        {
+            var state = BuildTestV4RuntimeState();
+            var classProfile = state.ClassProfile;
+            var masteryProfile = state.MasteryProfile;
+            var classRegistry = state.ClassRegistry;
+            var skillRegistry = state.SkillRegistry;
+            var skillTree = state.ClassSkillTreeBindingRegistry.GetSkillTree(
+                SkillTreeId.Tlamatini);
+            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+                BuildCompleteV4SnapshotWithBinding(
+                    ClassId.Tlamatini,
+                    SkillTreeId.Tlamatini),
+                state.ClassProfile,
+                state.MasteryProfile,
+                state.MentorRelationshipProfile,
+                state.SkillTreeProgressProfile,
+                state.ClassRegistry,
+                state.SkillRegistry,
+                state.MentorRegistry,
+                skillTree,
+                state.ClassSkillTreeBindingRegistry);
+
+            Assert(
+                restoreResult.FullyRestored
+                && object.ReferenceEquals(classProfile, state.ClassProfile)
+                && object.ReferenceEquals(masteryProfile, state.MasteryProfile)
+                && object.ReferenceEquals(classRegistry, state.ClassRegistry)
+                && object.ReferenceEquals(skillRegistry, state.SkillRegistry),
+                "Application combat workflow should restore one loaded runtime state without replacing its live dependencies.");
+
+            var factory = new V4ApplicationCombatFactory();
+            var firstRandom = new FixedRandomSource(0.0, 0.99);
+            var firstPassives = new List<ICombatPassiveEffect>();
+            TurnBasedCombatEngine firstEngine = factory.CreateEngine(
+                state,
+                firstRandom,
+                firstPassives);
+            var firstPlayer = BuildCombatEntity(
+                "bootstrap_workflow_first_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var firstEnemy = BuildCombatEntity(
+                "bootstrap_workflow_first_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var firstDefinition = state.SkillRegistry.Get(
+                "skill_balance_ritual");
+            var firstSkill = new TrackingCombatSkill(firstDefinition.Id);
+            var firstProgress = new SkillProgress(firstDefinition);
+
+            firstEngine.ExecuteTurn(
+                BuildCombatRuntime(firstPlayer, firstEnemy),
+                TurnRequest.SkillAction(
+                    firstPlayer,
+                    firstEnemy,
+                    firstSkill,
+                    firstProgress));
+
+            Assert(
+                firstSkill.Applied
+                && firstProgress.Experience == 10,
+                "The first application-created combat should allow a restored current-class skill.");
+
+            state.MasteryProfile.IncreaseProgress(
+                "skill_deep_sight",
+                MasteryRecord.MasteredProgress
+                    - state.MasteryProfile.GetRecord("skill_deep_sight").Progress,
+                state.SkillRegistry);
+            state.ClassProfile.ChangeClassId(
+                ClassId.Wanderer,
+                state.ClassRegistry);
+
+            Assert(
+                object.ReferenceEquals(classProfile, state.ClassProfile)
+                && object.ReferenceEquals(masteryProfile, state.MasteryProfile)
+                && state.MasteryProfile.IsMastered("skill_deep_sight")
+                && state.ClassProfile.CurrentClassId == ClassId.Wanderer,
+                "Progression between combats should mutate the same loaded runtime-state profiles.");
+
+            var secondRandom = new FixedRandomSource(0.0, 0.99);
+            var secondPassives = new List<ICombatPassiveEffect>();
+            TurnBasedCombatEngine secondEngine = factory.CreateEngine(
+                state,
+                secondRandom,
+                secondPassives);
+            var secondPlayer = BuildCombatEntity(
+                "bootstrap_workflow_second_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var secondEnemy = BuildCombatEntity(
+                "bootstrap_workflow_second_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var retainedDefinition = state.SkillRegistry.Get(
+                "skill_deep_sight");
+            var retainedSkill = new TrackingCombatSkill(
+                retainedDefinition.Id);
+
+            secondEngine.ExecuteTurn(
+                BuildCombatRuntime(secondPlayer, secondEnemy),
+                TurnRequest.SkillAction(
+                    secondPlayer,
+                    secondEnemy,
+                    retainedSkill,
+                    new SkillProgress(retainedDefinition)));
+
+            Assert(
+                retainedSkill.Applied,
+                "A later application-created combat should allow mastery retained in the shared live state.");
+
+            var pipelineField = typeof(TurnBasedCombatEngine).GetField(
+                "pipeline",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+            var randomField = typeof(TurnBasedCombatEngine).GetField(
+                "random",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+
+            Assert(
+                firstEngine != secondEngine
+                && pipelineField != null
+                && !object.ReferenceEquals(
+                    pipelineField.GetValue(firstEngine),
+                    pipelineField.GetValue(secondEngine))
+                && randomField != null
+                && object.ReferenceEquals(
+                    firstRandom,
+                    randomField.GetValue(firstEngine))
+                && object.ReferenceEquals(
+                    secondRandom,
+                    randomField.GetValue(secondEngine)),
+                "Repeated application combat creation should produce fresh engines and passive pipelines with their per-combat random sources.");
+
+            var thirdRandom = new FixedRandomSource(0.0, 0.99);
+            var thirdPassives = new List<ICombatPassiveEffect>();
+            TurnBasedCombatEngine thirdEngine = factory.CreateEngine(
+                state,
+                thirdRandom,
+                thirdPassives);
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var blockedPlayer = BuildCombatEntity(
+                "bootstrap_workflow_blocked_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var blockedEnemy = BuildCombatEntity(
+                "bootstrap_workflow_blocked_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            int startingHealth = blockedEnemy.Stats.CurrentHealth;
+            var blockedRuntime = BuildCombatRuntime(
+                blockedPlayer,
+                blockedEnemy,
+                resonance);
+            var blockedDefinition = new SkillDefinition(
+                "skill_balance_ritual",
+                "Bootstrap Workflow Blocked",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                "",
+                2);
+            var blockedProgress = new SkillProgress(blockedDefinition);
+            var blockedSkill = new TrackingCombatSkill(blockedDefinition.Id);
+
+            thirdEngine.ExecuteTurn(
+                blockedRuntime,
+                TurnRequest.SkillAction(
+                    blockedPlayer,
+                    blockedEnemy,
+                    blockedSkill,
+                    blockedProgress));
+
+            Assert(
+                CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.ActionBlocked) == 1
+                && blockedRuntime.TurnNumber == 2,
+                "A later application-created combat should block one non-mastered cross-class action and consume its turn.");
+
+            Assert(
+                blockedPlayer.Resource.Current == 20
+                && resonance.Active.Current == 6
+                && resonance.Reserve.Current == 10
+                && CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.ResourceSpent) == 0,
+                "Blocked bootstrap workflow validation should spend neither Essence nor Resonance.");
+
+            Assert(
+                blockedProgress.Experience == 0
+                && !blockedSkill.Applied
+                && blockedEnemy.Stats.CurrentHealth == startingHealth
+                && CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.SkillUsed) == 0,
+                "Blocked bootstrap workflow validation should grant no experience or skill effects.");
+
+            Assert(
+                pipelineField != null
+                && !object.ReferenceEquals(
+                    pipelineField.GetValue(secondEngine),
+                    pipelineField.GetValue(thirdEngine))
+                && object.ReferenceEquals(
+                    classProfile,
+                    state.ClassProfile)
+                && object.ReferenceEquals(
+                    masteryProfile,
+                    state.MasteryProfile),
+                "Each combat should receive fresh per-combat dependencies while reusing the one loaded runtime state.");
+
+            Assert(
+                FoundationVerticalSlice.Run().Events.Count == 38,
+                "Bootstrap combat creation workflow verification should preserve the legacy 38-event slice.");
         }
 
         private static void AssertSkillTreeProgressionIntegratedWorkflow()

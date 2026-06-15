@@ -932,10 +932,31 @@ Application combat creation smoke coverage verifies:
   experience, and execute no skill effects
 - the legacy foundation slice still emits exactly 38 events
 
-The next required atomic item remains bootstrap workflow verification. It must
-prove that an application owner supplies one loaded runtime state across
-restore, progression, and repeated combat creation without creating duplicate
-registries, stale validators, or accidental legacy engines.
+## Bootstrap Combat Creation Workflow Verification
+
+The dedicated application-owned combat creation workflow verifies:
+
+- one loaded `V4RuntimeState` is reused across restore, progression, and three
+  separate combat engine creations
+- restore mutates the same live profiles and preserves canonical registry
+  references
+- a first factory-created combat allows a restored current-class skill
+- mastery progression and a class switch mutate the same live profiles
+- a later factory-created combat allows the newly mastered retained skill
+- a non-mastered cross-class skill remains blocked in another later combat
+- blocking emits one `ActionBlocked`, consumes the turn, spends no Essence or
+  Resonance, grants no experience, and executes no skill effects
+- each factory call creates a distinct engine and passive pipeline while
+  retaining its supplied per-combat random source
+- the legacy `FoundationVerticalSlice` remains unchanged at 38 events
+
+No production or bootstrap call site is migrated by this verification. Full
+application/bootstrap migration remains deferred.
+
+The runtime-state, restore, combat-validation composition, application combat
+creation, and repeated-combat workflow foundations are now ready for a final
+V4 closure audit. That audit should decide whether the completed foundation can
+close while recording full bootstrap migration as later application work.
 
 Validation rules:
 
@@ -1040,6 +1061,7 @@ V4 smoke tests include integrated workflow coverage for:
 - combat actor classification through context creation and validation
 - combat skill validation orchestration across class switching and failures
 - runtime-state restore/progression through combat validation composition
+- application-owned repeated combat creation from one loaded runtime state
 - skill tree progression
 - class-specific skill tree binding
 - class skill tree binding snapshot, JSON round-trip, and restore
@@ -1239,8 +1261,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `415`
-- Total smoke assertions executed: `797`
+- V4 Classes / Mentors / Mastery assertions: `425`
+- Total smoke assertions executed: `807`
 
 ## Validation
 
