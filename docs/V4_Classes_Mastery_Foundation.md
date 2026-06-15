@@ -958,6 +958,81 @@ creation, and repeated-combat workflow foundations are now ready for a final
 V4 closure audit. That audit should decide whether the completed foundation can
 close while recording full bootstrap migration as later application work.
 
+## Final V4 Closure Audit
+
+The V4 foundations are behaviorally complete, but V4 should not close until
+one naming cleanup branch removes version-prefixed names from active
+application-facing production APIs.
+
+Closure findings:
+
+- runtime-state ownership is explicit and session-scoped
+- restore preflights before mutating live profiles
+- progression and restore mutate the same live profile instances later read by
+  combat validation
+- combat validation remains behind `ICombatSkillTurnValidator`
+- `TurnBasedCombatEngine` receives V4 validation only through an optional
+  dependency
+- application-owned combat creation accepts an already-loaded runtime state
+  and creates only per-combat engine dependencies
+- repeated-combat workflow coverage verifies restore, progression, multiple
+  engine creations, blocked-action semantics, fresh per-combat dependencies,
+  and V1 compatibility
+- save/restore remains schema-compatible through existing V2 snapshot types
+- full production/bootstrap migration remains later application work, not a
+  V4 foundation blocker
+
+Remaining risks:
+
+- active application APIs named with `V4` will become misleading once V5 work
+  begins
+- callers can still bypass validation by directly using the legacy
+  two-argument `TurnBasedCombatEngine` constructor outside the explicit V4
+  application path
+- callers can still create duplicate runtime-state or registry instances
+  unless the future bootstrap owner centralizes that lifecycle
+- stale validators remain possible if an application replaces runtime-state
+  profile instances after creating engines
+- the mutable `ClassSkillTreeBindingRegistry` must stay scoped to the loaded
+  session or be guarded from cross-player sharing
+
+Version-prefixed name classification:
+
+- safe to keep for tests, documentation, and history:
+  `RunV4SmokeTests`, V4 assertion labels, V4 documentation headings, and test
+  helpers such as `V4ValidatorCombatSkill`
+- safe to keep because they represent existing serialized schema or snapshot
+  compatibility:
+  all `V2*` snapshot, repository, path-provider, serializer, service, and
+  version types
+- safe to defer until broader persistence naming changes:
+  `V4ProgressRestoreCoordinator`, `V4ProgressRestoreResult`, and
+  `V4ProgressRestoreFailureReason`, because they are restore adapters for the
+  V4 class/mastery/mentor/skill-tree foundation over the existing V2 snapshot
+  schema
+- safe to defer as internal validation facts:
+  `V4AccessChecked`, `V4BlockReason`, `V4ContextIncomplete`, and
+  `V4SkillBlocked`, because they distinguish V3 unlock checks from class and
+  mastery access checks in diagnostic results
+- should rename before V4 closure:
+  `V4RuntimeState`, `V4ApplicationCombatFactory`, and
+  `CreateV4EnabledEngine`, because they are active application/composition
+  APIs that future work will call after the V4 milestone ends
+
+Recommended rename cleanup:
+
+- `V4RuntimeState` -> `ApplicationRuntimeState` or
+  `PlayerSessionRuntimeState`
+- `V4ApplicationCombatFactory` -> `ApplicationCombatFactory` or
+  `CombatCreationService`
+- `CreateV4EnabledEngine` -> `CreateValidatedEngine` or
+  `CreateSkillValidatedEngine`
+
+After that cleanup and its smoke/doc verification pass, V4 can close. The
+first V5 objective should then be an application/bootstrap integration design
+slice that wires the neutral runtime-state and combat-creation APIs into one
+real loaded-session path without changing gameplay rules.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
