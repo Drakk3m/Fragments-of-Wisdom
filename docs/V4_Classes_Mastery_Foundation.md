@@ -1027,6 +1027,47 @@ be an application/bootstrap integration design slice that wires the neutral
 runtime-state and combat-creation APIs into one real loaded-session path
 without changing gameplay rules.
 
+## V4 Foundation Closure Decision
+
+V4 can close after this audit branch merges.
+
+The final closure audit confirms:
+
+- no active application or composition API still exposes stale V4 naming
+- `PlayerProgressionRuntimeState`,
+  `ProgressionAwareCombatEngineFactory`, and
+  `CreateProgressionAwareEngine` are the neutral production-facing names
+- deferred V4-prefixed restore/result and validation diagnostic facts remain
+  intentional and non-blocking
+- workflow coverage still verifies runtime-state ownership, restore mutation,
+  combat validation composition, application-owned combat creation, repeated
+  combat creation, blocked-action semantics, and legacy V1 compatibility
+- full application/bootstrap migration remains outside V4 foundation scope
+
+Remaining risks carried forward:
+
+- direct legacy engine construction can bypass progression-aware validation
+  outside the explicit application factory path
+- bootstrap must centralize runtime-state and registry lifetimes to avoid
+  duplicate instances or stale validators
+- `ClassSkillTreeBindingRegistry` remains mutable during restore and must stay
+  scoped to the loaded player/session or be protected from cross-player
+  sharing
+
+Deferred items carried into V5:
+
+- full application/bootstrap integration
+- broader naming policy for versioned persistence and restore adapters
+- any future decision to rename V4 diagnostic facts after V3/V4 terminology is
+  no longer useful for debugging
+
+First V5 objective:
+
+- design and verify one application/bootstrap loaded-session path that creates
+  the player progression runtime state, restores/saves it, creates
+  progression-aware combat engines through the application factory, and
+  preserves the legacy V1 slice unchanged.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
