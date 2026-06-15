@@ -740,15 +740,13 @@ Unresolved risks before integration:
   gateway reading stale state
 - locally constructed skill definitions can diverge from the canonical skill
   registry
-- no dedicated post-composition combat-validation workflow-verification branch
-  exists yet, although focused smoke coverage exists for gateway, engine, and
-  composition behavior
+- production/bootstrap call sites have not yet been migrated to the verified
+  runtime-state and combat-validation composition path
 
 Recommended next atomic step:
 
-- follow the runtime-state ownership foundation with a dedicated
-  combat-validation workflow-verification iteration before wiring any
-  production/bootstrap engine creation
+- decide the application/bootstrap integration owner and migrate one explicit
+  V4-enabled engine creation path without changing the legacy V1 slice
 
 ## V4 Runtime State Ownership Foundation
 
@@ -801,6 +799,25 @@ The runtime-state ownership smoke coverage verifies:
 - the runtime state exposes no engine or combat-runtime creation path
 - the legacy `FoundationVerticalSlice` remains unchanged through its existing
   V1 event-count guard
+
+The dedicated runtime-state/combat-validation workflow further verifies that:
+
+- `V4ProgressRestoreCoordinator` restores into the live profile instances
+  owned by `V4RuntimeState`
+- progression and class changes remain visible through those same instances
+- `CombatSkillTurnValidationComposition` can create per-combat engines from
+  the runtime state's live profiles and canonical registries
+- a restored current-class skill and a mastered retained skill are allowed
+- a non-mastered cross-class skill is blocked, consumes the turn, emits one
+  `ActionBlocked`, and spends no Essence or Resonance
+- blocked validation grants no skill experience and executes no skill effects
+- missing player context fails closed
+- enemy validation requires no player progression context
+- legacy engine construction remains pass-through
+
+Application/bootstrap integration remains intentionally deferred. The
+workflow proves the dependency and lifetime path but does not migrate any
+production engine call site.
 
 Validation rules:
 
@@ -904,6 +921,7 @@ V4 smoke tests include integrated workflow coverage for:
 - combat skill use validation context provider across class switching
 - combat actor classification through context creation and validation
 - combat skill validation orchestration across class switching and failures
+- runtime-state restore/progression through combat validation composition
 - skill tree progression
 - class-specific skill tree binding
 - class skill tree binding snapshot, JSON round-trip, and restore
@@ -1103,8 +1121,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `395`
-- Total smoke assertions executed: `777`
+- V4 Classes / Mentors / Mastery assertions: `405`
+- Total smoke assertions executed: `787`
 
 ## Validation
 
