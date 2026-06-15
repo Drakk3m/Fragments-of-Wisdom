@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json;
+using Game.Application.Runtime;
 using Game.Domain.Classes;
 using Game.Domain.Common;
 using Game.Domain.Combat;
@@ -284,6 +285,18 @@ namespace Game.SmokeTests
                     AssertComposedEnemySkillNeedsNoPlayerContext();
                     AssertComposedEngineAllowsMasteredRetainedSkill();
                     AssertComposedEngineBlocksCrossClassSkillSafely();
+                });
+
+            RunSection(
+                "V4 runtime state ownership assertions",
+                delegate
+                {
+                    AssertV4RuntimeStateExposesLiveProfiles();
+                    AssertV4RuntimeStateKeepsProfileIdentity();
+                    AssertV4RuntimeStateExposesCanonicalRegistries();
+                    AssertV4RuntimeStateRestoreMutatesOwnedProfiles();
+                    AssertV4RuntimeStateFeedsLiveProfilesToValidation();
+                    AssertV4RuntimeStateDoesNotOwnCombatEngines();
                 });
 
             RunSection(
@@ -3513,6 +3526,204 @@ namespace Game.SmokeTests
                 enemy.Stats.CurrentHealth == startingHealth
                 && CountEvents(runtime.EventLog, GameEventType.SkillUsed) == 0,
                 "Blocked composed validation should not execute skill effects.");
+        }
+
+        private static void AssertV4RuntimeStateExposesLiveProfiles()
+        {
+            var state = BuildTestV4RuntimeState();
+
+            Assert(
+                state.UnlockProfile != null
+                && state.ClassProfile != null
+                && state.MasteryProfile != null
+                && state.MentorRelationshipProfile != null
+                && state.SkillTreeProgressProfile != null
+                && state.ClassSkillTreeBindingRegistry != null,
+                "V4 runtime state should expose all required live progression and binding state.");
+        }
+
+        private static void AssertV4RuntimeStateKeepsProfileIdentity()
+        {
+            var state = BuildTestV4RuntimeState();
+            var unlockProfile = state.UnlockProfile;
+            var classProfile = state.ClassProfile;
+            var masteryProfile = state.MasteryProfile;
+            var mentorProfile = state.MentorRelationshipProfile;
+            var skillTreeProfile = state.SkillTreeProgressProfile;
+
+            Assert(
+                object.ReferenceEquals(unlockProfile, state.UnlockProfile)
+                && object.ReferenceEquals(classProfile, state.ClassProfile)
+                && object.ReferenceEquals(masteryProfile, state.MasteryProfile)
+                && object.ReferenceEquals(
+                    mentorProfile,
+                    state.MentorRelationshipProfile)
+                && object.ReferenceEquals(
+                    skillTreeProfile,
+                    state.SkillTreeProgressProfile),
+                "Repeated V4 runtime state access should return the same live profile instances.");
+        }
+
+        private static void AssertV4RuntimeStateExposesCanonicalRegistries()
+        {
+            var classRegistry = BuildTestClassRegistry();
+            var skillRegistry = BuildTestSkillRegistry();
+            var mentorRegistry = BuildTestMentorRegistry();
+            var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var state = new V4RuntimeState(
+                classRegistry,
+                skillRegistry,
+                mentorRegistry,
+                bindingRegistry);
+
+            Assert(
+                object.ReferenceEquals(classRegistry, state.ClassRegistry)
+                && object.ReferenceEquals(skillRegistry, state.SkillRegistry)
+                && object.ReferenceEquals(mentorRegistry, state.MentorRegistry)
+                && object.ReferenceEquals(
+                    bindingRegistry,
+                    state.ClassSkillTreeBindingRegistry),
+                "V4 runtime state should expose injected canonical registries without rebuilding them.");
+        }
+
+        private static void AssertV4RuntimeStateRestoreMutatesOwnedProfiles()
+        {
+            var state = BuildTestV4RuntimeState();
+            var classProfile = state.ClassProfile;
+            var masteryProfile = state.MasteryProfile;
+            var mentorProfile = state.MentorRelationshipProfile;
+            var skillTreeProfile = state.SkillTreeProgressProfile;
+            var skillTree = state.ClassSkillTreeBindingRegistry.GetSkillTree(
+                SkillTreeId.Tlamatini);
+            var snapshot = BuildCompleteV4SnapshotWithBinding(
+                ClassId.Tlamatini,
+                SkillTreeId.Tlamatini);
+
+            var result = new V4ProgressRestoreCoordinator().Restore(
+                snapshot,
+                state.ClassProfile,
+                state.MasteryProfile,
+                state.MentorRelationshipProfile,
+                state.SkillTreeProgressProfile,
+                state.ClassRegistry,
+                state.SkillRegistry,
+                state.MentorRegistry,
+                skillTree,
+                state.ClassSkillTreeBindingRegistry);
+
+            Assert(
+                result.FullyRestored
+                && object.ReferenceEquals(classProfile, state.ClassProfile)
+                && object.ReferenceEquals(masteryProfile, state.MasteryProfile)
+                && object.ReferenceEquals(
+                    mentorProfile,
+                    state.MentorRelationshipProfile)
+                && object.ReferenceEquals(
+                    skillTreeProfile,
+                    state.SkillTreeProgressProfile),
+                "V4 restore should mutate the runtime state's existing live profile instances.");
+
+            Assert(
+                state.ClassProfile.CurrentClassId == ClassId.Tlamatini
+                && state.MasteryProfile.GetRecord("skill_deep_sight").Progress
+                    == 25
+                && state.MentorRelationshipProfile.IsDiscovered(MentorId.Lyra)
+                && state.MentorRelationshipProfile.GetTrust(MentorId.Lyra) == 12
+                && state.SkillTreeProgressProfile.IsUnlocked(
+                    "node_deep_sight",
+                    skillTree)
+                && state.ClassSkillTreeBindingRegistry.GetBindingForClass(
+                    ClassId.Tlamatini) != null,
+                "V4 restore should populate all owned progression and binding state.");
+        }
+
+        private static void AssertV4RuntimeStateFeedsLiveProfilesToValidation()
+        {
+            var state = BuildTestV4RuntimeState();
+            ICombatSkillTurnValidator validator =
+                CombatSkillTurnValidationComposition.CreateValidator(
+                    state.UnlockProfile,
+                    state.ClassProfile,
+                    state.MasteryProfile,
+                    state.ClassRegistry,
+                    state.SkillRegistry);
+
+            state.ClassProfile.AssignClassId(
+                ClassId.Tlamatini,
+                state.ClassRegistry);
+
+            var player = BuildCombatEntity(
+                "runtime_state_validation_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "runtime_state_validation_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var definition = state.SkillRegistry.Get("skill_deep_sight");
+
+            var result = validator.Validate(
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    new V4ValidatorCombatSkill(definition.Id),
+                    new SkillProgress(definition)),
+                BuildCombatRuntime(player, enemy));
+
+            Assert(
+                result.IsAllowed
+                && result.ValidationMode == CombatSkillUseValidationMode.Player,
+                "Future validation composition should observe the runtime state's live profile instances without cloning.");
+        }
+
+        private static void AssertV4RuntimeStateDoesNotOwnCombatEngines()
+        {
+            bool ownsEngine = false;
+            var runtimeStateType = typeof(V4RuntimeState);
+
+            foreach (var property in runtimeStateType.GetProperties())
+            {
+                if (property.PropertyType == typeof(TurnBasedCombatEngine)
+                    || property.PropertyType == typeof(CombatRuntimeContext))
+                {
+                    ownsEngine = true;
+                }
+            }
+
+            foreach (var method in runtimeStateType.GetMethods())
+            {
+                if (method.DeclaringType == runtimeStateType
+                    && (method.ReturnType == typeof(TurnBasedCombatEngine)
+                        || method.ReturnType == typeof(CombatRuntimeContext)))
+                {
+                    ownsEngine = true;
+                }
+            }
+
+            Assert(
+                !ownsEngine,
+                "V4 runtime state should leave engines and combat runtime objects per-combat.");
+        }
+
+        private static V4RuntimeState BuildTestV4RuntimeState()
+        {
+            return new V4RuntimeState(
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                BuildTestClassSkillTreeBindingRegistry());
         }
 
         private static CombatSkillTurnValidationResult BuildTurnValidationResult(
