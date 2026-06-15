@@ -613,8 +613,27 @@ The gateway derives the actor from `TurnRequest.Attacker`. Engine-facing
 callers do not receive or pass the orchestrator, classifier, context provider,
 validator, profiles, or registries per turn. The gateway remains read-only and
 does not emit events, advance turns, spend resources, apply skills, grant
-experience, or modify combat state. `TurnBasedCombatEngine` does not consume
-the gateway yet.
+experience, or modify combat state.
+
+`TurnBasedCombatEngine` accepts `ICombatSkillTurnValidator` through an optional
+three-argument constructor overload. The existing two-argument constructor
+remains unchanged for callers and delegates with no validator, preserving the
+legacy/pass-through behavior and event sequence.
+
+For skill actions, the engine calls the optional validator immediately before
+the existing `SkillSeal` check. Allowed validation continues through the
+existing skill path without adding events. Blocked validation:
+
+- emits exactly one `ActionBlocked` event with a stable enum-based reason
+- ends and consumes the turn through the existing `EndTurn` path
+- does not continue into `SkillSeal`
+- does not calculate or spend Essence
+- does not calculate or spend Resonance
+- does not execute the skill
+- does not grant skill experience
+- does not emit `ResourceNotEnough`
+
+Basic attacks do not invoke combat skill turn validation.
 
 Validation rules:
 
@@ -813,7 +832,18 @@ The combat skill turn validator gateway workflow verifies:
 - player mode blocks a non-mastered cross-class skill
 - missing player dependencies return clear classification failure facts
 - the engine-facing interface accepts only the turn request and runtime
-- `TurnBasedCombatEngine` is not invoked or changed
+
+The combat skill turn validator engine integration verifies:
+
+- the existing two-argument constructor preserves legacy execution
+- an explicit null validator produces the same event types
+- allowed validation preserves skill execution, costs, and experience
+- blocked validation emits exactly one `ActionBlocked`
+- blocked validation consumes the turn
+- blocked validation spends neither Essence nor Resonance
+- blocked validation grants no experience and executes no skill effects
+- blocked validation does not emit `ResourceNotEnough`
+- validation runs before and preempts `SkillSeal`
 
 The skill tree workflow verifies:
 
@@ -889,8 +919,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `354`
-- Total smoke assertions executed: `736`
+- V4 Classes / Mentors / Mastery assertions: `366`
+- Total smoke assertions executed: `748`
 
 ## Validation
 

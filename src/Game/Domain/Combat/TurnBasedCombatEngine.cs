@@ -12,13 +12,23 @@ namespace Game.Domain.Combat
         private readonly DamageResolver damageResolver;
         private readonly DebuffResolver debuffResolver;
         private readonly StatusEffectResolver statusEffectResolver;
+        private readonly ICombatSkillTurnValidator skillTurnValidator;
 
         public TurnBasedCombatEngine(
             IRandomSource random,
             CombatPassivePipeline pipeline)
+            : this(random, pipeline, null)
+        {
+        }
+
+        public TurnBasedCombatEngine(
+            IRandomSource random,
+            CombatPassivePipeline pipeline,
+            ICombatSkillTurnValidator skillTurnValidator)
         {
             this.random = random;
             this.pipeline = pipeline;
+            this.skillTurnValidator = skillTurnValidator;
             damageResolver = new DamageResolver(random);
             debuffResolver = new DebuffResolver(random, pipeline);
             statusEffectResolver = new StatusEffectResolver();
@@ -78,6 +88,22 @@ namespace Game.Domain.Combat
 
             if (request.ActionType == TurnActionType.Skill)
             {
+                if (skillTurnValidator != null)
+                {
+                    var validation = skillTurnValidator.Validate(request, runtime);
+
+                    if (!validation.IsAllowed)
+                    {
+                        runtime.EventLog.Add(
+                            GameEventType.ActionBlocked,
+                            BuildSkillValidationBlockedMessage(
+                                request.Attacker,
+                                validation));
+                        EndTurn(runtime, context);
+                        return;
+                    }
+                }
+
                 if (request.Attacker.StatusEffects.HasActive(StatusEffectType.SkillSeal))
                 {
                     runtime.EventLog.Add(GameEventType.ActionBlocked, request.Attacker.Name + " is sealed and cannot use skills.");
@@ -159,6 +185,32 @@ namespace Game.Domain.Combat
             }
 
             EndTurn(runtime, context);
+        }
+
+        private static string BuildSkillValidationBlockedMessage(
+            CombatEntity attacker,
+            CombatSkillTurnValidationResult validation)
+        {
+            string reason;
+
+            if (validation.BlockReason != CombatSkillUseBlockReason.None)
+            {
+                reason = validation.BlockReason.ToString();
+            }
+            else if (validation.ClassificationFailureReason
+                != CombatActorValidationClassificationFailureReason.None)
+            {
+                reason = validation.ClassificationFailureReason.ToString();
+            }
+            else
+            {
+                reason = validation.FailureStage.ToString();
+            }
+
+            return attacker.Name
+                + " cannot use the skill. Validation reason: "
+                + reason
+                + ".";
         }
 
         private void EndTurn(
