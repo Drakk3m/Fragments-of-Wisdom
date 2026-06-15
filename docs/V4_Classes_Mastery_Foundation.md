@@ -680,6 +680,78 @@ progression dependencies. Legacy callers continue constructing
 `TurnBasedCombatEngine` with its existing two-argument constructor and remain
 pass-through.
 
+## Combat Validation Bootstrap Ownership Audit
+
+The current production-like entry point is `FoundationVerticalSlice`. It owns a
+short-lived `PlayerProfile`, combat entities, passive pipeline,
+`TurnBasedCombatEngine`, and `CombatRuntimeContext`. It intentionally creates
+the engine through the legacy two-argument constructor and remains the V1
+event-count compatibility path.
+
+The slice is not yet a safe V4 composition root:
+
+- `PlayerProfile` owns the legacy `PlayerClassCollection`, but not the V4
+  `UnlockProfile`, `ClassProfile`, `MasteryProfile`,
+  `MentorRelationshipProfile`, or `SkillTreeProgressProfile`
+- V4 restore APIs mutate caller-supplied profile instances in place
+- `ClassBootstrap` can build class definitions, but there is no complete
+  production bootstrap for the skill, mentor, skill-tree, and binding
+  registries
+- slice combat skills are currently defined locally instead of being resolved
+  from one authoritative `SkillDefinitionRegistry`
+- creating fresh V4 profiles or registries per combat would disconnect
+  validation from restored and mutated progression state
+
+The recommended owner is a future application/session-scoped V4 runtime state,
+not `TurnBasedCombatEngine`, `CombatRuntimeContext`, or a static domain
+singleton. That owner should:
+
+- create each mutable V4 profile exactly once per loaded player session
+- create each definition registry exactly once per application content
+  session
+- restore snapshots into those same live profile instances before combat
+- provide the same profile and registry references to progression services,
+  save/snapshot services, and `CreateV4EnabledEngine`
+- keep combat entities, turn order, passive pipelines, resonance, and the
+  combat engine scoped to an individual combat
+
+`CombatSkillTurnValidationComposition` is sufficient for final engine
+assembly, but it does not own or build the dependency graph. Calling it is safe
+only after an application owner can supply canonical live profiles and
+registries.
+
+Accidental legacy validation remains possible anywhere callers use the
+two-argument engine constructor. This is required for V1 compatibility, so the
+future V4 application path should centralize engine creation and avoid direct
+constructor use without changing the legacy slice.
+
+The earliest safe integration point is the future application-level
+per-combat creation method, after session state has been created or restored
+and the canonical registries are available. `CreateV4EnabledEngine` should be
+called there immediately before constructing the matching
+`CombatRuntimeContext`.
+
+Unresolved risks before integration:
+
+- legacy `PlayerClassCollection` and V4 `ClassProfile` can drift unless one
+  application owner defines their roles
+- independently rebuilt registries can contain different definition sets
+- replacing profile instances after gateway construction would leave the
+  gateway reading stale state
+- locally constructed skill definitions can diverge from the canonical skill
+  registry
+- no dedicated post-composition combat-validation workflow-verification branch
+  exists yet, although focused smoke coverage exists for gateway, engine, and
+  composition behavior
+
+Recommended next atomic step:
+
+- add an application-layer V4 runtime-state ownership foundation that holds the
+  live mutable profiles and canonical registries without migrating combat call
+  sites
+- follow it with a dedicated combat-validation workflow-verification iteration
+  before wiring any production/bootstrap engine creation
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
