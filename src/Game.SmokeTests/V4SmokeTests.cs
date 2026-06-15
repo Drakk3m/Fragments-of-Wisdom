@@ -272,6 +272,19 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "Combat skill turn validation composition assertions",
+                delegate
+                {
+                    AssertCompositionCreatesTurnValidator();
+                    AssertComposedEngineAllowsPlayerClassSkill();
+                    AssertLegacyEngineCreationRemainsPassThrough();
+                    AssertComposedEngineFailsClosedWithoutPlayerContext();
+                    AssertComposedEnemySkillNeedsNoPlayerContext();
+                    AssertComposedEngineAllowsMasteredRetainedSkill();
+                    AssertComposedEngineBlocksCrossClassSkillSafely();
+                });
+
+            RunSection(
                 "Mentor foundation assertions",
                 delegate
                 {
@@ -2947,6 +2960,403 @@ namespace Game.SmokeTests
                     CombatSkillUseBlockReason.V4SkillBlocked.ToString())
                 && !blockedMessage.Contains("sealed"),
                 "Turn validation should run before and preempt the SkillSeal check.");
+        }
+
+        private static void AssertCompositionCreatesTurnValidator()
+        {
+            ICombatSkillTurnValidator validator =
+                CombatSkillTurnValidationComposition.CreateValidator(
+                    new UnlockProfile(),
+                    new ClassProfile(),
+                    new MasteryProfile(),
+                    new ClassDefinitionRegistry(),
+                    new SkillDefinitionRegistry());
+
+            Assert(
+                validator != null,
+                "Combat validation composition should create a non-null turn validator.");
+        }
+
+        private static void AssertComposedEngineAllowsPlayerClassSkill()
+        {
+            const string skillId = "skill_composition_player_class";
+            const string classId = "class_composition_player_class";
+            var player = BuildCombatEntity(
+                "composition_player_class_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "composition_player_class_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Composition Player Class");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Composition Player Class",
+                new[] { skillId }));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            var skill = new TrackingCombatSkill(skillId);
+            var progress = new SkillProgress(definition);
+
+            TurnBasedCombatEngine engine =
+                CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                    new FixedRandomSource(0.0, 0.99),
+                    BuildEmptyPassivePipeline(),
+                    new UnlockProfile(),
+                    classProfile,
+                    new MasteryProfile(),
+                    classRegistry,
+                    skillRegistry);
+
+            engine.ExecuteTurn(
+                BuildCombatRuntime(player, enemy),
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    skill,
+                    progress));
+
+            Assert(
+                engine != null,
+                "Combat validation composition should create a V4-enabled engine.");
+
+            Assert(
+                skill.Applied && progress.Experience == 10,
+                "Composed V4 engine should allow a current-class player skill.");
+        }
+
+        private static void AssertLegacyEngineCreationRemainsPassThrough()
+        {
+            const string skillId = "skill_composition_legacy";
+            var player = BuildCombatEntity(
+                "composition_legacy_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "composition_legacy_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var skill = new TrackingCombatSkill(skillId);
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        new SkillProgress(
+                            BuildTestSkillDefinition(
+                                skillId,
+                                "Composition Legacy"))));
+
+            Assert(
+                skill.Applied
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 0,
+                "Existing engine creation should remain legacy pass-through.");
+        }
+
+        private static void AssertComposedEngineFailsClosedWithoutPlayerContext()
+        {
+            const string skillId = "skill_composition_missing_player";
+            var player = BuildCombatEntity(
+                "composition_missing_player_actor",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "composition_missing_player_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var skill = new TrackingCombatSkill(skillId);
+
+            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                null,
+                null,
+                null,
+                null,
+                null).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        new SkillProgress(
+                            BuildTestSkillDefinition(
+                                skillId,
+                                "Composition Missing Player"))));
+
+            Assert(
+                !skill.Applied
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 1
+                && FindEventMessage(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked).Contains(
+                        CombatActorValidationClassificationFailureReason
+                            .IncompletePlayerDependencies
+                            .ToString()),
+                "Composed player validation should fail closed when V4 dependencies are missing.");
+        }
+
+        private static void AssertComposedEnemySkillNeedsNoPlayerContext()
+        {
+            const string skillId = "skill_composition_enemy";
+            var player = BuildCombatEntity(
+                "composition_enemy_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "composition_enemy_actor",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                20);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var skill = new TrackingCombatSkill(skillId);
+
+            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                null,
+                null,
+                null,
+                null,
+                null).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        enemy,
+                        player,
+                        skill,
+                        new SkillProgress(
+                            BuildTestSkillDefinition(
+                                skillId,
+                                "Composition Enemy"))));
+
+            Assert(
+                skill.Applied
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 0,
+                "Composed enemy validation should not require player progression dependencies.");
+        }
+
+        private static void AssertComposedEngineAllowsMasteredRetainedSkill()
+        {
+            const string skillId = "skill_composition_retained";
+            const string classId = "class_composition_retained";
+            var player = BuildCombatEntity(
+                "composition_retained_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "composition_retained_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Composition Retained");
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Composition Retained Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            var masteryProfile = new MasteryProfile();
+            masteryProfile.IncreaseProgress(
+                skillId,
+                MasteryRecord.MasteredProgress,
+                skillRegistry);
+            var skill = new TrackingCombatSkill(skillId);
+
+            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                new UnlockProfile(),
+                classProfile,
+                masteryProfile,
+                classRegistry,
+                skillRegistry).ExecuteTurn(
+                    BuildCombatRuntime(player, enemy),
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        new SkillProgress(definition)));
+
+            Assert(
+                skill.Applied,
+                "Composed V4 engine should allow a mastered retained skill.");
+        }
+
+        private static void AssertComposedEngineBlocksCrossClassSkillSafely()
+        {
+            const string skillId = "skill_composition_blocked";
+            const string classId = "class_composition_blocked";
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var player = BuildCombatEntity(
+                "composition_blocked_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "composition_blocked_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            int startingHealth = enemy.Stats.CurrentHealth;
+            var runtime = BuildCombatRuntime(player, enemy, resonance);
+            var definition = new SkillDefinition(
+                skillId,
+                "Composition Blocked",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                "",
+                2);
+            var skillRegistry = new SkillDefinitionRegistry();
+            skillRegistry.Register(definition);
+            var classRegistry = new ClassDefinitionRegistry();
+            classRegistry.Register(new ClassDefinition(
+                classId,
+                "Composition Blocked Class",
+                new string[0]));
+            var classProfile = new ClassProfile();
+            classProfile.AssignClassId(classId, classRegistry);
+            var progress = new SkillProgress(definition);
+            var skill = new TrackingCombatSkill(skillId);
+
+            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                new UnlockProfile(),
+                classProfile,
+                new MasteryProfile(),
+                classRegistry,
+                skillRegistry).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        progress));
+
+            Assert(
+                !skill.Applied,
+                "Composed V4 engine should block a non-mastered cross-class skill.");
+
+            Assert(
+                CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 1,
+                "Blocked composed validation should emit exactly one ActionBlocked event.");
+
+            Assert(
+                runtime.TurnNumber == 2,
+                "Blocked composed validation should consume the turn.");
+
+            Assert(
+                player.Resource.Current == 20
+                && resonance.Active.Current == 6
+                && resonance.Reserve.Current == 10,
+                "Blocked composed validation should spend neither Essence nor Resonance.");
+
+            Assert(
+                progress.Experience == 0,
+                "Blocked composed validation should not grant skill experience.");
+
+            Assert(
+                enemy.Stats.CurrentHealth == startingHealth
+                && CountEvents(runtime.EventLog, GameEventType.SkillUsed) == 0,
+                "Blocked composed validation should not execute skill effects.");
         }
 
         private static CombatSkillTurnValidationResult BuildTurnValidationResult(
