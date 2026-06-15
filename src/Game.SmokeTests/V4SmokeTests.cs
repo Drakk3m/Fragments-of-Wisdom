@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Text.Json;
+using Game.Application.Integration;
 using Game.Application.Runtime;
 using Game.Domain.Classes;
 using Game.Domain.Common;
 using Game.Domain.Combat;
+using Game.Domain.Combat.Passives;
 using Game.Domain.Combat.Resources;
 using Game.Domain.Combat.StatusEffects;
 using Game.Domain.Codex;
@@ -11,6 +13,7 @@ using Game.Domain.Missions;
 using Game.Domain.Player;
 using Game.Domain.Progress;
 using Game.Domain.Skills;
+using Game.Slice;
 
 namespace Game.SmokeTests
 {
@@ -297,6 +300,17 @@ namespace Game.SmokeTests
                     AssertV4RuntimeStateRestoreMutatesOwnedProfiles();
                     AssertV4RuntimeStateFeedsLiveProfilesToValidation();
                     AssertV4RuntimeStateDoesNotOwnCombatEngines();
+                });
+
+            RunSection(
+                "V4 application combat creation assertions",
+                delegate
+                {
+                    AssertApplicationCombatCreationRequiresRuntimeState();
+                    AssertApplicationCombatCreationUsesProvidedRuntimeState();
+                    AssertApplicationCombatCreationAllowsMasteredRetainedSkill();
+                    AssertApplicationCombatCreationBlocksCrossClassSkillSafely();
+                    AssertApplicationCombatCreationPreservesLegacySlice();
                 });
 
             RunSection(
@@ -3527,6 +3541,251 @@ namespace Game.SmokeTests
                 enemy.Stats.CurrentHealth == startingHealth
                 && CountEvents(runtime.EventLog, GameEventType.SkillUsed) == 0,
                 "Blocked composed validation should not execute skill effects.");
+        }
+
+        private static void AssertApplicationCombatCreationRequiresRuntimeState()
+        {
+            bool threw = false;
+
+            try
+            {
+                new V4ApplicationCombatFactory().CreateEngine(
+                    null,
+                    new FixedRandomSource(0.0, 0.99),
+                    new List<ICombatPassiveEffect>());
+            }
+            catch (System.ArgumentNullException)
+            {
+                threw = true;
+            }
+
+            Assert(
+                threw,
+                "Application combat creation should reject a null V4 runtime state.");
+        }
+
+        private static void AssertApplicationCombatCreationUsesProvidedRuntimeState()
+        {
+            var state = BuildTestV4RuntimeState();
+            var factory = new V4ApplicationCombatFactory();
+            TurnBasedCombatEngine engine = factory.CreateEngine(
+                state,
+                new FixedRandomSource(0.0, 0.99),
+                new List<ICombatPassiveEffect>());
+            bool ownsRuntimeState = false;
+
+            foreach (var field in typeof(V4ApplicationCombatFactory).GetFields(
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic))
+            {
+                if (field.FieldType == typeof(V4RuntimeState))
+                {
+                    ownsRuntimeState = true;
+                }
+            }
+
+            Assert(
+                !ownsRuntimeState,
+                "Application combat creation should not own or create a second V4 runtime state.");
+
+            var validatorField = typeof(TurnBasedCombatEngine).GetField(
+                "skillTurnValidator",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+
+            Assert(
+                engine != null
+                && validatorField != null
+                && validatorField.GetValue(engine)
+                    is CombatSkillTurnValidatorGateway,
+                "Application combat creation should use the existing V4 validation composition path.");
+
+            state.ClassProfile.AssignClassId(
+                ClassId.Tlamatini,
+                state.ClassRegistry);
+
+            var player = BuildCombatEntity(
+                "application_creation_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "application_creation_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var definition = state.SkillRegistry.Get("skill_deep_sight");
+            var skill = new TrackingCombatSkill(definition.Id);
+
+            engine.ExecuteTurn(
+                BuildCombatRuntime(player, enemy),
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    skill,
+                    new SkillProgress(definition)));
+
+            Assert(
+                skill.Applied,
+                "Application-created combat should validate against the supplied runtime state's live profiles.");
+        }
+
+        private static void AssertApplicationCombatCreationAllowsMasteredRetainedSkill()
+        {
+            var state = BuildTestV4RuntimeState();
+            TurnBasedCombatEngine engine =
+                new V4ApplicationCombatFactory().CreateEngine(
+                    state,
+                    new FixedRandomSource(0.0, 0.99),
+                    new List<ICombatPassiveEffect>());
+
+            state.ClassProfile.AssignClassId(
+                ClassId.Tlamatini,
+                state.ClassRegistry);
+            state.MasteryProfile.IncreaseProgress(
+                "skill_deep_sight",
+                MasteryRecord.MasteredProgress,
+                state.SkillRegistry);
+            state.ClassProfile.ChangeClassId(
+                ClassId.Wanderer,
+                state.ClassRegistry);
+
+            var player = BuildCombatEntity(
+                "application_retained_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "application_retained_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var definition = state.SkillRegistry.Get("skill_deep_sight");
+            var skill = new TrackingCombatSkill(definition.Id);
+
+            engine.ExecuteTurn(
+                BuildCombatRuntime(player, enemy),
+                TurnRequest.SkillAction(
+                    player,
+                    enemy,
+                    skill,
+                    new SkillProgress(definition)));
+
+            Assert(
+                skill.Applied,
+                "Application-created combat should allow a mastered retained skill from the supplied live state.");
+        }
+
+        private static void AssertApplicationCombatCreationBlocksCrossClassSkillSafely()
+        {
+            var state = BuildTestV4RuntimeState();
+            state.ClassProfile.AssignClassId(
+                ClassId.Wanderer,
+                state.ClassRegistry);
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var player = BuildCombatEntity(
+                "application_blocked_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "application_blocked_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            int startingHealth = enemy.Stats.CurrentHealth;
+            var runtime = BuildCombatRuntime(player, enemy, resonance);
+            var definition = new SkillDefinition(
+                "skill_balance_ritual",
+                "Application Blocked",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                "",
+                2);
+            var progress = new SkillProgress(definition);
+            var skill = new TrackingCombatSkill(definition.Id);
+
+            new V4ApplicationCombatFactory().CreateEngine(
+                state,
+                new FixedRandomSource(0.0, 0.99),
+                new List<ICombatPassiveEffect>()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        progress));
+
+            Assert(
+                !skill.Applied
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 1,
+                "Application-created combat should block a non-mastered cross-class skill with one ActionBlocked event.");
+
+            Assert(
+                runtime.TurnNumber == 2,
+                "Application-created blocked validation should consume the turn.");
+
+            Assert(
+                player.Resource.Current == 20
+                && resonance.Active.Current == 6
+                && resonance.Reserve.Current == 10
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ResourceSpent) == 0,
+                "Application-created blocked validation should spend neither Essence nor Resonance.");
+
+            Assert(
+                progress.Experience == 0
+                && enemy.Stats.CurrentHealth == startingHealth
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.SkillUsed) == 0,
+                "Application-created blocked validation should grant no experience or skill effects.");
+        }
+
+        private static void AssertApplicationCombatCreationPreservesLegacySlice()
+        {
+            Assert(
+                FoundationVerticalSlice.Run().Events.Count == 38,
+                "Application-owned V4 combat creation should leave the legacy slice pass-through unchanged.");
         }
 
         private static void AssertV4RuntimeStateExposesLiveProfiles()
