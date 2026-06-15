@@ -559,7 +559,8 @@ Classification rules:
   the runtime fail with stable classification reasons
 - failed classification returns `Unknown` with no validation mode
 - classification uses actor identity from `CombatRuntimeContext`
-- `TurnBasedCombatEngine` does not consume the classifier yet
+- `TurnBasedCombatEngine` does not consume the classifier directly; the
+  configured gateway owns classification
 
 `CombatSkillValidationOrchestrator` composes the production validation flow:
 
@@ -582,7 +583,8 @@ Failure behavior:
   stage and preserve V3/V4 validator reasons
 - successful validation reports no failure stage
 - the orchestrator is read-only and does not emit events or execute combat
-- `TurnBasedCombatEngine` does not consume the orchestrator yet
+- `TurnBasedCombatEngine` does not consume the orchestrator directly; the
+  configured gateway owns orchestration
 
 `ICombatSkillTurnValidator` is the engine-facing validation boundary. It
 exposes only:
@@ -695,7 +697,8 @@ Validation rules:
 
 The validator is read-only. It does not emit events, spend resources, advance
 turns, apply skills, grant experience, or modify combat state.
-`TurnBasedCombatEngine` does not consume the validator yet.
+`TurnBasedCombatEngine` consumes validation only through
+`ICombatSkillTurnValidator`.
 
 The previous parameter-based validator overload remains compatible. New engine
 integration should use the context-based overload so legacy, player, and enemy
@@ -949,8 +952,8 @@ Allowed:
 
 Not included:
 
-- combat engine integration
-- skill execution changes
+- application/bootstrap integration
+- changes to skill effect behavior
 - automatic skill unlock grants
 - mentor rewards
 - mentor missions
