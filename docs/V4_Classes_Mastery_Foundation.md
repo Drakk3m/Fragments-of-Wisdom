@@ -885,6 +885,58 @@ proves the application owner reuses one runtime state across restore,
 progression, and multiple combat creations without registry duplication,
 stale validators, or accidental legacy construction.
 
+## Application-Owned V4 Combat Creation
+
+`Game.Application.Integration.V4ApplicationCombatFactory` provides one
+explicit application-layer method:
+
+```csharp
+TurnBasedCombatEngine CreateEngine(
+    V4RuntimeState runtimeState,
+    IRandomSource random,
+    IReadOnlyList<ICombatPassiveEffect> passives);
+```
+
+The caller must supply the already-loaded `V4RuntimeState`. The factory rejects
+a null runtime state and never creates, stores, clones, or replaces one. Live
+profiles, canonical definition registries, and the session-scoped mutable
+binding registry remain owned outside the combat factory.
+
+For each call, the factory creates a fresh `CombatPassivePipeline` from the
+provided per-combat passive list and delegates engine construction to
+`CombatSkillTurnValidationComposition.CreateV4EnabledEngine`. The existing
+composition path receives the runtime state's current:
+
+- `UnlockProfile`
+- `ClassProfile`
+- `MasteryProfile`
+- `ClassDefinitionRegistry`
+- `SkillDefinitionRegistry`
+
+The resulting engine remains per-combat and observes later mutations to the
+same live profile instances. Gateway, orchestrator, classification, and
+validation policy logic are not duplicated.
+
+This is not a full bootstrap migration. `FoundationVerticalSlice` and the
+legacy two-argument `TurnBasedCombatEngine` constructor remain unchanged and
+continue to provide the V1 pass-through path.
+
+Application combat creation smoke coverage verifies:
+
+- null runtime state is rejected
+- the factory has no owned `V4RuntimeState` field
+- the created engine uses the existing gateway-backed composition path
+- current-class and mastered retained skills read the supplied live state
+- non-mastered cross-class skills block with one `ActionBlocked`
+- blocked actions consume the turn, spend no Essence or Resonance, grant no
+  experience, and execute no skill effects
+- the legacy foundation slice still emits exactly 38 events
+
+The next required atomic item remains bootstrap workflow verification. It must
+prove that an application owner supplies one loaded runtime state across
+restore, progression, and repeated combat creation without creating duplicate
+registries, stale validators, or accidental legacy engines.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
@@ -1187,8 +1239,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `405`
-- Total smoke assertions executed: `787`
+- V4 Classes / Mentors / Mastery assertions: `415`
+- Total smoke assertions executed: `797`
 
 ## Validation
 
