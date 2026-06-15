@@ -1068,6 +1068,66 @@ First V5 objective:
   progression-aware combat engines through the application factory, and
   preserves the legacy V1 slice unchanged.
 
+## V5 Loaded-Session Bootstrap Design Audit
+
+The first V5 slice should add one application-owned loaded-session boundary,
+not migrate the legacy slice directly.
+
+Design findings:
+
+- `FoundationVerticalSlice` remains the V1 compatibility path and should keep
+  constructing `TurnBasedCombatEngine` through the legacy two-argument
+  constructor
+- the new loaded-session boundary should own exactly one
+  `PlayerProgressionRuntimeState` for the loaded player/session
+- canonical `ClassDefinitionRegistry`, `SkillDefinitionRegistry`, and
+  `MentorDefinitionRegistry` should be built once by that boundary and passed
+  into the runtime state
+- `ClassSkillTreeBindingRegistry` should be created once for the loaded
+  session because restore can mutate bindings from snapshots
+- restore and progression services should mutate the runtime state's live
+  profiles, not replace the runtime state or profile instances
+- combat creation should call `ProgressionAwareCombatEngineFactory.CreateEngine`
+  with that loaded runtime state and fresh per-combat random/passive
+  dependencies
+- `CombatRuntimeContext`, combat entities, resonance, turn order, and the
+  combat engine remain per-combat
+
+Ownership and lifetime decision:
+
+- application/session owner:
+  `PlayerProgressionRuntimeState`, mutable binding registry, and live V4
+  progression profiles
+- application-content owner:
+  class, skill, and mentor definition registries
+- per-combat owner:
+  combat entities, runtime context, passive pipeline, random source, resonance,
+  and `TurnBasedCombatEngine`
+- legacy owner:
+  `FoundationVerticalSlice` and legacy `PlayerProfile` remain unchanged until a
+  future migration explicitly chooses how V2/V4 profile roles converge
+
+Risks to guard in the implementation branch:
+
+- creating a second runtime state for the same loaded player
+- rebuilding registries per combat
+- sharing mutable class-skill-tree bindings across loaded players
+- replacing live profiles after creating a progression-aware engine
+- accidentally using the legacy engine constructor in the new V5 loaded-session
+  path
+- diverging locally constructed combat `SkillDefinition` instances from the
+  canonical `SkillDefinitionRegistry`
+
+Earliest safe V5 implementation branch:
+
+- add a small loaded-session application object or factory that builds canonical
+  registries, creates one `PlayerProgressionRuntimeState`, exposes it for
+  restore/progression, and provides a method for creating progression-aware
+  combat engines through `ProgressionAwareCombatEngineFactory`
+- include smoke coverage proving one loaded session reuses the same runtime
+  state across restore/progression and combat creation while the legacy
+  foundation slice still emits 38 events
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
