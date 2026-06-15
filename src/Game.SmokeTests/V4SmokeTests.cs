@@ -270,6 +270,7 @@ namespace Game.SmokeTests
                     AssertBlockedTurnValidatorStopsSkillBeforeCosts();
                     AssertTurnValidationRunsBeforeSkillSeal();
                     AssertBasicAttackSkipsSkillTurnValidation();
+                    AssertNullTurnValidationResultFailsClosed();
                 });
 
             RunSection(
@@ -3011,6 +3012,110 @@ namespace Game.SmokeTests
                 && enemy.Stats.CurrentHealth < startingHealth
                 && runtime.TurnNumber == 2,
                 "Basic attacks should retain their existing execution behavior.");
+        }
+
+        private static void AssertNullTurnValidationResultFailsClosed()
+        {
+            const string skillId = "skill_engine_validation_null_result";
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var player = BuildCombatEntity(
+                "engine_validation_null_result_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "engine_validation_null_result_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            new StatusEffectResolver().Apply(
+                player,
+                new StatusEffectInstance(
+                    StatusEffectType.SkillSeal,
+                    2,
+                    false));
+            int startingHealth = enemy.Stats.CurrentHealth;
+            var runtime = BuildCombatRuntime(player, enemy, resonance);
+            var definition = new SkillDefinition(
+                skillId,
+                "Engine Validation Null Result",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                "",
+                2);
+            var progress = new SkillProgress(definition);
+            var skill = new TrackingCombatSkill(skillId);
+            var validator = new TrackingSkillTurnValidator(null);
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                validator).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        progress));
+
+            string blockedMessage = FindEventMessage(
+                runtime.EventLog,
+                GameEventType.ActionBlocked);
+
+            Assert(
+                validator.CallCount == 1
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 1
+                && blockedMessage.Contains("NullValidationResult"),
+                "A null turn validation result should fail closed with one stable ActionBlocked event.");
+
+            Assert(
+                runtime.TurnNumber == 2
+                && CountEvents(runtime.EventLog, GameEventType.TurnEnded) == 1,
+                "A null turn validation result should consume the turn.");
+
+            Assert(
+                CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ResourceNotEnough) == 0,
+                "A null turn validation result should not emit ResourceNotEnough.");
+
+            Assert(
+                player.Resource.Current == 20
+                && resonance.Active.Current == 6
+                && resonance.Reserve.Current == 10
+                && CountEvents(runtime.EventLog, GameEventType.ResourceSpent) == 0,
+                "A null turn validation result should spend neither Essence nor Resonance.");
+
+            Assert(
+                progress.Experience == 0,
+                "A null turn validation result should not grant skill experience.");
+
+            Assert(
+                !skill.Applied
+                && enemy.Stats.CurrentHealth == startingHealth
+                && CountEvents(runtime.EventLog, GameEventType.SkillUsed) == 0,
+                "A null turn validation result should not execute skill effects.");
+
+            Assert(
+                !blockedMessage.Contains("sealed"),
+                "A null turn validation result should preempt the SkillSeal check.");
         }
 
         private static void AssertCompositionCreatesTurnValidator()

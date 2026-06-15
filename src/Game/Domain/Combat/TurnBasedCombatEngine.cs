@@ -7,6 +7,8 @@ namespace Game.Domain.Combat
 {
     public class TurnBasedCombatEngine
     {
+        private const string NullValidationResultReason = "NullValidationResult";
+
         private readonly IRandomSource random;
         private readonly CombatPassivePipeline pipeline;
         private readonly DamageResolver damageResolver;
@@ -92,7 +94,7 @@ namespace Game.Domain.Combat
                 {
                     var validation = skillTurnValidator.Validate(request, runtime);
 
-                    if (!validation.IsAllowed)
+                    if (validation == null || !validation.IsAllowed)
                     {
                         runtime.EventLog.Add(
                             GameEventType.ActionBlocked,
@@ -193,7 +195,11 @@ namespace Game.Domain.Combat
         {
             string reason;
 
-            if (validation.BlockReason != CombatSkillUseBlockReason.None)
+            if (validation == null)
+            {
+                reason = NullValidationResultReason;
+            }
+            else if (validation.BlockReason != CombatSkillUseBlockReason.None)
             {
                 reason = validation.BlockReason.ToString();
             }

@@ -637,6 +637,13 @@ existing skill path without adding events. Blocked validation:
 
 Basic attacks do not invoke combat skill turn validation.
 
+Custom `ICombatSkillTurnValidator` implementations must return a non-null
+`CombatSkillTurnValidationResult`. If a custom validator returns null, the
+engine fails closed before `SkillSeal` and resource processing. It emits one
+`ActionBlocked` event with the stable `NullValidationResult` reason, consumes
+the turn through `EndTurn`, and does not spend resources, grant experience,
+execute skill effects, or emit `ResourceNotEnough`.
+
 `CombatSkillTurnValidationComposition` owns production construction for the
 validation path without moving dependency graphs into the combat engine.
 
@@ -883,6 +890,9 @@ The combat skill turn validator engine integration verifies:
 - blocked validation grants no experience and executes no skill effects
 - blocked validation does not emit `ResourceNotEnough`
 - validation runs before and preempts `SkillSeal`
+- a null custom validator result fails closed with `NullValidationResult`
+- null-result blocking preserves turn, resource, experience, and effect rules
+- null-result blocking preempts `SkillSeal`
 
 The combat skill turn validation composition verifies:
 
@@ -971,8 +981,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `379`
-- Total smoke assertions executed: `761`
+- V4 Classes / Mentors / Mastery assertions: `388`
+- Total smoke assertions executed: `770`
 
 ## Validation
 
