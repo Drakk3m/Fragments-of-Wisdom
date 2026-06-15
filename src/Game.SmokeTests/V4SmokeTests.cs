@@ -368,6 +368,7 @@ namespace Game.SmokeTests
                     AssertCombatSkillUseValidationContextProviderIntegratedWorkflow();
                     AssertCombatActorValidationClassificationIntegratedWorkflow();
                     AssertCombatSkillValidationOrchestratorIntegratedWorkflow();
+                    AssertV4RuntimeStateCombatValidationIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
@@ -6976,6 +6977,361 @@ namespace Game.SmokeTests
                 && mismatchResult.Validation.BlockReason
                     == CombatSkillUseBlockReason.SkillProgressIdMismatch,
                 "Orchestrator workflow should report id mismatch at validation.");
+        }
+
+        private static void AssertV4RuntimeStateCombatValidationIntegratedWorkflow()
+        {
+            var state = BuildTestV4RuntimeState();
+            var classProfile = state.ClassProfile;
+            var masteryProfile = state.MasteryProfile;
+            var skillTree = state.ClassSkillTreeBindingRegistry.GetSkillTree(
+                SkillTreeId.Tlamatini);
+            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+                BuildCompleteV4SnapshotWithBinding(
+                    ClassId.Tlamatini,
+                    SkillTreeId.Tlamatini),
+                state.ClassProfile,
+                state.MasteryProfile,
+                state.MentorRelationshipProfile,
+                state.SkillTreeProgressProfile,
+                state.ClassRegistry,
+                state.SkillRegistry,
+                state.MentorRegistry,
+                skillTree,
+                state.ClassSkillTreeBindingRegistry);
+
+            Assert(
+                restoreResult.FullyRestored
+                && object.ReferenceEquals(classProfile, state.ClassProfile)
+                && object.ReferenceEquals(masteryProfile, state.MasteryProfile)
+                && state.ClassProfile.CurrentClassId == ClassId.Tlamatini,
+                "Runtime-state workflow should restore into the same live profile instances.");
+
+            var classSkillDefinition = state.SkillRegistry.Get(
+                "skill_balance_ritual");
+            var classSkill = new TrackingCombatSkill(classSkillDefinition.Id);
+            var classSkillProgress = new SkillProgress(classSkillDefinition);
+            var classSkillPlayer = BuildCombatEntity(
+                "runtime_workflow_class_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var classSkillEnemy = BuildCombatEntity(
+                "runtime_workflow_class_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var classSkillRuntime = BuildCombatRuntime(
+                classSkillPlayer,
+                classSkillEnemy);
+
+            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                state.UnlockProfile,
+                state.ClassProfile,
+                state.MasteryProfile,
+                state.ClassRegistry,
+                state.SkillRegistry).ExecuteTurn(
+                    classSkillRuntime,
+                    TurnRequest.SkillAction(
+                        classSkillPlayer,
+                        classSkillEnemy,
+                        classSkill,
+                        classSkillProgress));
+
+            Assert(
+                classSkill.Applied
+                && classSkillProgress.Experience == 10
+                && CountEvents(
+                    classSkillRuntime.EventLog,
+                    GameEventType.ActionBlocked) == 0,
+                "Runtime-state workflow should allow a restored current-class skill.");
+
+            state.MasteryProfile.IncreaseProgress(
+                "skill_deep_sight",
+                MasteryRecord.MasteredProgress
+                    - state.MasteryProfile.GetRecord("skill_deep_sight").Progress,
+                state.SkillRegistry);
+            state.ClassProfile.ChangeClassId(
+                ClassId.Wanderer,
+                state.ClassRegistry);
+
+            Assert(
+                state.MasteryProfile.IsMastered("skill_deep_sight")
+                && state.ClassProfile.CurrentClassId == ClassId.Wanderer,
+                "Runtime-state workflow should retain progression mutations on the live profiles.");
+
+            var retainedDefinition = state.SkillRegistry.Get("skill_deep_sight");
+            var retainedSkill = new TrackingCombatSkill(retainedDefinition.Id);
+            var retainedPlayer = BuildCombatEntity(
+                "runtime_workflow_retained_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var retainedEnemy = BuildCombatEntity(
+                "runtime_workflow_retained_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+
+            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                state.UnlockProfile,
+                state.ClassProfile,
+                state.MasteryProfile,
+                state.ClassRegistry,
+                state.SkillRegistry).ExecuteTurn(
+                    BuildCombatRuntime(retainedPlayer, retainedEnemy),
+                    TurnRequest.SkillAction(
+                        retainedPlayer,
+                        retainedEnemy,
+                        retainedSkill,
+                        new SkillProgress(retainedDefinition)));
+
+            Assert(
+                retainedSkill.Applied,
+                "Runtime-state workflow should allow a mastered retained skill after the live class switch.");
+
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var blockedPlayer = BuildCombatEntity(
+                "runtime_workflow_blocked_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var blockedEnemy = BuildCombatEntity(
+                "runtime_workflow_blocked_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var blockedRuntime = BuildCombatRuntime(
+                blockedPlayer,
+                blockedEnemy,
+                resonance);
+            var blockedDefinition = new SkillDefinition(
+                "skill_balance_ritual",
+                "Runtime Workflow Blocked",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                "",
+                2);
+            var blockedProgress = new SkillProgress(blockedDefinition);
+            var blockedSkill = new TrackingCombatSkill(blockedDefinition.Id);
+
+            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                state.UnlockProfile,
+                state.ClassProfile,
+                state.MasteryProfile,
+                state.ClassRegistry,
+                state.SkillRegistry).ExecuteTurn(
+                    blockedRuntime,
+                    TurnRequest.SkillAction(
+                        blockedPlayer,
+                        blockedEnemy,
+                        blockedSkill,
+                        blockedProgress));
+
+            Assert(
+                CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.ActionBlocked) == 1
+                && blockedRuntime.TurnNumber == 2,
+                "Runtime-state workflow should block a non-mastered cross-class skill and consume the turn.");
+
+            Assert(
+                blockedPlayer.Resource.Current == 20
+                && resonance.Active.Current == 6
+                && resonance.Reserve.Current == 10
+                && CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.ResourceSpent) == 0,
+                "Runtime-state workflow blocking should spend neither Essence nor Resonance.");
+
+            Assert(
+                blockedProgress.Experience == 0
+                && !blockedSkill.Applied
+                && CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.SkillUsed) == 0
+                && CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.ResourceNotEnough) == 0,
+                "Runtime-state workflow blocking should grant no experience or skill effects.");
+
+            var missingPlayer = BuildCombatEntity(
+                "runtime_workflow_missing_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var missingEnemy = BuildCombatEntity(
+                "runtime_workflow_missing_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var missingRuntime = BuildCombatRuntime(
+                missingPlayer,
+                missingEnemy);
+            var missingSkill = new TrackingCombatSkill(
+                classSkillDefinition.Id);
+
+            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                null,
+                null,
+                null,
+                null,
+                null).ExecuteTurn(
+                    missingRuntime,
+                    TurnRequest.SkillAction(
+                        missingPlayer,
+                        missingEnemy,
+                        missingSkill,
+                        new SkillProgress(classSkillDefinition)));
+
+            Assert(
+                !missingSkill.Applied
+                && CountEvents(
+                    missingRuntime.EventLog,
+                    GameEventType.ActionBlocked) == 1,
+                "Runtime-state workflow should fail closed when player context is missing.");
+
+            var enemyPathPlayer = BuildCombatEntity(
+                "runtime_workflow_enemy_path_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemyPathEnemy = BuildCombatEntity(
+                "runtime_workflow_enemy_path_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                20);
+            var enemyPathRuntime = BuildCombatRuntime(
+                enemyPathPlayer,
+                enemyPathEnemy);
+            var enemyPathSkill = new TrackingCombatSkill(
+                classSkillDefinition.Id);
+
+            CombatSkillTurnValidationComposition.CreateV4EnabledEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                null,
+                null,
+                null,
+                null,
+                null).ExecuteTurn(
+                    enemyPathRuntime,
+                    TurnRequest.SkillAction(
+                        enemyPathEnemy,
+                        enemyPathPlayer,
+                        enemyPathSkill,
+                        new SkillProgress(classSkillDefinition)));
+
+            Assert(
+                enemyPathSkill.Applied
+                && CountEvents(
+                    enemyPathRuntime.EventLog,
+                    GameEventType.ActionBlocked) == 0,
+                "Runtime-state workflow enemy validation should require no player progression context.");
+
+            var legacyPlayer = BuildCombatEntity(
+                "runtime_workflow_legacy_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var legacyEnemy = BuildCombatEntity(
+                "runtime_workflow_legacy_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var legacyRuntime = BuildCombatRuntime(legacyPlayer, legacyEnemy);
+            var legacySkill = new TrackingCombatSkill(
+                classSkillDefinition.Id);
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    legacyRuntime,
+                    TurnRequest.SkillAction(
+                        legacyPlayer,
+                        legacyEnemy,
+                        legacySkill,
+                        new SkillProgress(classSkillDefinition)));
+
+            Assert(
+                legacySkill.Applied
+                && CountEvents(
+                    legacyRuntime.EventLog,
+                    GameEventType.ActionBlocked) == 0,
+                "Runtime-state workflow should preserve legacy no-validator pass-through behavior.");
         }
 
         private static void AssertSkillTreeProgressionIntegratedWorkflow()
