@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using System.Text.Json;
 using Game.Domain.Classes;
+using Game.Domain.Common;
 using Game.Domain.Combat;
+using Game.Domain.Combat.Resources;
+using Game.Domain.Combat.StatusEffects;
 using Game.Domain.Codex;
 using Game.Domain.Missions;
 using Game.Domain.Player;
@@ -256,6 +259,16 @@ namespace Game.SmokeTests
                     AssertTurnValidatorGatewayBlocksNonMasteredCrossClassSkill();
                     AssertTurnValidatorGatewayReportsMissingPlayerContext();
                     AssertTurnValidatorGatewayExposesSmallEngineFacingContract();
+                });
+
+            RunSection(
+                "Combat skill turn validator engine integration assertions",
+                delegate
+                {
+                    AssertEngineWithoutTurnValidatorPreservesLegacyBehavior();
+                    AssertAllowedTurnValidatorPreservesSkillExecution();
+                    AssertBlockedTurnValidatorStopsSkillBeforeCosts();
+                    AssertTurnValidationRunsBeforeSkillSeal();
                 });
 
             RunSection(
@@ -2629,6 +2642,382 @@ namespace Game.SmokeTests
                 && parameters[0].ParameterType == typeof(TurnRequest)
                 && parameters[1].ParameterType == typeof(CombatRuntimeContext),
                 "Turn validator gateway should expose only request and runtime to engine-facing callers.");
+        }
+
+        private static void AssertEngineWithoutTurnValidatorPreservesLegacyBehavior()
+        {
+            const string skillId = "skill_engine_validation_legacy";
+            var definition = BuildTestSkillDefinition(
+                skillId,
+                "Engine Validation Legacy");
+            var firstPlayer = BuildCombatEntity(
+                "engine_validation_legacy_first_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var firstEnemy = BuildCombatEntity(
+                "engine_validation_legacy_first_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var secondPlayer = BuildCombatEntity(
+                "engine_validation_legacy_second_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var secondEnemy = BuildCombatEntity(
+                "engine_validation_legacy_second_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var firstRuntime = BuildCombatRuntime(firstPlayer, firstEnemy);
+            var secondRuntime = BuildCombatRuntime(secondPlayer, secondEnemy);
+            var firstSkill = new TrackingCombatSkill(skillId);
+            var secondSkill = new TrackingCombatSkill(skillId);
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline()).ExecuteTurn(
+                    firstRuntime,
+                    TurnRequest.SkillAction(
+                        firstPlayer,
+                        firstEnemy,
+                        firstSkill,
+                        new SkillProgress(definition)));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                null).ExecuteTurn(
+                    secondRuntime,
+                    TurnRequest.SkillAction(
+                        secondPlayer,
+                        secondEnemy,
+                        secondSkill,
+                        new SkillProgress(definition)));
+
+            Assert(
+                firstSkill.Applied
+                && secondSkill.Applied
+                && firstPlayer.Resource.Current == secondPlayer.Resource.Current,
+                "Existing engine construction should preserve legacy skill execution.");
+
+            Assert(
+                EventTypesMatch(firstRuntime.EventLog, secondRuntime.EventLog)
+                && CountEvents(
+                    firstRuntime.EventLog,
+                    GameEventType.ActionBlocked) == 0
+                && CountEvents(
+                    secondRuntime.EventLog,
+                    GameEventType.ActionBlocked) == 0,
+                "No validator should produce no validation event changes.");
+        }
+
+        private static void AssertAllowedTurnValidatorPreservesSkillExecution()
+        {
+            const string skillId = "skill_engine_validation_allowed";
+            var player = BuildCombatEntity(
+                "engine_validation_allowed_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "engine_validation_allowed_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var runtime = BuildCombatRuntime(player, enemy);
+            var progress = new SkillProgress(
+                BuildTestSkillDefinition(
+                    skillId,
+                    "Engine Validation Allowed"));
+            var skill = new TrackingCombatSkill(skillId);
+            var validator = new TrackingSkillTurnValidator(
+                BuildTurnValidationResult(true));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                validator).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        progress));
+
+            Assert(
+                validator.CallCount == 1
+                && skill.Applied
+                && progress.Experience == 10
+                && player.Resource.Current == 15,
+                "Allowed turn validation should preserve normal skill execution.");
+
+            Assert(
+                CountEvents(runtime.EventLog, GameEventType.ActionBlocked) == 0
+                && CountEvents(runtime.EventLog, GameEventType.SkillUsed) == 1
+                && CountEvents(runtime.EventLog, GameEventType.ResourceSpent) == 1,
+                "Allowed turn validation should emit no additional validation events.");
+        }
+
+        private static void AssertBlockedTurnValidatorStopsSkillBeforeCosts()
+        {
+            const string skillId = "skill_engine_validation_blocked";
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var player = BuildCombatEntity(
+                "engine_validation_blocked_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "engine_validation_blocked_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            int startingHealth = enemy.Stats.CurrentHealth;
+            var runtime = BuildCombatRuntime(player, enemy, resonance);
+            var definition = new SkillDefinition(
+                skillId,
+                "Engine Validation Blocked",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                "",
+                2);
+            var progress = new SkillProgress(definition);
+            var skill = new TrackingCombatSkill(skillId);
+            var validator = new TrackingSkillTurnValidator(
+                BuildTurnValidationResult(false));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                validator).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        progress));
+
+            Assert(
+                validator.CallCount == 1
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 1
+                && FindEventMessage(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked).Contains(
+                        CombatSkillUseBlockReason.V4SkillBlocked.ToString()),
+                "Blocked turn validation should emit one stable ActionBlocked event.");
+
+            Assert(
+                runtime.TurnNumber == 2
+                && CountEvents(runtime.EventLog, GameEventType.TurnEnded) == 1,
+                "Blocked turn validation should consume the turn through the normal end-turn path.");
+
+            Assert(
+                player.Resource.Current == 20
+                && CountEvents(runtime.EventLog, GameEventType.ResourceSpent) == 0,
+                "Blocked turn validation should not spend Essence.");
+
+            Assert(
+                resonance.Active.Current == 6
+                && resonance.Reserve.Current == 10,
+                "Blocked turn validation should not spend Resonance.");
+
+            Assert(
+                progress.Experience == 0,
+                "Blocked turn validation should not grant skill experience.");
+
+            Assert(
+                !skill.Applied
+                && enemy.Stats.CurrentHealth == startingHealth
+                && CountEvents(runtime.EventLog, GameEventType.SkillUsed) == 0,
+                "Blocked turn validation should not execute skill effects.");
+
+            Assert(
+                CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ResourceNotEnough) == 0,
+                "Blocked turn validation should not emit ResourceNotEnough.");
+        }
+
+        private static void AssertTurnValidationRunsBeforeSkillSeal()
+        {
+            const string skillId = "skill_engine_validation_before_seal";
+            var player = BuildCombatEntity(
+                "engine_validation_before_seal_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "engine_validation_before_seal_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            new StatusEffectResolver().Apply(
+                player,
+                new StatusEffectInstance(
+                    StatusEffectType.SkillSeal,
+                    2,
+                    false));
+            var runtime = BuildCombatRuntime(player, enemy);
+            var validator = new TrackingSkillTurnValidator(
+                BuildTurnValidationResult(false));
+
+            new TurnBasedCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                BuildEmptyPassivePipeline(),
+                validator).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        new TrackingCombatSkill(skillId),
+                        new SkillProgress(
+                            BuildTestSkillDefinition(
+                                skillId,
+                                "Engine Validation Before Seal"))));
+
+            string blockedMessage = FindEventMessage(
+                runtime.EventLog,
+                GameEventType.ActionBlocked);
+
+            Assert(
+                validator.CallCount == 1
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 1
+                && blockedMessage.Contains(
+                    CombatSkillUseBlockReason.V4SkillBlocked.ToString())
+                && !blockedMessage.Contains("sealed"),
+                "Turn validation should run before and preempt the SkillSeal check.");
+        }
+
+        private static CombatSkillTurnValidationResult BuildTurnValidationResult(
+            bool isAllowed)
+        {
+            return new CombatSkillTurnValidationResult(
+                isAllowed,
+                CombatSkillUseValidationMode.Player,
+                isAllowed
+                    ? CombatSkillValidationOrchestrationFailureStage.None
+                    : CombatSkillValidationOrchestrationFailureStage.Validation,
+                CombatActorValidationClassificationFailureReason.None,
+                isAllowed
+                    ? CombatSkillUseBlockReason.None
+                    : CombatSkillUseBlockReason.V4SkillBlocked,
+                string.Empty,
+                isAllowed
+                    ? MasteredSkillRetentionBlockReason.None
+                    : MasteredSkillRetentionBlockReason.SkillNotAllowed);
+        }
+
+        private static int CountEvents(
+            GameEventLog eventLog,
+            GameEventType eventType)
+        {
+            int count = 0;
+
+            foreach (var gameEvent in eventLog.Events)
+            {
+                if (gameEvent.Type == eventType)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static string FindEventMessage(
+            GameEventLog eventLog,
+            GameEventType eventType)
+        {
+            foreach (var gameEvent in eventLog.Events)
+            {
+                if (gameEvent.Type == eventType)
+                {
+                    return gameEvent.Message;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private static bool EventTypesMatch(
+            GameEventLog first,
+            GameEventLog second)
+        {
+            if (first.Events.Count != second.Events.Count)
+            {
+                return false;
+            }
+
+            for (int index = 0; index < first.Events.Count; index++)
+            {
+                if (first.Events[index].Type != second.Events[index].Type)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static void AssertSkillDefinitionCanBeRegisteredAndResolved()
@@ -6741,6 +7130,53 @@ namespace Game.SmokeTests
                 CombatContext context,
                 SkillProgress progress)
             {
+            }
+        }
+
+        private class TrackingCombatSkill : ICombatSkill
+        {
+            public string Id { get; private set; }
+            public bool Applied { get; private set; }
+
+            public string Name
+            {
+                get { return "Tracking Combat Skill"; }
+            }
+
+            public TrackingCombatSkill(string id)
+            {
+                Id = id;
+            }
+
+            public void Apply(
+                CombatContext context,
+                SkillProgress progress)
+            {
+                Applied = true;
+                context.EventLog.Add(
+                    GameEventType.SkillUsed,
+                    context.Attacker.Name + " uses a tracking skill.");
+            }
+        }
+
+        private class TrackingSkillTurnValidator : ICombatSkillTurnValidator
+        {
+            private readonly CombatSkillTurnValidationResult result;
+
+            public int CallCount { get; private set; }
+
+            public TrackingSkillTurnValidator(
+                CombatSkillTurnValidationResult result)
+            {
+                this.result = result;
+            }
+
+            public CombatSkillTurnValidationResult Validate(
+                TurnRequest request,
+                CombatRuntimeContext runtime)
+            {
+                CallCount++;
+                return result;
             }
         }
     }
