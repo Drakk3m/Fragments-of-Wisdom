@@ -635,6 +635,42 @@ existing skill path without adding events. Blocked validation:
 
 Basic attacks do not invoke combat skill turn validation.
 
+`CombatSkillTurnValidationComposition` owns production construction for the
+validation path without moving dependency graphs into the combat engine.
+
+It exposes:
+
+```csharp
+ICombatSkillTurnValidator CreateValidator(
+    UnlockProfile unlockProfile,
+    ClassProfile classProfile,
+    MasteryProfile masteryProfile,
+    ClassDefinitionRegistry classRegistry,
+    SkillDefinitionRegistry skillRegistry);
+
+TurnBasedCombatEngine CreateV4EnabledEngine(
+    IRandomSource random,
+    CombatPassivePipeline pipeline,
+    UnlockProfile unlockProfile,
+    ClassProfile classProfile,
+    MasteryProfile masteryProfile,
+    ClassDefinitionRegistry classRegistry,
+    SkillDefinitionRegistry skillRegistry);
+```
+
+`CreateValidator` constructs the existing
+`CombatSkillTurnValidatorGateway`. `CreateV4EnabledEngine` passes that
+validator through the existing optional engine constructor. The composition
+helper does not duplicate classification, context creation, validation, or
+engine behavior.
+
+Player validation requires all five player dependencies. Missing dependencies
+remain configured on the gateway and fail player actions closed through the
+existing classifier. Enemy actions still classify and validate without player
+progression dependencies. Legacy callers continue constructing
+`TurnBasedCombatEngine` with its existing two-argument constructor and remain
+pass-through.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
@@ -845,6 +881,19 @@ The combat skill turn validator engine integration verifies:
 - blocked validation does not emit `ResourceNotEnough`
 - validation runs before and preempts `SkillSeal`
 
+The combat skill turn validation composition verifies:
+
+- the factory creates a non-null `ICombatSkillTurnValidator`
+- the explicit V4 engine path allows current-class player skills
+- legacy engine construction remains pass-through
+- missing player dependencies fail closed
+- enemy actions require no player progression dependencies
+- mastered retained skills remain allowed
+- non-mastered cross-class skills are blocked
+- blocked composed validation emits one `ActionBlocked` and consumes the turn
+- blocked composed validation spends no Essence or Resonance
+- blocked composed validation grants no experience or skill effects
+
 The skill tree workflow verifies:
 
 - skills are registered
@@ -919,8 +968,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `366`
-- Total smoke assertions executed: `748`
+- V4 Classes / Mentors / Mastery assertions: `379`
+- Total smoke assertions executed: `761`
 
 ## Validation
 
