@@ -644,8 +644,9 @@ engine fails closed before `SkillSeal` and resource processing. It emits one
 the turn through `EndTurn`, and does not spend resources, grant experience,
 execute skill effects, or emit `ResourceNotEnough`.
 
-`CombatSkillTurnValidationComposition` owns production construction for the
-validation path without moving dependency graphs into the combat engine.
+`CombatSkillTurnValidationComposition` owns the explicit V4 construction path
+without moving dependency graphs into the combat engine. No production
+bootstrap call site uses that path yet.
 
 It exposes:
 
@@ -761,16 +762,28 @@ It creates and retains these session/player-scoped mutable profiles:
 - `MentorRelationshipProfile`
 - `SkillTreeProgressProfile`
 
-It receives and retains these application-content-scoped canonical registries:
+It receives and retains these application-content-scoped canonical definition
+registries:
 
 - `ClassDefinitionRegistry`
 - `SkillDefinitionRegistry`
 - `MentorDefinitionRegistry`
+
+It also retains:
+
 - `ClassSkillTreeBindingRegistry`
 
 All registry constructor arguments are required. The runtime state returns the
 same profile and registry references on every access. It does not clone,
 rebuild, or replace them.
+
+`ClassSkillTreeBindingRegistry` is currently a mutable restore target because
+class-to-tree bindings are persisted in V2 progress snapshots. Bootstrap must
+therefore scope that registry to the loaded session, or otherwise guarantee
+that it is not shared across independently loaded players. The three
+definition registries may be shared as application-content catalogs, but the
+current binding registry must not be treated as an unrestricted process-wide
+singleton.
 
 Restore coordinators and progression services should mutate the profiles held
 by `V4RuntimeState` directly. Future validation composition should receive
@@ -818,6 +831,59 @@ The dedicated runtime-state/combat-validation workflow further verifies that:
 Application/bootstrap integration remains intentionally deferred. The
 workflow proves the dependency and lifetime path but does not migrate any
 production engine call site.
+
+## Runtime State And Combat Validation Final Audit
+
+The runtime-state and combat-validation workflow is ready for a narrow
+application-owned integration step. No additional combat, validation, restore,
+or runtime-state foundation is required before that step.
+
+The audit confirms:
+
+- `V4RuntimeState` owns one stable set of mutable profiles for a loaded player
+- restore preflights into temporary profiles, then mutates the owned live
+  profiles only after all restore checks pass
+- the validator gateway retains references to the supplied live profiles and
+  reads later progression changes without cloning
+- `CombatSkillTurnValidationComposition` creates per-combat validators and
+  engines without moving the V4 dependency graph into
+  `TurnBasedCombatEngine`
+- missing player context fails closed, while enemy and explicit legacy paths
+  preserve their documented behavior
+- workflow coverage verifies restored current-class access, mastered retained
+  access, cross-class blocking consequences, enemy behavior, and legacy
+  pass-through
+
+Remaining ownership risks are outside the validated combat path:
+
+- the APIs cannot prevent a caller from creating a second `V4RuntimeState`
+  for the same loaded player
+- callers can still rebuild definition registries or provide registries that
+  do not match the definitions used to create combat requests
+- the mutable `ClassSkillTreeBindingRegistry` can leak restored bindings
+  between players if bootstrap shares it beyond one loaded session
+- replacing a runtime state after constructing a validator leaves that
+  validator attached to the old profiles
+- any V4 application call site can accidentally bypass validation by using
+  the legacy two-argument engine constructor
+- the legacy `PlayerClassCollection` and V4 `ClassProfile` remain separate
+  models until application ownership chooses the authoritative path
+
+The earliest safe next atomic item is one application-owned combat creation
+method that:
+
+- receives the single loaded `V4RuntimeState`
+- creates a fresh passive pipeline and engine per combat
+- calls `CreateV4EnabledEngine` with the runtime state's existing profile and
+  registry references
+- prevents direct legacy engine construction in that V4 application path
+- leaves `FoundationVerticalSlice` unchanged as the V1 compatibility path
+
+V4 should not close immediately after that integration change. The integration
+must be followed by a focused bootstrap workflow-verification iteration that
+proves the application owner reuses one runtime state across restore,
+progression, and multiple combat creations without registry duplication,
+stale validators, or accidental legacy construction.
 
 Validation rules:
 
