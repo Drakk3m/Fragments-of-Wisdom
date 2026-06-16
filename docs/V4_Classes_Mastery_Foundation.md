@@ -1339,6 +1339,33 @@ This is not full bootstrap migration. `FoundationVerticalSlice` and legacy
 engine construction remain unchanged/pass-through. Dedicated workflow
 verification should follow before any broad call-site migration.
 
+## V5 Player Session Composition Workflow Verification
+
+Dedicated workflow verification now proves the `PlayerSessionComposition` path
+before full bootstrap migration.
+
+The workflow uses one `PlayerSessionComposition` and verifies:
+
+- one stable `LoadedPlayerSession`
+- one stable `PlayerProgressionRuntimeState`
+- restore mutates the same live runtime-state profiles exposed by the
+  composition
+- progression and mastery mutation affect later combat validation
+- repeated `CreateCombatEngine` calls use the same session state
+- combat engines, passive pipelines, random sources, combat runtimes, and event
+  logs remain per-combat
+- canonical class and skill registries remain stable by reference
+- mutable class-skill-tree bindings are session-scoped and not global
+- restored current-class skills pass validation
+- mastered retained skills pass after progression mutation
+- non-mastered cross-class skills block with one `ActionBlocked`
+- blocked actions consume the turn, spend no Essence or Resonance, grant no
+  experience, and execute no skill effects
+- `FoundationVerticalSlice` remains V1-compatible at 38 events
+
+Full bootstrap migration remains deferred. The player-session composition path
+is ready for a focused audit before any broader call-site migration.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
