@@ -1292,6 +1292,53 @@ Recommended first implementation branch:
 - keep `FoundationVerticalSlice` and existing legacy constructors unchanged
 - follow immediately with workflow verification before broad call-site migration
 
+## V5 Bootstrap Session Composition Foundation
+
+`Game.Application.Runtime.PlayerSessionComposition` is the explicit
+application-layer composition entry point for one loaded player/session.
+
+It receives canonical registries:
+
+- `ClassDefinitionRegistry`
+- `SkillDefinitionRegistry`
+- `MentorDefinitionRegistry`
+
+It also receives, or creates for an empty session, one
+`ClassSkillTreeBindingRegistry`. This binding registry is mutable
+player/session state and must not be shared across loaded players.
+
+The composition creates exactly one `LoadedPlayerSession` during construction
+and exposes:
+
+```csharp
+LoadedPlayerSession LoadedSession
+PlayerProgressionRuntimeState RuntimeState
+TurnBasedCombatEngine CreateCombatEngine(
+    IRandomSource random,
+    IReadOnlyList<ICombatPassiveEffect> passives)
+```
+
+`RuntimeState` is the same instance owned by `LoadedSession`. Restore and
+progression flows should mutate that live runtime state. Combat creation is
+available only through `CreateCombatEngine`, which delegates to
+`LoadedPlayerSession.CreateCombatEngine` and keeps per-combat dependencies
+fresh.
+
+Lifetime boundaries:
+
+- `PlayerSessionComposition` is one loaded-session owner
+- `LoadedPlayerSession` and `PlayerProgressionRuntimeState` are created once per
+  composition
+- class, skill, and mentor registries are canonical references supplied to the
+  composition and reused across combat creation
+- `ClassSkillTreeBindingRegistry` is session-scoped mutable state
+- combat engines, passive pipelines, random sources, combat entities, runtime
+  contexts, and event logs remain per-combat
+
+This is not full bootstrap migration. `FoundationVerticalSlice` and legacy
+engine construction remain unchanged/pass-through. Dedicated workflow
+verification should follow before any broad call-site migration.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
