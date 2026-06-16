@@ -412,6 +412,7 @@ namespace Game.SmokeTests
                     AssertApplicationCombatCreationIntegratedWorkflow();
                     AssertLoadedPlayerSessionIntegratedWorkflow();
                     AssertPlayerSessionCompositionIntegratedWorkflow();
+                    AssertPlayerSessionBootstrapIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
@@ -9423,6 +9424,301 @@ namespace Game.SmokeTests
             Assert(
                 FoundationVerticalSlice.Run().Events.Count == 38,
                 "Player-session composition workflow should preserve the legacy 38-event slice.");
+        }
+
+        private static void AssertPlayerSessionBootstrapIntegratedWorkflow()
+        {
+            var suppliedBindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var bootstrap = new PlayerSessionBootstrap(
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                suppliedBindingRegistry);
+            var secondBootstrap = BuildTestPlayerSessionBootstrap();
+            var composition = bootstrap.Composition;
+            var loadedSession = bootstrap.LoadedSession;
+            var runtimeState = bootstrap.RuntimeState;
+            var classProfile = runtimeState.ClassProfile;
+            var masteryProfile = runtimeState.MasteryProfile;
+            var classRegistry = runtimeState.ClassRegistry;
+            var skillRegistry = runtimeState.SkillRegistry;
+            var bindingRegistry = runtimeState.ClassSkillTreeBindingRegistry;
+            var skillTree = bindingRegistry.GetSkillTree(SkillTreeId.Tlamatini);
+
+            Assert(
+                composition != null
+                && object.ReferenceEquals(composition, bootstrap.Composition)
+                && object.ReferenceEquals(loadedSession, bootstrap.LoadedSession)
+                && object.ReferenceEquals(runtimeState, bootstrap.RuntimeState)
+                && object.ReferenceEquals(loadedSession, composition.LoadedSession)
+                && object.ReferenceEquals(runtimeState, composition.RuntimeState),
+                "Player-session bootstrap workflow should keep one composition, loaded session, and runtime state by reference.");
+
+            Assert(
+                object.ReferenceEquals(suppliedBindingRegistry, bindingRegistry)
+                && object.ReferenceEquals(
+                    bindingRegistry,
+                    bootstrap.Composition.ClassSkillTreeBindingRegistry)
+                && !object.ReferenceEquals(
+                    bindingRegistry,
+                    secondBootstrap.RuntimeState.ClassSkillTreeBindingRegistry),
+                "Player-session bootstrap workflow should keep mutable bindings session-scoped and separate between bootstraps.");
+
+            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+                BuildCompleteV4SnapshotWithBinding(
+                    ClassId.Tlamatini,
+                    SkillTreeId.Tlamatini),
+                runtimeState.ClassProfile,
+                runtimeState.MasteryProfile,
+                runtimeState.MentorRelationshipProfile,
+                runtimeState.SkillTreeProgressProfile,
+                runtimeState.ClassRegistry,
+                runtimeState.SkillRegistry,
+                runtimeState.MentorRegistry,
+                skillTree,
+                runtimeState.ClassSkillTreeBindingRegistry);
+
+            Assert(
+                restoreResult.FullyRestored
+                && object.ReferenceEquals(classProfile, runtimeState.ClassProfile)
+                && object.ReferenceEquals(masteryProfile, runtimeState.MasteryProfile)
+                && object.ReferenceEquals(classRegistry, runtimeState.ClassRegistry)
+                && object.ReferenceEquals(skillRegistry, runtimeState.SkillRegistry)
+                && object.ReferenceEquals(bindingRegistry, runtimeState.ClassSkillTreeBindingRegistry),
+                "Player-session bootstrap workflow should restore into the same live runtime-state profiles and registries.");
+
+            var firstRandom = new FixedRandomSource(0.0, 0.99);
+            TurnBasedCombatEngine firstEngine = bootstrap.CreateCombatEngine(
+                firstRandom,
+                new List<ICombatPassiveEffect>());
+            var firstPlayer = BuildCombatEntity(
+                "session_bootstrap_workflow_first_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var firstEnemy = BuildCombatEntity(
+                "session_bootstrap_workflow_first_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var firstDefinition = runtimeState.SkillRegistry.Get(
+                "skill_balance_ritual");
+            var firstSkill = new TrackingCombatSkill(firstDefinition.Id);
+            var firstProgress = new SkillProgress(firstDefinition);
+
+            firstEngine.ExecuteTurn(
+                BuildCombatRuntime(firstPlayer, firstEnemy),
+                TurnRequest.SkillAction(
+                    firstPlayer,
+                    firstEnemy,
+                    firstSkill,
+                    firstProgress));
+
+            Assert(
+                firstSkill.Applied
+                && firstProgress.Experience == 10,
+                "Player-session bootstrap workflow should allow a restored current-class skill through the first combat.");
+
+            runtimeState.MasteryProfile.IncreaseProgress(
+                "skill_deep_sight",
+                MasteryRecord.MasteredProgress
+                    - runtimeState.MasteryProfile.GetRecord(
+                        "skill_deep_sight").Progress,
+                runtimeState.SkillRegistry);
+            runtimeState.ClassProfile.ChangeClassId(
+                ClassId.Wanderer,
+                runtimeState.ClassRegistry);
+
+            Assert(
+                object.ReferenceEquals(runtimeState, bootstrap.RuntimeState)
+                && object.ReferenceEquals(classProfile, runtimeState.ClassProfile)
+                && object.ReferenceEquals(masteryProfile, runtimeState.MasteryProfile)
+                && runtimeState.MasteryProfile.IsMastered("skill_deep_sight")
+                && runtimeState.ClassProfile.CurrentClassId == ClassId.Wanderer,
+                "Player-session bootstrap workflow progression should mutate the same runtime state before later combats.");
+
+            var secondRandom = new FixedRandomSource(0.0, 0.99);
+            TurnBasedCombatEngine secondEngine = bootstrap.CreateCombatEngine(
+                secondRandom,
+                new List<ICombatPassiveEffect>());
+            var secondPlayer = BuildCombatEntity(
+                "session_bootstrap_workflow_second_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var secondEnemy = BuildCombatEntity(
+                "session_bootstrap_workflow_second_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var retainedDefinition = runtimeState.SkillRegistry.Get(
+                "skill_deep_sight");
+            var retainedSkill = new TrackingCombatSkill(
+                retainedDefinition.Id);
+
+            secondEngine.ExecuteTurn(
+                BuildCombatRuntime(secondPlayer, secondEnemy),
+                TurnRequest.SkillAction(
+                    secondPlayer,
+                    secondEnemy,
+                    retainedSkill,
+                    new SkillProgress(retainedDefinition)));
+
+            Assert(
+                retainedSkill.Applied,
+                "Player-session bootstrap workflow should let later combats observe mastered retained progression.");
+
+            var pipelineField = typeof(TurnBasedCombatEngine).GetField(
+                "pipeline",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+            var randomField = typeof(TurnBasedCombatEngine).GetField(
+                "random",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+            var validatorField = typeof(TurnBasedCombatEngine).GetField(
+                "skillTurnValidator",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+
+            Assert(
+                firstEngine != secondEngine
+                && pipelineField != null
+                && !object.ReferenceEquals(
+                    pipelineField.GetValue(firstEngine),
+                    pipelineField.GetValue(secondEngine))
+                && randomField != null
+                && object.ReferenceEquals(
+                    firstRandom,
+                    randomField.GetValue(firstEngine))
+                && object.ReferenceEquals(
+                    secondRandom,
+                    randomField.GetValue(secondEngine))
+                && validatorField != null
+                && validatorField.GetValue(firstEngine)
+                    is CombatSkillTurnValidatorGateway
+                && validatorField.GetValue(secondEngine)
+                    is CombatSkillTurnValidatorGateway,
+                "Player-session bootstrap workflow should create fresh progression-aware combat dependencies per combat.");
+
+            var thirdRandom = new FixedRandomSource(0.0, 0.99);
+            TurnBasedCombatEngine thirdEngine = bootstrap.CreateCombatEngine(
+                thirdRandom,
+                new List<ICombatPassiveEffect>());
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var blockedPlayer = BuildCombatEntity(
+                "session_bootstrap_workflow_blocked_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var blockedEnemy = BuildCombatEntity(
+                "session_bootstrap_workflow_blocked_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            int startingHealth = blockedEnemy.Stats.CurrentHealth;
+            var blockedRuntime = BuildCombatRuntime(
+                blockedPlayer,
+                blockedEnemy,
+                resonance);
+            var blockedDefinition = new SkillDefinition(
+                "skill_balance_ritual",
+                "Session Bootstrap Workflow Blocked",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                "",
+                2);
+            var blockedProgress = new SkillProgress(blockedDefinition);
+            var blockedSkill = new TrackingCombatSkill(blockedDefinition.Id);
+
+            thirdEngine.ExecuteTurn(
+                blockedRuntime,
+                TurnRequest.SkillAction(
+                    blockedPlayer,
+                    blockedEnemy,
+                    blockedSkill,
+                    blockedProgress));
+
+            Assert(
+                !blockedSkill.Applied
+                && CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.ActionBlocked) == 1
+                && blockedRuntime.TurnNumber == 2,
+                "Player-session bootstrap workflow should block non-mastered cross-class skills and consume the turn.");
+
+            Assert(
+                blockedPlayer.Resource.Current == 20
+                && resonance.Active.Current == 6
+                && resonance.Reserve.Current == 10
+                && CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.ResourceSpent) == 0,
+                "Player-session bootstrap workflow blocking should spend neither Essence nor Resonance.");
+
+            Assert(
+                blockedProgress.Experience == 0
+                && blockedEnemy.Stats.CurrentHealth == startingHealth
+                && CountEvents(
+                    blockedRuntime.EventLog,
+                    GameEventType.SkillUsed) == 0,
+                "Player-session bootstrap workflow blocking should grant no experience or skill effects.");
+
+            Assert(
+                pipelineField != null
+                && !object.ReferenceEquals(
+                    pipelineField.GetValue(secondEngine),
+                    pipelineField.GetValue(thirdEngine))
+                && randomField != null
+                && object.ReferenceEquals(
+                    thirdRandom,
+                    randomField.GetValue(thirdEngine))
+                && object.ReferenceEquals(composition, bootstrap.Composition)
+                && object.ReferenceEquals(loadedSession, bootstrap.LoadedSession)
+                && object.ReferenceEquals(runtimeState, bootstrap.RuntimeState)
+                && object.ReferenceEquals(classRegistry, runtimeState.ClassRegistry)
+                && object.ReferenceEquals(skillRegistry, runtimeState.SkillRegistry)
+                && object.ReferenceEquals(bindingRegistry, runtimeState.ClassSkillTreeBindingRegistry),
+                "Player-session bootstrap workflow should keep canonical registries and session state stable across repeated combat creation.");
+
+            Assert(
+                FoundationVerticalSlice.Run().Events.Count == 38,
+                "Player-session bootstrap workflow should preserve the legacy 38-event slice.");
         }
 
         private static void AssertSkillTreeProgressionIntegratedWorkflow()
