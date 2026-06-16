@@ -1366,6 +1366,51 @@ The workflow uses one `PlayerSessionComposition` and verifies:
 Full bootstrap migration remains deferred. The player-session composition path
 is ready for a focused audit before any broader call-site migration.
 
+## V5 Player Session Composition Audit
+
+The verified `PlayerSessionComposition` path is ready for a narrow bootstrap
+migration design/implementation step.
+
+Audit findings:
+
+- `PlayerSessionComposition` is right-sized as an application/session
+  composition boundary
+- it creates exactly one `LoadedPlayerSession` and exposes that same session by
+  reference
+- `RuntimeState` is the same `PlayerProgressionRuntimeState` owned by
+  `LoadedPlayerSession`
+- restore and progression mutate the live runtime-state profile instances
+- canonical class, skill, and mentor registries are supplied once and reused by
+  validation
+- `ClassSkillTreeBindingRegistry` remains session-scoped mutable state
+- repeated combat creation flows through
+  `PlayerSessionComposition.CreateCombatEngine` and then
+  `LoadedPlayerSession.CreateCombatEngine`
+- combat engines, passive pipelines, random sources, combat runtimes, entities,
+  and event logs remain per-combat
+- `FoundationVerticalSlice` remains unchanged as the legacy/pass-through path
+
+Risks carried into the next migration step:
+
+- a future bootstrap path can still accidentally call the legacy
+  `TurnBasedCombatEngine` constructor and bypass progression-aware validation
+- creating more than one `PlayerSessionComposition` for the same loaded player
+  can split restore, progression, and combat validation state
+- replacing runtime-state profile instances instead of mutating them can leave
+  validators stale
+- sharing a mutable `ClassSkillTreeBindingRegistry` across loaded players can
+  leak binding state between sessions
+- locally constructed skill definitions can diverge from the canonical
+  `SkillDefinitionRegistry`
+
+Earliest safe next atomic item:
+
+- add one narrow bootstrap/session entry point that creates or receives
+  canonical registries, creates one `PlayerSessionComposition`, restores
+  through `PlayerSessionComposition.RuntimeState`, and exposes combat creation
+  through `PlayerSessionComposition.CreateCombatEngine` while leaving
+  `FoundationVerticalSlice` unchanged.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
