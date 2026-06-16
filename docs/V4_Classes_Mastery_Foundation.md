@@ -1128,6 +1128,60 @@ Earliest safe V5 implementation branch:
   state across restore/progression and combat creation while the legacy
   foundation slice still emits 38 events
 
+## V5 Loaded-Session Foundation
+
+`Game.Application.Runtime.LoadedPlayerSession` is the first V5
+loaded-session boundary.
+
+It is constructed with canonical registries:
+
+- `ClassDefinitionRegistry`
+- `SkillDefinitionRegistry`
+- `MentorDefinitionRegistry`
+- `ClassSkillTreeBindingRegistry`
+
+The session creates exactly one `PlayerProgressionRuntimeState` from those
+registries and exposes it through `RuntimeState` for restore and progression.
+Repeated access returns the same runtime-state instance. The class-skill-tree
+binding registry is supplied to that runtime state once and remains scoped to
+the loaded session.
+
+Combat creation is explicit:
+
+```csharp
+TurnBasedCombatEngine CreateCombatEngine(
+    IRandomSource random,
+    IReadOnlyList<ICombatPassiveEffect> passives);
+```
+
+Each call delegates to `ProgressionAwareCombatEngineFactory` and creates a
+fresh combat engine with fresh per-combat passive pipeline/random inputs.
+Combat entities, `CombatRuntimeContext`, resonance, turn order, and engine
+instances remain outside the loaded session.
+
+This is not a full bootstrap migration. `FoundationVerticalSlice` remains the
+legacy V1 pass-through path and still constructs combat through the old
+two-argument `TurnBasedCombatEngine` constructor.
+
+Loaded-session smoke coverage verifies:
+
+- one session owns one stable `PlayerProgressionRuntimeState`
+- repeated access returns the same runtime state
+- restore and progression mutate that same runtime state
+- canonical registries are passed by reference and not rebuilt per combat
+- repeated combat engine creation uses the same runtime state
+- each combat engine receives fresh per-combat dependencies
+- current-class and mastered retained player skills pass
+- non-mastered cross-class skills block with one `ActionBlocked`
+- blocked actions consume the turn, spend no Essence or Resonance, grant no
+  experience, and execute no skill effects
+- `FoundationVerticalSlice` remains 38-event compatible
+
+The next atomic item should be dedicated loaded-session workflow verification:
+restore into a `LoadedPlayerSession`, perform progression mutations, create
+multiple combats through the session, and verify save/restore and validation
+read the same live state without migrating production bootstrap call sites.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
@@ -1431,8 +1485,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `425`
-- Total smoke assertions executed: `807`
+- V4 Classes / Mentors / Mastery assertions: `435`
+- Total smoke assertions executed: `817`
 
 ## Validation
 
