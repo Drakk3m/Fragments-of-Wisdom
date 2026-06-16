@@ -1244,6 +1244,54 @@ Earliest safe next atomic item:
   `LoadedPlayerSession.CreateCombatEngine` while leaving
   `FoundationVerticalSlice` unchanged.
 
+## V5 Bootstrap Migration Design Audit
+
+The smallest safe bootstrap boundary is one loaded player/session owner that
+creates or receives canonical content registries, creates exactly one
+`LoadedPlayerSession`, exposes `LoadedPlayerSession.RuntimeState` to restore and
+progression flows, and routes progression-aware combat creation through
+`LoadedPlayerSession.CreateCombatEngine`.
+
+Ownership and lifetime decisions:
+
+- bootstrap should own the session lifetime and either receive already-built
+  application-content registries or build them once before creating the session
+- class, skill, mentor, and skill-tree definition registries are
+  application-content scoped and must not be rebuilt per combat
+- `ClassSkillTreeBindingRegistry` is mutable player/session state and should be
+  supplied to exactly one `LoadedPlayerSession` for the loaded player
+- `LoadedPlayerSession` owns exactly one `PlayerProgressionRuntimeState` for the
+  loaded session
+- restore and progression should mutate the live profiles exposed by
+  `LoadedPlayerSession.RuntimeState`; they should not replace profile instances
+- combat creation should call `LoadedPlayerSession.CreateCombatEngine`, passing
+  fresh per-combat random sources and passive collections
+- `FoundationVerticalSlice` remains the legacy/pass-through compatibility path
+  and should not be migrated as part of the first bootstrap implementation
+
+Design risks to address in implementation:
+
+- accidental legacy engine construction in the V5 path can bypass progression
+  validation
+- creating more than one `LoadedPlayerSession` or
+  `PlayerProgressionRuntimeState` for a loaded player can split restore,
+  progression, and validation state
+- replacing runtime-state profile instances after a validator has been created
+  can leave stale validation dependencies
+- sharing one mutable `ClassSkillTreeBindingRegistry` across players can leak
+  binding state between sessions
+- constructing local combat skill definitions outside the canonical
+  `SkillDefinitionRegistry` can diverge from validation facts
+
+Recommended first implementation branch:
+
+- add one explicit bootstrap/session composition entry point that creates or
+  receives canonical registries, creates one `LoadedPlayerSession`, restores
+  through `LoadedPlayerSession.RuntimeState`, and exposes combat creation only
+  through `LoadedPlayerSession.CreateCombatEngine`
+- keep `FoundationVerticalSlice` and existing legacy constructors unchanged
+- follow immediately with workflow verification before broad call-site migration
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
