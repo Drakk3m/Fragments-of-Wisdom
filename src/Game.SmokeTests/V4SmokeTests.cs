@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json;
+using Game.Application.Bootstrap;
 using Game.Application.Integration;
 using Game.Application.Runtime;
 using Game.Domain.Classes;
@@ -317,6 +318,12 @@ namespace Game.SmokeTests
                 "V5 loaded session foundation assertions",
                 delegate
                 {
+                    AssertPlayerSessionBootstrapCreatesOneComposition();
+                    AssertPlayerSessionBootstrapKeepsBindingRegistrySessionScoped();
+                    AssertPlayerSessionBootstrapRestoresProgressesAndCreatesCombat();
+                    AssertPlayerSessionBootstrapAllowsMasteredRetainedSkill();
+                    AssertPlayerSessionBootstrapBlocksCrossClassSkillSafely();
+                    AssertPlayerSessionBootstrapPreservesLegacySlice();
                     AssertPlayerSessionCompositionCreatesOneLoadedSession();
                     AssertPlayerSessionCompositionKeepsBindingRegistrySessionScoped();
                     AssertPlayerSessionCompositionRestoreAndProgressionMutateRuntimeState();
@@ -3810,6 +3817,354 @@ namespace Game.SmokeTests
                 "Application-owned V4 combat creation should leave the legacy slice pass-through unchanged.");
         }
 
+        private static void AssertPlayerSessionBootstrapCreatesOneComposition()
+        {
+            var bootstrap = BuildTestPlayerSessionBootstrap();
+            var composition = bootstrap.Composition;
+            var loadedSession = bootstrap.LoadedSession;
+            var runtimeState = bootstrap.RuntimeState;
+
+            Assert(
+                composition != null
+                && object.ReferenceEquals(composition, bootstrap.Composition),
+                "Player session bootstrap should expose one stable player session composition.");
+
+            Assert(
+                loadedSession != null
+                && object.ReferenceEquals(loadedSession, bootstrap.LoadedSession)
+                && object.ReferenceEquals(
+                    loadedSession,
+                    composition.LoadedSession),
+                "Player session bootstrap should expose the composition's one loaded session.");
+
+            Assert(
+                runtimeState != null
+                && object.ReferenceEquals(runtimeState, bootstrap.RuntimeState)
+                && object.ReferenceEquals(runtimeState, composition.RuntimeState),
+                "Player session bootstrap should expose the composition's one runtime state.");
+        }
+
+        private static void AssertPlayerSessionBootstrapKeepsBindingRegistrySessionScoped()
+        {
+            var firstBindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var secondBindingRegistry = BuildTestClassSkillTreeBindingRegistry();
+            var firstBootstrap = new PlayerSessionBootstrap(
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                firstBindingRegistry);
+            var secondBootstrap = new PlayerSessionBootstrap(
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                secondBindingRegistry);
+
+            Assert(
+                object.ReferenceEquals(
+                    firstBindingRegistry,
+                    firstBootstrap.RuntimeState.ClassSkillTreeBindingRegistry)
+                && object.ReferenceEquals(
+                    firstBindingRegistry,
+                    firstBootstrap.Composition.ClassSkillTreeBindingRegistry)
+                && !object.ReferenceEquals(
+                    firstBootstrap.RuntimeState.ClassSkillTreeBindingRegistry,
+                    secondBootstrap.RuntimeState.ClassSkillTreeBindingRegistry),
+                "Player session bootstrap should keep mutable bindings scoped to one loaded player session.");
+
+            Assert(
+                object.ReferenceEquals(
+                    firstBootstrap.Composition.ClassRegistry,
+                    firstBootstrap.RuntimeState.ClassRegistry)
+                && object.ReferenceEquals(
+                    firstBootstrap.Composition.SkillRegistry,
+                    firstBootstrap.RuntimeState.SkillRegistry)
+                && object.ReferenceEquals(
+                    firstBootstrap.Composition.MentorRegistry,
+                    firstBootstrap.RuntimeState.MentorRegistry),
+                "Player session bootstrap should reuse canonical registries through its composition.");
+        }
+
+        private static void AssertPlayerSessionBootstrapRestoresProgressesAndCreatesCombat()
+        {
+            var bootstrap = BuildTestPlayerSessionBootstrap();
+            var runtimeState = bootstrap.RuntimeState;
+            var classProfile = runtimeState.ClassProfile;
+            var masteryProfile = runtimeState.MasteryProfile;
+            var skillTree = runtimeState.ClassSkillTreeBindingRegistry.GetSkillTree(
+                SkillTreeId.Tlamatini);
+            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+                BuildCompleteV4SnapshotWithBinding(
+                    ClassId.Tlamatini,
+                    SkillTreeId.Tlamatini),
+                runtimeState.ClassProfile,
+                runtimeState.MasteryProfile,
+                runtimeState.MentorRelationshipProfile,
+                runtimeState.SkillTreeProgressProfile,
+                runtimeState.ClassRegistry,
+                runtimeState.SkillRegistry,
+                runtimeState.MentorRegistry,
+                skillTree,
+                runtimeState.ClassSkillTreeBindingRegistry);
+            var firstRandom = new FixedRandomSource(0.0, 0.99);
+            var secondRandom = new FixedRandomSource(0.0, 0.99);
+            var firstEngine = bootstrap.CreateCombatEngine(
+                firstRandom,
+                new List<ICombatPassiveEffect>());
+            var secondEngine = bootstrap.CreateCombatEngine(
+                secondRandom,
+                new List<ICombatPassiveEffect>());
+            var pipelineField = typeof(TurnBasedCombatEngine).GetField(
+                "pipeline",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+            var randomField = typeof(TurnBasedCombatEngine).GetField(
+                "random",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+            var validatorField = typeof(TurnBasedCombatEngine).GetField(
+                "skillTurnValidator",
+                System.Reflection.BindingFlags.Instance
+                | System.Reflection.BindingFlags.NonPublic);
+            var firstPlayer = BuildCombatEntity(
+                "session_bootstrap_allowed_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var firstEnemy = BuildCombatEntity(
+                "session_bootstrap_allowed_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var firstDefinition = runtimeState.SkillRegistry.Get(
+                "skill_balance_ritual");
+            var firstSkill = new TrackingCombatSkill(firstDefinition.Id);
+
+            firstEngine.ExecuteTurn(
+                BuildCombatRuntime(firstPlayer, firstEnemy),
+                TurnRequest.SkillAction(
+                    firstPlayer,
+                    firstEnemy,
+                    firstSkill,
+                    new SkillProgress(firstDefinition)));
+
+            runtimeState.MasteryProfile.IncreaseProgress(
+                "skill_deep_sight",
+                MasteryRecord.MasteredProgress
+                    - runtimeState.MasteryProfile.GetRecord(
+                        "skill_deep_sight").Progress,
+                runtimeState.SkillRegistry);
+            runtimeState.ClassProfile.ChangeClassId(
+                ClassId.Wanderer,
+                runtimeState.ClassRegistry);
+            var secondPlayer = BuildCombatEntity(
+                "session_bootstrap_retained_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var secondEnemy = BuildCombatEntity(
+                "session_bootstrap_retained_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var retainedDefinition = runtimeState.SkillRegistry.Get(
+                "skill_deep_sight");
+            var retainedSkill = new TrackingCombatSkill(retainedDefinition.Id);
+
+            secondEngine.ExecuteTurn(
+                BuildCombatRuntime(secondPlayer, secondEnemy),
+                TurnRequest.SkillAction(
+                    secondPlayer,
+                    secondEnemy,
+                    retainedSkill,
+                    new SkillProgress(retainedDefinition)));
+
+            Assert(
+                restoreResult.FullyRestored
+                && firstSkill.Applied
+                && retainedSkill.Applied
+                && object.ReferenceEquals(classProfile, runtimeState.ClassProfile)
+                && object.ReferenceEquals(masteryProfile, runtimeState.MasteryProfile),
+                "Player session bootstrap should restore and progress through the same runtime state used by combat.");
+
+            Assert(
+                firstEngine != secondEngine
+                && pipelineField != null
+                && !object.ReferenceEquals(
+                    pipelineField.GetValue(firstEngine),
+                    pipelineField.GetValue(secondEngine))
+                && randomField != null
+                && object.ReferenceEquals(
+                    firstRandom,
+                    randomField.GetValue(firstEngine))
+                && object.ReferenceEquals(
+                    secondRandom,
+                    randomField.GetValue(secondEngine))
+                && validatorField != null
+                && validatorField.GetValue(firstEngine)
+                    is CombatSkillTurnValidatorGateway,
+                "Player session bootstrap should create progression-aware combat through PlayerSessionComposition.");
+        }
+
+        private static void AssertPlayerSessionBootstrapAllowsMasteredRetainedSkill()
+        {
+            var bootstrap = BuildTestPlayerSessionBootstrap();
+            var runtimeState = bootstrap.RuntimeState;
+            runtimeState.ClassProfile.AssignClassId(
+                ClassId.Tlamatini,
+                runtimeState.ClassRegistry);
+            runtimeState.MasteryProfile.IncreaseProgress(
+                "skill_deep_sight",
+                MasteryRecord.MasteredProgress,
+                runtimeState.SkillRegistry);
+            runtimeState.ClassProfile.ChangeClassId(
+                ClassId.Wanderer,
+                runtimeState.ClassRegistry);
+            var player = BuildCombatEntity(
+                "session_bootstrap_mastered_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "session_bootstrap_mastered_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            var definition = runtimeState.SkillRegistry.Get("skill_deep_sight");
+            var skill = new TrackingCombatSkill(definition.Id);
+
+            bootstrap.CreateCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                new List<ICombatPassiveEffect>()).ExecuteTurn(
+                    BuildCombatRuntime(player, enemy),
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        new SkillProgress(definition)));
+
+            Assert(
+                skill.Applied,
+                "Player session bootstrap should allow mastered retained skills after progression mutation.");
+        }
+
+        private static void AssertPlayerSessionBootstrapBlocksCrossClassSkillSafely()
+        {
+            var bootstrap = BuildTestPlayerSessionBootstrap();
+            var runtimeState = bootstrap.RuntimeState;
+            runtimeState.ClassProfile.AssignClassId(
+                ClassId.Wanderer,
+                runtimeState.ClassRegistry);
+            var resonance = new ResonanceProfile(
+                new ActiveResonance(6),
+                new ResonanceReserve(10));
+            var player = BuildCombatEntity(
+                "session_bootstrap_blocked_player",
+                10,
+                5,
+                100,
+                0,
+                0,
+                0,
+                2f,
+                20);
+            var enemy = BuildCombatEntity(
+                "session_bootstrap_blocked_enemy",
+                5,
+                5,
+                100,
+                0,
+                0,
+                0,
+                1f,
+                10);
+            int startingHealth = enemy.Stats.CurrentHealth;
+            var runtime = BuildCombatRuntime(player, enemy, resonance);
+            var definition = new SkillDefinition(
+                "skill_balance_ritual",
+                "Session Bootstrap Blocked",
+                3,
+                new SkillCost(10, 0),
+                SkillCategory.Combat,
+                SkillTargeting.SingleEnemy,
+                SkillEffectType.Damage,
+                "",
+                2);
+            var progress = new SkillProgress(definition);
+            var skill = new TrackingCombatSkill(definition.Id);
+
+            bootstrap.CreateCombatEngine(
+                new FixedRandomSource(0.0, 0.99),
+                new List<ICombatPassiveEffect>()).ExecuteTurn(
+                    runtime,
+                    TurnRequest.SkillAction(
+                        player,
+                        enemy,
+                        skill,
+                        progress));
+
+            Assert(
+                !skill.Applied
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ActionBlocked) == 1
+                && runtime.TurnNumber == 2,
+                "Player session bootstrap should block non-mastered cross-class skills and consume the turn.");
+
+            Assert(
+                player.Resource.Current == 20
+                && resonance.Active.Current == 6
+                && resonance.Reserve.Current == 10
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.ResourceSpent) == 0,
+                "Player session bootstrap blocked validation should spend neither Essence nor Resonance.");
+
+            Assert(
+                progress.Experience == 0
+                && enemy.Stats.CurrentHealth == startingHealth
+                && CountEvents(
+                    runtime.EventLog,
+                    GameEventType.SkillUsed) == 0,
+                "Player session bootstrap blocked validation should grant no experience or skill effects.");
+        }
+
+        private static void AssertPlayerSessionBootstrapPreservesLegacySlice()
+        {
+            Assert(
+                FoundationVerticalSlice.Run().Events.Count == 38,
+                "Player session bootstrap should preserve the legacy 38-event slice.");
+        }
+
         private static void AssertPlayerSessionCompositionCreatesOneLoadedSession()
         {
             var composition = BuildTestPlayerSessionComposition();
@@ -4640,6 +4995,15 @@ namespace Game.SmokeTests
         private static PlayerSessionComposition BuildTestPlayerSessionComposition()
         {
             return new PlayerSessionComposition(
+                BuildTestClassRegistry(),
+                BuildTestSkillRegistry(),
+                BuildTestMentorRegistry(),
+                BuildTestClassSkillTreeBindingRegistry());
+        }
+
+        private static PlayerSessionBootstrap BuildTestPlayerSessionBootstrap()
+        {
+            return new PlayerSessionBootstrap(
                 BuildTestClassRegistry(),
                 BuildTestSkillRegistry(),
                 BuildTestMentorRegistry(),
