@@ -1526,6 +1526,52 @@ Earliest safe next atomic item:
   `PlayerSessionBootstrap.CreateCombatEngine`, while leaving
   `FoundationVerticalSlice` unchanged.
 
+## V5 Runtime Demo Bootstrap Flow
+
+`Game.Application.Bootstrap.V5RuntimeDemoBootstrap` is the first explicit V5
+runtime/demo bootstrap flow. It is a narrow path, not a full bootstrap
+migration.
+
+It receives canonical registries:
+
+- `ClassDefinitionRegistry`
+- `SkillDefinitionRegistry`
+- `MentorDefinitionRegistry`
+
+It also receives, or creates for an empty demo session, one session-scoped
+`ClassSkillTreeBindingRegistry`.
+
+The flow creates exactly one `PlayerSessionBootstrap` and exposes:
+
+```csharp
+PlayerSessionBootstrap SessionBootstrap
+PlayerSessionComposition Composition
+LoadedPlayerSession LoadedSession
+PlayerProgressionRuntimeState RuntimeState
+TurnBasedCombatEngine CreateCombatEngine(
+    IRandomSource random,
+    IReadOnlyList<ICombatPassiveEffect> passives)
+```
+
+Restore and progression should use `RuntimeState`, which is the same live state
+owned by `SessionBootstrap`. Combat creation delegates to
+`PlayerSessionBootstrap.CreateCombatEngine`; the demo flow does not own or
+directly construct `TurnBasedCombatEngine`.
+
+Ownership boundaries:
+
+- one `V5RuntimeDemoBootstrap` owns one `PlayerSessionBootstrap`
+- canonical definition registries are supplied once and reused
+- class-skill-tree bindings remain mutable session state
+- `PlayerSessionBootstrap`, `PlayerSessionComposition`,
+  `LoadedPlayerSession`, and `PlayerProgressionRuntimeState` are created once
+  per demo flow
+- combat engines, passive pipelines, random sources, combat entities, combat
+  runtimes, and event logs remain per-combat
+
+`FoundationVerticalSlice` remains the V1 legacy/pass-through path. Dedicated
+workflow verification should follow before broader bootstrap migration.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
