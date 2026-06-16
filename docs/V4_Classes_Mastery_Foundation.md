@@ -1483,6 +1483,49 @@ The workflow uses one `PlayerSessionBootstrap` and verifies:
 Full bootstrap migration remains deferred. The player-session bootstrap path is
 ready for a focused audit before any broader call-site migration.
 
+## V5 Player Session Bootstrap Audit
+
+The verified `PlayerSessionBootstrap` path is ready for the first narrow real
+bootstrap migration step.
+
+Audit findings:
+
+- `PlayerSessionBootstrap` is right-sized as a thin loaded-session bootstrap
+  owner
+- it owns exactly one `PlayerSessionComposition`
+- `Composition`, `LoadedSession`, and `RuntimeState` remain stable by reference
+- canonical class, skill, and mentor registries are supplied once through the
+  composition path
+- `ClassSkillTreeBindingRegistry` remains session-scoped mutable state
+- separate bootstrap instances do not share mutable binding registries
+- restore and progression mutate the live runtime-state profile instances
+- combat creation flows through `PlayerSessionBootstrap.CreateCombatEngine`,
+  then `PlayerSessionComposition.CreateCombatEngine`
+- combat engines, passive pipelines, random sources, combat runtimes, entities,
+  and event logs remain per-combat
+- `FoundationVerticalSlice` remains unchanged as the legacy/pass-through path
+
+Risks carried into the next migration step:
+
+- a future runtime path can still bypass progression-aware validation by
+  directly constructing `TurnBasedCombatEngine`
+- creating more than one `PlayerSessionBootstrap` for the same loaded player can
+  split restore, progression, and combat validation state
+- replacing runtime-state profile instances instead of mutating them can stale
+  validators created before replacement
+- sharing mutable binding registries across loaded players can leak class/tree
+  binding state
+- local combat skill definitions can diverge from the canonical
+  `SkillDefinitionRegistry`
+
+Earliest safe next atomic item:
+
+- add one explicit V5 runtime/demo bootstrap flow that creates or receives
+  canonical registries, creates one `PlayerSessionBootstrap`, restores through
+  `PlayerSessionBootstrap.RuntimeState`, and creates combat only through
+  `PlayerSessionBootstrap.CreateCombatEngine`, while leaving
+  `FoundationVerticalSlice` unchanged.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
