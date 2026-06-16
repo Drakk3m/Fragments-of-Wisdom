@@ -1177,10 +1177,24 @@ Loaded-session smoke coverage verifies:
   experience, and execute no skill effects
 - `FoundationVerticalSlice` remains 38-event compatible
 
-The next atomic item should be dedicated loaded-session workflow verification:
-restore into a `LoadedPlayerSession`, perform progression mutations, create
-multiple combats through the session, and verify save/restore and validation
-read the same live state without migrating production bootstrap call sites.
+Dedicated loaded-session workflow verification now proves:
+
+- one `LoadedPlayerSession` reuses the same `RuntimeState` across restore,
+  progression, and repeated combat creation
+- restore mutates the runtime state's live profiles
+- mastery progression before a later combat is observed by later validation
+- multiple `CreateCombatEngine` calls produce fresh per-combat engines,
+  passive pipelines, and random sources
+- canonical class and skill registries stay stable by reference across the
+  workflow
+- current-class skills and mastered retained skills pass
+- non-mastered cross-class skills block with one `ActionBlocked`
+- blocked actions consume the turn, spend no Essence or Resonance, grant no
+  experience, and execute no skill effects
+- `FoundationVerticalSlice` remains 38-event compatible
+
+The loaded-session foundation is ready for an audit/design pass before any
+production bootstrap migration. Full bootstrap migration remains deferred.
 
 Validation rules:
 
@@ -1286,6 +1300,7 @@ V4 smoke tests include integrated workflow coverage for:
 - combat skill validation orchestration across class switching and failures
 - runtime-state restore/progression through combat validation composition
 - application-owned repeated combat creation from one loaded runtime state
+- loaded-session restore/progression through repeated session-created combats
 - skill tree progression
 - class-specific skill tree binding
 - class skill tree binding snapshot, JSON round-trip, and restore
@@ -1485,8 +1500,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `435`
-- Total smoke assertions executed: `817`
+- V4 Classes / Mentors / Mastery assertions: `445`
+- Total smoke assertions executed: `827`
 
 ## Validation
 
