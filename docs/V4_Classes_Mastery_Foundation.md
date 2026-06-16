@@ -1455,6 +1455,34 @@ This is controlled migration, not full bootstrap replacement.
 unchanged/pass-through. Dedicated workflow verification should follow before
 broader call-site migration.
 
+## V5 Player Session Bootstrap Workflow Verification
+
+Dedicated workflow verification now proves the `PlayerSessionBootstrap` path
+before broader bootstrap migration.
+
+The workflow uses one `PlayerSessionBootstrap` and verifies:
+
+- one stable `PlayerSessionComposition`
+- one stable `LoadedPlayerSession`
+- one stable `PlayerProgressionRuntimeState`
+- restore mutates the same live runtime-state profiles exposed by the bootstrap
+- progression and mastery mutation affect later combat validation
+- repeated `CreateCombatEngine` calls use the same session state
+- combat engines, passive pipelines, random sources, combat runtimes, and event
+  logs remain per-combat
+- canonical class and skill registries remain stable by reference
+- mutable class-skill-tree bindings are session-scoped and not global
+- separate bootstrap instances do not share mutable binding registries
+- restored current-class skills pass validation
+- mastered retained skills pass after progression mutation
+- non-mastered cross-class skills block with one `ActionBlocked`
+- blocked actions consume the turn, spend no Essence or Resonance, grant no
+  experience, and execute no skill effects
+- `FoundationVerticalSlice` remains V1-compatible at 38 events
+
+Full bootstrap migration remains deferred. The player-session bootstrap path is
+ready for a focused audit before any broader call-site migration.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
