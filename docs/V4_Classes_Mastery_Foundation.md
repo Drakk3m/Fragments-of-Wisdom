@@ -1196,6 +1196,54 @@ Dedicated loaded-session workflow verification now proves:
 The loaded-session foundation is ready for an audit/design pass before any
 production bootstrap migration. Full bootstrap migration remains deferred.
 
+## V5 Loaded-Session Foundation Audit
+
+The loaded-session foundation is complete enough to proceed to full bootstrap
+migration design.
+
+Audit findings:
+
+- `LoadedPlayerSession` owns exactly one `PlayerProgressionRuntimeState`
+  and exposes it for restore/progression
+- canonical class, skill, and mentor registries are supplied once to the
+  session runtime state
+- mutable class-skill-tree bindings are scoped to the loaded session through
+  the supplied `ClassSkillTreeBindingRegistry`
+- combat engines, passive pipelines, random sources, runtime contexts,
+  entities, turn order, and resonance remain per-combat
+- `ProgressionAwareCombatEngineFactory` usage is clean and keeps progression
+  dependency graphs out of `TurnBasedCombatEngine`
+- repeated workflow coverage verifies live profile mutation, registry identity,
+  fresh per-combat dependencies, blocked-action semantics, and V1 compatibility
+
+Risks carried into bootstrap design:
+
+- a future bootstrap owner can still create duplicate loaded sessions or
+  runtime states unless ownership is centralized
+- replacing runtime-state profile instances after engine creation could leave
+  stale validators
+- direct legacy engine construction can still bypass progression-aware
+  validation outside the loaded-session path
+- locally constructed combat skill definitions can diverge from the canonical
+  `SkillDefinitionRegistry`
+
+Test and documentation naming:
+
+- V5 loaded-session coverage currently lives under `V4SmokeTests` and
+  `V4_Classes_Mastery_Foundation.md`
+- this is acceptable to defer because the project still reports one combined
+  V4/V5 foundation smoke group and renaming test/doc containers would be a
+  broad organizational change
+- no rename is required before bootstrap migration design
+
+Earliest safe next atomic item:
+
+- add a bootstrap migration design audit for one loaded-session path that
+  creates or receives canonical registries, owns one `LoadedPlayerSession`,
+  restores/progresses through its runtime state, and creates combat through
+  `LoadedPlayerSession.CreateCombatEngine` while leaving
+  `FoundationVerticalSlice` unchanged.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
