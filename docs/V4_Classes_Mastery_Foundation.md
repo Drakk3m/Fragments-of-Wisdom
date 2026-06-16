@@ -1411,6 +1411,50 @@ Earliest safe next atomic item:
   through `PlayerSessionComposition.CreateCombatEngine` while leaving
   `FoundationVerticalSlice` unchanged.
 
+## V5 Narrow Bootstrap Session Entry Point
+
+`Game.Application.Bootstrap.PlayerSessionBootstrap` is the first narrow
+bootstrap/session entry point for one loaded player/session.
+
+It receives canonical registries:
+
+- `ClassDefinitionRegistry`
+- `SkillDefinitionRegistry`
+- `MentorDefinitionRegistry`
+
+It also receives, or creates for an empty session, one session-scoped
+`ClassSkillTreeBindingRegistry`.
+
+The bootstrap creates exactly one `PlayerSessionComposition` and exposes:
+
+```csharp
+PlayerSessionComposition Composition
+LoadedPlayerSession LoadedSession
+PlayerProgressionRuntimeState RuntimeState
+TurnBasedCombatEngine CreateCombatEngine(
+    IRandomSource random,
+    IReadOnlyList<ICombatPassiveEffect> passives)
+```
+
+`RuntimeState` is the same live state owned by the composition's
+`LoadedPlayerSession`. Restore and progression flows should mutate that state.
+Combat creation delegates to `PlayerSessionComposition.CreateCombatEngine`.
+
+Ownership boundaries:
+
+- `PlayerSessionBootstrap` is one loaded-session bootstrap owner
+- canonical definition registries are supplied once and reused
+- class-skill-tree bindings remain mutable session state
+- `PlayerSessionComposition`, `LoadedPlayerSession`, and
+  `PlayerProgressionRuntimeState` are created once per bootstrap
+- combat engines, passive pipelines, random sources, combat entities, combat
+  runtimes, and event logs remain per-combat
+
+This is controlled migration, not full bootstrap replacement.
+`FoundationVerticalSlice` and existing legacy engine construction remain
+unchanged/pass-through. Dedicated workflow verification should follow before
+broader call-site migration.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
