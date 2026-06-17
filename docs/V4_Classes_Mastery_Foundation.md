@@ -1526,9 +1526,9 @@ Earliest safe next atomic item:
   `PlayerSessionBootstrap.CreateCombatEngine`, while leaving
   `FoundationVerticalSlice` unchanged.
 
-## V5 Runtime Demo Bootstrap Flow
+## Progression Runtime Demo Bootstrap Flow
 
-`Game.Application.Bootstrap.V5RuntimeDemoBootstrap` is the first explicit V5
+`Game.Application.Bootstrap.ProgressionRuntimeDemoBootstrap` is the first explicit
 runtime/demo bootstrap flow. It is a narrow path, not a full bootstrap
 migration.
 
@@ -1560,7 +1560,7 @@ directly construct `TurnBasedCombatEngine`.
 
 Ownership boundaries:
 
-- one `V5RuntimeDemoBootstrap` owns one `PlayerSessionBootstrap`
+- one `ProgressionRuntimeDemoBootstrap` owns one `PlayerSessionBootstrap`
 - canonical definition registries are supplied once and reused
 - class-skill-tree bindings remain mutable session state
 - `PlayerSessionBootstrap`, `PlayerSessionComposition`,
@@ -1572,12 +1572,12 @@ Ownership boundaries:
 `FoundationVerticalSlice` remains the V1 legacy/pass-through path. Dedicated
 workflow verification should follow before broader bootstrap migration.
 
-## V5 Runtime Demo Bootstrap Workflow Verification
+## Progression Runtime Demo Bootstrap Workflow Verification
 
-Dedicated workflow verification now proves the `V5RuntimeDemoBootstrap` path
+Dedicated workflow verification now proves the `ProgressionRuntimeDemoBootstrap` path
 before broader bootstrap migration.
 
-The workflow uses one `V5RuntimeDemoBootstrap` and verifies:
+The workflow uses one `ProgressionRuntimeDemoBootstrap` and verifies:
 
 - one stable `PlayerSessionBootstrap`
 - one stable `PlayerSessionComposition`
@@ -1601,19 +1601,20 @@ The workflow uses one `V5RuntimeDemoBootstrap` and verifies:
   experience, and execute no skill effects
 - `FoundationVerticalSlice` remains V1-compatible at 38 events
 
-Broader bootstrap migration remains deferred. The V5 runtime demo bootstrap
-path is ready for a focused audit before any broader call-site migration.
+Broader bootstrap migration remains deferred. The progression runtime demo
+bootstrap path is ready for a focused audit before any broader call-site
+migration.
 
-## V5 Runtime Demo Bootstrap Audit
+## Progression Runtime Demo Bootstrap Audit
 
-The verified `V5RuntimeDemoBootstrap` path is ready for visual smoke demo
-design. It is also complete enough to close the V5 bootstrap foundation after
+The verified `ProgressionRuntimeDemoBootstrap` path is ready for visual smoke
+demo design. It is also complete enough to close the bootstrap foundation after
 this audit, with broader bootstrap migration carried forward as later
 application work.
 
 Audit findings:
 
-- `V5RuntimeDemoBootstrap` is thin enough to remain a demo/runtime path
+- `ProgressionRuntimeDemoBootstrap` is thin enough to remain a demo/runtime path
 - it owns exactly one `PlayerSessionBootstrap` and does not duplicate
   `PlayerSessionBootstrap` internals
 - `SessionBootstrap`, `Composition`, `LoadedSession`, and `RuntimeState` remain
@@ -1622,7 +1623,7 @@ Audit findings:
 - `ClassSkillTreeBindingRegistry` remains session-scoped mutable state
 - separate demo bootstrap instances do not share mutable binding registries
 - restore and progression mutate the live runtime-state profile instances
-- combat creation flows through `V5RuntimeDemoBootstrap.CreateCombatEngine`,
+- combat creation flows through `ProgressionRuntimeDemoBootstrap.CreateCombatEngine`,
   then `PlayerSessionBootstrap.CreateCombatEngine`
 - the demo path does not own or expose direct `TurnBasedCombatEngine`
   construction
@@ -1645,7 +1646,7 @@ Risks carried forward:
 
 Earliest safe next atomic item:
 
-- add a visual smoke demo design audit that uses `V5RuntimeDemoBootstrap` as the
+- add a visual smoke demo design audit that uses `ProgressionRuntimeDemoBootstrap` as the
   backend entry point, keeps `FoundationVerticalSlice` legacy, and defines the
   minimum non-Unity or Unity-adapter-facing presentation contract without
   implementing visual demo behavior yet.

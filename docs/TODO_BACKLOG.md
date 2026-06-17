@@ -28,13 +28,13 @@ This is the living backlog for the current foundation track. It should reflect w
 - `LoadedPlayerSession` owns one runtime state and creates progression-aware combat engines.
 - `PlayerSessionComposition` owns one loaded session and exposes stable runtime state and combat creation.
 - `PlayerSessionBootstrap` provides the narrow session bootstrap boundary.
-- `V5RuntimeDemoBootstrap` provides the current runtime demo bootstrap path and is pending neutral rename before visual work.
+- `ProgressionRuntimeDemoBootstrap` provides the current runtime demo bootstrap path.
+- The active runtime/demo bootstrap API rename from `V5RuntimeDemoBootstrap` to `ProgressionRuntimeDemoBootstrap` is complete.
 
 ## Current Atomic Track
 
 The current track is naming cleanup before visual smoke demo design.
 
-- Rename `V5RuntimeDemoBootstrap` to `ProgressionRuntimeDemoBootstrap`.
 - Rename or split the active progression smoke test suite currently grouped under `V4SmokeTests`.
 - Rename active progression foundation documentation currently grouped under V4 naming.
 - Rename progress restore APIs currently prefixed with `V4`.
@@ -43,33 +43,28 @@ The current track is naming cleanup before visual smoke demo design.
 
 ## Immediate Next Branches
 
-1. `codex/rename-runtime-demo-bootstrap-api`
-   - Rename `V5RuntimeDemoBootstrap` to `ProgressionRuntimeDemoBootstrap`.
-   - Update direct usages, smoke assertions, and docs.
-   - Preserve behavior and smoke counts.
-
-2. `codex/rename-progression-foundation-smoke-suite`
+1. `codex/rename-progression-foundation-smoke-suite`
    - Rename `V4SmokeTests` and related runner labels to responsibility-based progression names.
    - Preserve V1, V3, grouped progression, and total assertion counts.
 
-3. `codex/rename-progression-foundation-docs`
+2. `codex/rename-progression-foundation-docs`
    - Rename or split active V4 progression foundation docs.
    - Keep historical/audit references clearly marked as history.
 
-4. `codex/rename-progress-restore-api`
+3. `codex/rename-progress-restore-api`
    - Rename `V4ProgressRestoreCoordinator`, `V4ProgressRestoreResult`, and `V4ProgressRestoreFailureReason`.
    - Preserve restore semantics.
 
-5. `codex/rename-combat-validation-diagnostics`
+4. `codex/rename-combat-validation-diagnostics`
    - Rename active `V3` / `V4` combat validation diagnostic facts to unlock/progression terms.
    - Preserve event and validation behavior.
 
-6. `codex/visual-smoke-demo-design-audit`
+5. `codex/visual-smoke-demo-design-audit`
    - Start only after the visual boundary no longer depends on active V5-named bootstrap APIs.
 
 ## Naming Cleanup Backlog
 
-- `V5RuntimeDemoBootstrap` -> `ProgressionRuntimeDemoBootstrap`.
+- Completed: `V5RuntimeDemoBootstrap` -> `ProgressionRuntimeDemoBootstrap`.
 - `V4SmokeTests` -> `ProgressionFoundationSmokeTests` or `FoundationProgressionSmokeTests`.
 - `RunV4SmokeTests` -> `RunProgressionFoundationSmokeTests`.
 - Active V4/V5 assertion group names -> responsibility-based progression/session/bootstrap labels.
@@ -92,7 +87,7 @@ The current track is naming cleanup before visual smoke demo design.
 
 - Run a visual smoke demo design audit before implementation.
 - Define the smallest visual boundary that consumes existing backend state, results, and events.
-- Use `ProgressionRuntimeDemoBootstrap` as the backend entry point after the pending rename.
+- Use `ProgressionRuntimeDemoBootstrap` as the backend entry point.
 - Keep combat, progression, validation, restore, and session ownership rules in backend code.
 - Visual layer must not own game rules.
 - Visual layer must not construct `TurnBasedCombatEngine` directly.
