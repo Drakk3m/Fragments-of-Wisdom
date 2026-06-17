@@ -56,11 +56,11 @@ namespace Game.SmokeTests
                     RunV3SmokeTests();
                 });
 
-            int v4Assertions = RunGroup(
-                "V4 Classes / Mentors / Mastery",
+            int playerProgressionAssertions = RunGroup(
+                "Player Progression / Combat Validation",
                 delegate
                 {
-                    RunV4SmokeTests();
+                    RunPlayerProgressionFoundationSmokeTests();
                 });
 
             int v2Assertions = RunGroup(
@@ -76,7 +76,7 @@ namespace Game.SmokeTests
             Console.WriteLine("  Shared Domain Foundations assertions: " + sharedAssertions);
             Console.WriteLine("  V2 Narrative / Progression / Persistence assertions: " + v2Assertions);
             Console.WriteLine("  V3 Combat / Skills / Resonance / Status / Stats assertions: " + v3Assertions);
-            Console.WriteLine("  V4 Classes / Mentors / Mastery assertions: " + v4Assertions);
+            Console.WriteLine("  Player Progression / Combat Validation assertions: " + playerProgressionAssertions);
             Console.WriteLine("Total smoke assertions executed: " + assertionsExecuted);
             return 0;
         }
