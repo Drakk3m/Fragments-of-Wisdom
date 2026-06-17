@@ -1230,8 +1230,10 @@ Risks carried into bootstrap design:
 
 Test and documentation naming:
 
-- loaded-session coverage now lives under
+- progression foundation coverage lives under
   `PlayerProgressionFoundationSmokeTests`
+- runtime/session/bootstrap/demo coverage now lives under
+  `ProgressionRuntimeBootstrapSmokeTests`
 - active smoke runner labels now use responsibility-based progression naming
 - `V4_Classes_Mastery_Foundation.md` still needs a dedicated doc rename or
   split before visual implementation
