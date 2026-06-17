@@ -1604,6 +1604,52 @@ The workflow uses one `V5RuntimeDemoBootstrap` and verifies:
 Broader bootstrap migration remains deferred. The V5 runtime demo bootstrap
 path is ready for a focused audit before any broader call-site migration.
 
+## V5 Runtime Demo Bootstrap Audit
+
+The verified `V5RuntimeDemoBootstrap` path is ready for visual smoke demo
+design. It is also complete enough to close the V5 bootstrap foundation after
+this audit, with broader bootstrap migration carried forward as later
+application work.
+
+Audit findings:
+
+- `V5RuntimeDemoBootstrap` is thin enough to remain a demo/runtime path
+- it owns exactly one `PlayerSessionBootstrap` and does not duplicate
+  `PlayerSessionBootstrap` internals
+- `SessionBootstrap`, `Composition`, `LoadedSession`, and `RuntimeState` remain
+  stable by reference
+- canonical class, skill, and mentor registries are supplied once and reused
+- `ClassSkillTreeBindingRegistry` remains session-scoped mutable state
+- separate demo bootstrap instances do not share mutable binding registries
+- restore and progression mutate the live runtime-state profile instances
+- combat creation flows through `V5RuntimeDemoBootstrap.CreateCombatEngine`,
+  then `PlayerSessionBootstrap.CreateCombatEngine`
+- the demo path does not own or expose direct `TurnBasedCombatEngine`
+  construction
+- combat engines, passive pipelines, random sources, combat runtimes, entities,
+  and event logs remain per-combat
+- `FoundationVerticalSlice` remains unchanged as the legacy/pass-through path
+
+Risks carried forward:
+
+- future visual or runtime demo code can still bypass progression-aware combat
+  by constructing `TurnBasedCombatEngine` directly
+- creating multiple demo bootstraps for one loaded player can split restore,
+  progression, and combat validation state
+- replacing runtime-state profile instances instead of mutating them can stale
+  validators created before replacement
+- sharing mutable binding registries across loaded players can leak class/tree
+  binding state
+- locally constructed combat skill definitions can diverge from the canonical
+  `SkillDefinitionRegistry`
+
+Earliest safe next atomic item:
+
+- add a visual smoke demo design audit that uses `V5RuntimeDemoBootstrap` as the
+  backend entry point, keeps `FoundationVerticalSlice` legacy, and defines the
+  minimum non-Unity or Unity-adapter-facing presentation contract without
+  implementing visual demo behavior yet.
+
 Validation rules:
 
 - the request, skill, progress, and progress definition must exist
