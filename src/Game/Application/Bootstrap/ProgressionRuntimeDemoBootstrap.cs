@@ -8,7 +8,7 @@ using Game.Domain.Skills;
 
 namespace Game.Application.Bootstrap
 {
-    public class V5RuntimeDemoBootstrap
+    public class ProgressionRuntimeDemoBootstrap
     {
         private readonly PlayerSessionBootstrap sessionBootstrap;
 
@@ -32,7 +32,7 @@ namespace Game.Application.Bootstrap
             get { return sessionBootstrap.RuntimeState; }
         }
 
-        public V5RuntimeDemoBootstrap(
+        public ProgressionRuntimeDemoBootstrap(
             ClassDefinitionRegistry classRegistry,
             SkillDefinitionRegistry skillRegistry,
             MentorDefinitionRegistry mentorRegistry)
@@ -44,7 +44,7 @@ namespace Game.Application.Bootstrap
         {
         }
 
-        public V5RuntimeDemoBootstrap(
+        public ProgressionRuntimeDemoBootstrap(
             ClassDefinitionRegistry classRegistry,
             SkillDefinitionRegistry skillRegistry,
             MentorDefinitionRegistry mentorRegistry,

@@ -318,12 +318,12 @@ namespace Game.SmokeTests
                 "V5 loaded session foundation assertions",
                 delegate
                 {
-                    AssertV5RuntimeDemoBootstrapCreatesOneSessionBootstrap();
-                    AssertV5RuntimeDemoBootstrapKeepsBindingRegistrySessionScoped();
-                    AssertV5RuntimeDemoBootstrapRestoresProgressesAndCreatesCombat();
-                    AssertV5RuntimeDemoBootstrapAllowsMasteredRetainedSkill();
-                    AssertV5RuntimeDemoBootstrapBlocksCrossClassSkillSafely();
-                    AssertV5RuntimeDemoBootstrapPreservesLegacySlice();
+                    AssertProgressionRuntimeDemoBootstrapCreatesOneSessionBootstrap();
+                    AssertProgressionRuntimeDemoBootstrapKeepsBindingRegistrySessionScoped();
+                    AssertProgressionRuntimeDemoBootstrapRestoresProgressesAndCreatesCombat();
+                    AssertProgressionRuntimeDemoBootstrapAllowsMasteredRetainedSkill();
+                    AssertProgressionRuntimeDemoBootstrapBlocksCrossClassSkillSafely();
+                    AssertProgressionRuntimeDemoBootstrapPreservesLegacySlice();
                     AssertPlayerSessionBootstrapCreatesOneComposition();
                     AssertPlayerSessionBootstrapKeepsBindingRegistrySessionScoped();
                     AssertPlayerSessionBootstrapRestoresProgressesAndCreatesCombat();
@@ -419,7 +419,7 @@ namespace Game.SmokeTests
                     AssertLoadedPlayerSessionIntegratedWorkflow();
                     AssertPlayerSessionCompositionIntegratedWorkflow();
                     AssertPlayerSessionBootstrapIntegratedWorkflow();
-                    AssertV5RuntimeDemoBootstrapIntegratedWorkflow();
+                    AssertProgressionRuntimeDemoBootstrapIntegratedWorkflow();
                     AssertSkillTreeProgressionIntegratedWorkflow();
                     AssertSkillTreeUnlockApplicationIntegratedWorkflow();
                     AssertClassSkillTreeBindingIntegratedWorkflow();
@@ -3825,9 +3825,9 @@ namespace Game.SmokeTests
                 "Application-owned V4 combat creation should leave the legacy slice pass-through unchanged.");
         }
 
-        private static void AssertV5RuntimeDemoBootstrapCreatesOneSessionBootstrap()
+        private static void AssertProgressionRuntimeDemoBootstrapCreatesOneSessionBootstrap()
         {
-            var demo = BuildTestV5RuntimeDemoBootstrap();
+            var demo = BuildTestProgressionRuntimeDemoBootstrap();
             var sessionBootstrap = demo.SessionBootstrap;
             var composition = demo.Composition;
             var loadedSession = demo.LoadedSession;
@@ -3852,16 +3852,16 @@ namespace Game.SmokeTests
                 "V5 runtime demo bootstrap should expose the session bootstrap's loaded session and runtime state.");
         }
 
-        private static void AssertV5RuntimeDemoBootstrapKeepsBindingRegistrySessionScoped()
+        private static void AssertProgressionRuntimeDemoBootstrapKeepsBindingRegistrySessionScoped()
         {
             var firstBindingRegistry = BuildTestClassSkillTreeBindingRegistry();
             var secondBindingRegistry = BuildTestClassSkillTreeBindingRegistry();
-            var firstDemo = new V5RuntimeDemoBootstrap(
+            var firstDemo = new ProgressionRuntimeDemoBootstrap(
                 BuildTestClassRegistry(),
                 BuildTestSkillRegistry(),
                 BuildTestMentorRegistry(),
                 firstBindingRegistry);
-            var secondDemo = new V5RuntimeDemoBootstrap(
+            var secondDemo = new ProgressionRuntimeDemoBootstrap(
                 BuildTestClassRegistry(),
                 BuildTestSkillRegistry(),
                 BuildTestMentorRegistry(),
@@ -3892,9 +3892,9 @@ namespace Game.SmokeTests
                 "V5 runtime demo bootstrap should reuse canonical registries through the session bootstrap path.");
         }
 
-        private static void AssertV5RuntimeDemoBootstrapRestoresProgressesAndCreatesCombat()
+        private static void AssertProgressionRuntimeDemoBootstrapRestoresProgressesAndCreatesCombat()
         {
-            var demo = BuildTestV5RuntimeDemoBootstrap();
+            var demo = BuildTestProgressionRuntimeDemoBootstrap();
             var runtimeState = demo.RuntimeState;
             var classProfile = runtimeState.ClassProfile;
             var masteryProfile = runtimeState.MasteryProfile;
@@ -4007,7 +4007,7 @@ namespace Game.SmokeTests
                     new SkillProgress(retainedDefinition)));
 
             bool ownsTurnBasedCombatEngine = false;
-            foreach (var field in typeof(V5RuntimeDemoBootstrap).GetFields(
+            foreach (var field in typeof(ProgressionRuntimeDemoBootstrap).GetFields(
                 System.Reflection.BindingFlags.Instance
                 | System.Reflection.BindingFlags.NonPublic
                 | System.Reflection.BindingFlags.Public))
@@ -4046,9 +4046,9 @@ namespace Game.SmokeTests
                 "V5 runtime demo bootstrap should create combat through PlayerSessionBootstrap without owning TurnBasedCombatEngine.");
         }
 
-        private static void AssertV5RuntimeDemoBootstrapAllowsMasteredRetainedSkill()
+        private static void AssertProgressionRuntimeDemoBootstrapAllowsMasteredRetainedSkill()
         {
-            var demo = BuildTestV5RuntimeDemoBootstrap();
+            var demo = BuildTestProgressionRuntimeDemoBootstrap();
             var runtimeState = demo.RuntimeState;
             runtimeState.ClassProfile.AssignClassId(
                 ClassId.Tlamatini,
@@ -4098,9 +4098,9 @@ namespace Game.SmokeTests
                 "V5 runtime demo bootstrap should allow mastered retained skills after progression mutation.");
         }
 
-        private static void AssertV5RuntimeDemoBootstrapBlocksCrossClassSkillSafely()
+        private static void AssertProgressionRuntimeDemoBootstrapBlocksCrossClassSkillSafely()
         {
-            var demo = BuildTestV5RuntimeDemoBootstrap();
+            var demo = BuildTestProgressionRuntimeDemoBootstrap();
             var runtimeState = demo.RuntimeState;
             runtimeState.ClassProfile.AssignClassId(
                 ClassId.Wanderer,
@@ -4179,7 +4179,7 @@ namespace Game.SmokeTests
                 "V5 runtime demo bootstrap blocked validation should grant no experience or skill effects.");
         }
 
-        private static void AssertV5RuntimeDemoBootstrapPreservesLegacySlice()
+        private static void AssertProgressionRuntimeDemoBootstrapPreservesLegacySlice()
         {
             Assert(
                 FoundationVerticalSlice.Run().Events.Count == 38,
@@ -5379,9 +5379,9 @@ namespace Game.SmokeTests
                 BuildTestClassSkillTreeBindingRegistry());
         }
 
-        private static V5RuntimeDemoBootstrap BuildTestV5RuntimeDemoBootstrap()
+        private static ProgressionRuntimeDemoBootstrap BuildTestProgressionRuntimeDemoBootstrap()
         {
-            return new V5RuntimeDemoBootstrap(
+            return new ProgressionRuntimeDemoBootstrap(
                 BuildTestClassRegistry(),
                 BuildTestSkillRegistry(),
                 BuildTestMentorRegistry(),
@@ -10098,15 +10098,15 @@ namespace Game.SmokeTests
                 "Player-session bootstrap workflow should preserve the legacy 38-event slice.");
         }
 
-        private static void AssertV5RuntimeDemoBootstrapIntegratedWorkflow()
+        private static void AssertProgressionRuntimeDemoBootstrapIntegratedWorkflow()
         {
             var suppliedBindingRegistry = BuildTestClassSkillTreeBindingRegistry();
-            var demo = new V5RuntimeDemoBootstrap(
+            var demo = new ProgressionRuntimeDemoBootstrap(
                 BuildTestClassRegistry(),
                 BuildTestSkillRegistry(),
                 BuildTestMentorRegistry(),
                 suppliedBindingRegistry);
-            var secondDemo = BuildTestV5RuntimeDemoBootstrap();
+            var secondDemo = BuildTestProgressionRuntimeDemoBootstrap();
             var sessionBootstrap = demo.SessionBootstrap;
             var composition = demo.Composition;
             var loadedSession = demo.LoadedSession;
@@ -10276,7 +10276,7 @@ namespace Game.SmokeTests
                 System.Reflection.BindingFlags.Instance
                 | System.Reflection.BindingFlags.NonPublic);
             bool exposesTurnBasedCombatEngine = false;
-            foreach (var field in typeof(V5RuntimeDemoBootstrap).GetFields(
+            foreach (var field in typeof(ProgressionRuntimeDemoBootstrap).GetFields(
                 System.Reflection.BindingFlags.Instance
                 | System.Reflection.BindingFlags.NonPublic
                 | System.Reflection.BindingFlags.Public))
