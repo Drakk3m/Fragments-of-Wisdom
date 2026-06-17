@@ -20,7 +20,7 @@ namespace Game.SmokeTests
 {
     public static partial class Program
     {
-        private static void RunV4SmokeTests()
+        private static void RunPlayerProgressionFoundationSmokeTests()
         {
             RunSection(
                 "Class foundation assertions",
@@ -292,7 +292,7 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
-                "V4 runtime state ownership assertions",
+                "Player progression runtime state ownership assertions",
                 delegate
                 {
                     AssertPlayerProgressionRuntimeStateExposesLiveProfiles();
@@ -304,7 +304,7 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
-                "V4 application combat creation assertions",
+                "Progression-aware combat creation assertions",
                 delegate
                 {
                     AssertApplicationCombatCreationRequiresRuntimeState();
@@ -315,7 +315,7 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
-                "V5 loaded session foundation assertions",
+                "Loaded session foundation assertions",
                 delegate
                 {
                     AssertProgressionRuntimeDemoBootstrapCreatesOneSessionBootstrap();

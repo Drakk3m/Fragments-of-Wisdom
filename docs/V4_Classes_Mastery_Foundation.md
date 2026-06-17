@@ -993,11 +993,12 @@ Remaining risks:
 - the mutable `ClassSkillTreeBindingRegistry` must stay scoped to the loaded
   session or be guarded from cross-player sharing
 
-Version-prefixed name classification after neutralization:
+Version-prefixed name classification at V4 closure:
 
-- safe to keep for tests, documentation, and history:
-  `RunV4SmokeTests`, V4 assertion labels, V4 documentation headings, and test
-  helpers such as `V4ValidatorCombatSkill`
+- later neutralized in the active smoke suite:
+  `RunV4SmokeTests`, V4/V5 assertion labels, and the V4 smoke test filename
+- still safe to keep for test helper history:
+  helper names such as `V4ValidatorCombatSkill`
 - safe to keep because they represent existing serialized schema or snapshot
   compatibility:
   all `V2*` snapshot, repository, path-provider, serializer, service, and
@@ -1229,12 +1230,11 @@ Risks carried into bootstrap design:
 
 Test and documentation naming:
 
-- V5 loaded-session coverage currently lives under `V4SmokeTests` and
-  `V4_Classes_Mastery_Foundation.md`
-- this is acceptable to defer because the project still reports one combined
-  V4/V5 foundation smoke group and renaming test/doc containers would be a
-  broad organizational change
-- no rename is required before bootstrap migration design
+- loaded-session coverage now lives under
+  `PlayerProgressionFoundationSmokeTests`
+- active smoke runner labels now use responsibility-based progression naming
+- `V4_Classes_Mastery_Foundation.md` still needs a dedicated doc rename or
+  split before visual implementation
 
 Earliest safe next atomic item:
 
@@ -1955,8 +1955,8 @@ Current smoke groups:
 - Shared Domain Foundations assertions: `16`
 - V2 Narrative / Progression / Persistence assertions: `264`
 - V3 Combat / Skills / Resonance / Status / Stats assertions: `100`
-- V4 Classes / Mentors / Mastery assertions: `445`
-- Total smoke assertions executed: `827`
+- Player Progression / Combat Validation assertions: `517`
+- Total smoke assertions executed: `899`
 
 ## Validation
 

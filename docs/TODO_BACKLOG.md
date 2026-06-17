@@ -35,7 +35,6 @@ This is the living backlog for the current foundation track. It should reflect w
 
 The current track is naming cleanup before visual smoke demo design.
 
-- Rename or split the active progression smoke test suite currently grouped under `V4SmokeTests`.
 - Rename active progression foundation documentation currently grouped under V4 naming.
 - Rename progress restore APIs currently prefixed with `V4`.
 - Rename combat validation diagnostics currently prefixed with `V3` / `V4`.
@@ -43,31 +42,27 @@ The current track is naming cleanup before visual smoke demo design.
 
 ## Immediate Next Branches
 
-1. `codex/rename-progression-foundation-smoke-suite`
-   - Rename `V4SmokeTests` and related runner labels to responsibility-based progression names.
-   - Preserve V1, V3, grouped progression, and total assertion counts.
-
-2. `codex/rename-progression-foundation-docs`
+1. `codex/rename-progression-foundation-docs`
    - Rename or split active V4 progression foundation docs.
    - Keep historical/audit references clearly marked as history.
 
-3. `codex/rename-progress-restore-api`
+2. `codex/rename-progress-restore-api`
    - Rename `V4ProgressRestoreCoordinator`, `V4ProgressRestoreResult`, and `V4ProgressRestoreFailureReason`.
    - Preserve restore semantics.
 
-4. `codex/rename-combat-validation-diagnostics`
+3. `codex/rename-combat-validation-diagnostics`
    - Rename active `V3` / `V4` combat validation diagnostic facts to unlock/progression terms.
    - Preserve event and validation behavior.
 
-5. `codex/visual-smoke-demo-design-audit`
+4. `codex/visual-smoke-demo-design-audit`
    - Start only after the visual boundary no longer depends on active V5-named bootstrap APIs.
 
 ## Naming Cleanup Backlog
 
 - Completed: `V5RuntimeDemoBootstrap` -> `ProgressionRuntimeDemoBootstrap`.
-- `V4SmokeTests` -> `ProgressionFoundationSmokeTests` or `FoundationProgressionSmokeTests`.
-- `RunV4SmokeTests` -> `RunProgressionFoundationSmokeTests`.
-- Active V4/V5 assertion group names -> responsibility-based progression/session/bootstrap labels.
+- Completed: `V4SmokeTests` -> `PlayerProgressionFoundationSmokeTests`.
+- Completed: `RunV4SmokeTests` -> `RunPlayerProgressionFoundationSmokeTests`.
+- Completed: active V4/V5 smoke runner and assertion group labels -> responsibility-based progression/session/bootstrap labels.
 - `docs/V4_Classes_Mastery_Foundation.md` -> `PlayerProgression_CombatValidation_Foundation.md` or split into smaller living docs.
 - `V4ProgressRestoreCoordinator` -> `ProgressRestoreCoordinator` or `PlayerProgressionRestoreCoordinator`.
 - `V4ProgressRestoreResult` -> `ProgressRestoreResult` or `PlayerProgressionRestoreResult`.
