@@ -1,12 +1,12 @@
-# V4 Classes, Mentors, Mastery Foundation
+# Player Progression Foundation
 
-This document describes the current Vertical Slice V4 foundation for classes,
-mentors, mastery, mentor teaching, persistence, mastered skill retention, and
-skill tree progression with class-specific skill tree binding facts.
+This document describes the current player progression foundation for classes,
+mentors, mastery, mentor teaching, persistence, mastered skill retention, skill
+tree progression, combat validation, and runtime/bootstrap ownership.
 
-The scope remains intentionally small and domain-first. V4 stores and evaluates
-facts; it does not execute combat skills, grant rewards, drive UI, or introduce
-Unity behavior.
+The scope remains intentionally small and domain-first. The progression
+foundation stores and evaluates facts; it does not execute combat skills, grant
+rewards, drive UI, or introduce Unity behavior.
 
 ## Current Flow
 
@@ -749,7 +749,7 @@ Recommended next atomic step:
 - decide the application/bootstrap integration owner and migrate one explicit
   progression-aware engine creation path without changing the legacy V1 slice
 
-## V4 Runtime State Ownership Foundation
+## Player Progression Runtime State Ownership Foundation
 
 `Game.Application.Runtime.PlayerProgressionRuntimeState` is the application-layer owner for
 one loaded player's live V4 progression state.
@@ -885,7 +885,7 @@ proves the application owner reuses one runtime state across restore,
 progression, and multiple combat creations without registry duplication,
 stale validators, or accidental legacy construction.
 
-## Application-Owned V4 Combat Creation
+## Application-Owned Progression-Aware Combat Creation
 
 `Game.Application.Integration.ProgressionAwareCombatEngineFactory` provides one
 explicit application-layer method:
@@ -1235,8 +1235,9 @@ Test and documentation naming:
 - runtime/session/bootstrap/demo coverage now lives under
   `ProgressionRuntimeBootstrapSmokeTests`
 - active smoke runner labels now use responsibility-based progression naming
-- `V4_Classes_Mastery_Foundation.md` still needs a dedicated doc rename or
-  split before visual implementation
+- this document now uses the neutral `PlayerProgression_Foundation.md` filename
+- a future split may separate combat validation and runtime/bootstrap history if
+  the document becomes too broad
 
 Earliest safe next atomic item:
 
@@ -1684,7 +1685,7 @@ The previous parameter-based validator overload remains compatible. New engine
 integration should use the context-based overload so legacy, player, and enemy
 behavior cannot be inferred from null parameters.
 
-## Unified V4 Restore Coordinator
+## Unified Progress Restore Coordinator
 
 `V4ProgressRestoreCoordinator` restores V4 state in this defined order:
 
@@ -1744,7 +1745,7 @@ causes `FullyRestored` to be false.
 
 ## Integrated Workflow Verification
 
-V4 smoke tests include integrated workflow coverage for:
+Player progression smoke tests include integrated workflow coverage for:
 
 - class + mentor + teaching + mastery
 - class/mastery snapshot and restore
