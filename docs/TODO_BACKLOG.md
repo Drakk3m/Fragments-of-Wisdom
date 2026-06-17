@@ -30,6 +30,7 @@ This is the living backlog for the current foundation track. It should reflect w
 - `PlayerSessionBootstrap` provides the narrow session bootstrap boundary.
 - `ProgressionRuntimeDemoBootstrap` provides the current runtime demo bootstrap path.
 - The active runtime/demo bootstrap API rename from `V5RuntimeDemoBootstrap` to `ProgressionRuntimeDemoBootstrap` is complete.
+- Runtime/session/bootstrap/demo smoke coverage now lives in `ProgressionRuntimeBootstrapSmokeTests`.
 
 ## Current Atomic Track
 
@@ -63,6 +64,7 @@ The current track is naming cleanup before visual smoke demo design.
 - Completed: `V4SmokeTests` -> `PlayerProgressionFoundationSmokeTests`.
 - Completed: `RunV4SmokeTests` -> `RunPlayerProgressionFoundationSmokeTests`.
 - Completed: active V4/V5 smoke runner and assertion group labels -> responsibility-based progression/session/bootstrap labels.
+- Completed: runtime/session/bootstrap/demo smoke helpers split into `ProgressionRuntimeBootstrapSmokeTests`.
 - `docs/V4_Classes_Mastery_Foundation.md` -> `PlayerProgression_CombatValidation_Foundation.md` or split into smaller living docs.
 - `V4ProgressRestoreCoordinator` -> `ProgressRestoreCoordinator` or `PlayerProgressionRestoreCoordinator`.
 - `V4ProgressRestoreResult` -> `ProgressRestoreResult` or `PlayerProgressionRestoreResult`.
