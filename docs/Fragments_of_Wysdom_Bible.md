@@ -1,14 +1,47 @@
-# Fragments of Wysdom — Game Design, Creative Vision & Architecture Bible
+# Fragments of Wysdom: Game Design, Architecture & Development Bible
 
-> **v4.0 — DRAFT for review.** Consolidated from the v2 Bible on `main`, repository technical documents, current source-code inspection and documented design conversations. No gameplay changes.  
-> **Interpretation:** the Bible describes *desired experience*, *accepted direction*, *proposed ideas* and *current implementation* separately. Do not mistake a domain class for a finished game feature.  
-> **Scope of evidence:** source inspected on `main` (2026-10-30); build, smoke suite, CI and Unity Play Mode were **not run** in this pass.
+**Version 4.1, consolidated 2026-10-31. Single authoritative project specification.**
+This is a documentation-only consolidation, not approval to implement a new mechanic.
+The user's latest instruction authorizes this pass on `main`, superseding the earlier branch-only mission.
+Editing baseline: `ed6ddf54a3541d87d051dd7f6411d86f6f2df837`.
 
-## Reading guide: two independent status dimensions
+## How to Read This Bible
 
-Every mechanic has **Design status** (`ACCEPTED`, `PROMISING / TO REFINE`, `OPEN`, `REJECTED`) and **Implementation status** (`CODE FOUNDATION`, `PARTIAL`, `NOT FOUND / NOT VERIFIED`, `CONCEPT ONLY`, `VERIFIED`). `VERIFIED` requires actual execution evidence. A promising conversation idea is **not** a mandate to implement. When a conversation did not settle a detail, record it as `OPEN`. Old version names in code are compatibility identifiers, not proof of active design version.
+Parts I-VI are the current interpretation. Part VII preserves complete historical source contracts, examples and decisions; it is **not a second backlog or a set of executable instructions**. Where evidence conflicts, the reproduced audit and explicit corrections in Parts II-V override old claims. An unresolved design choice remains OPEN DECISION, not an implicit gameplay requirement. Contract details not summarized in active chapters remain available in the archive; do not silently discard or implement them.
 
-# Part I — Game Design & Creative Vision
+Keep two independent dimensions:
+- **Design:** LOCKED / ACCEPTED, PROMISING / PROPOSED, OPEN, REJECTED, or DEFERRED. Accepted direction is not a completed mechanic.
+- **Implementation:** VERIFIED (the specified executed scenario only), PARTIAL (implemented with known gaps), CODE FOUNDATION (source exists, not a complete loop), CONCEPT ONLY, or NOT VERIFIED.
+- **Evidence:** executed smoke, reproduced audit probe, source inspection, historical contract, or conversation design. Inferences and proposed remedies are labelled separately.
+
+A passing backend suite does not certify Unity, balance, complete content or a playable game.
+
+## Contents
+
+- [Part I: Game Design & Creative Vision](#creative-vision)
+- [Part II: Game Systems & Rules](#systems)
+- [Combat, resources and skill access](#combat-rules)
+- [Classes, mastery, mentors, trees and equipment](#progression-rules)
+- [Narrative, Codex, missions and unlocks](#narrative-rules)
+- [Part III: Software Architecture](#architecture)
+- [Runtime ownership and integration](#runtime-ownership)
+- [Persistence and compatibility](#persistence)
+- [Historical tooling and Unity boundaries](#tooling)
+- [Part IV: Implementation Status](#implementation-status)
+- [Verification commands, counts and evidence](#verification)
+- [Part V: Audit & Technical Debt](#audit)
+- [Reproduced findings](#reproduced-findings)
+- [Contradictions and open decisions](#reconciliation)
+- [Part VI: Development Governance](#governance)
+- [Workflow verification checklist](#workflow-verification)
+- [Single current backlog](#current-backlog)
+- [Part VII: Historical Decisions & Reference Archive](#historical-archive)
+- [Preservation matrix and source inventory](#preservation-matrix)
+
+<a id="creative-vision"></a>
+# Part I: Game Design & Creative Vision
+
+Creative direction below is retained from the previous Bible. Implementation descriptions are qualified by Parts II-V; design vocabulary is not evidence of production readiness.
 
 ### 1. Vision, player fantasy and emotional pillars
 
@@ -61,7 +94,7 @@ Canonical character sheets, enemy silhouettes, animation bible, tileset specific
 
 ### 4. Combat fantasy, rhythm and tactical economy
 
-**IMPLEMENTED — DOCUMENTED:** `TurnBasedCombatEngine` is the **only canonical turn-sequencing authority**. Do not introduce a second `CombatResolver` or parallel action engine. Existing flow:
+**CURRENT BACKEND CONTRACT:** `TurnBasedCombatEngine` is the canonical turn-sequencing authority. The separate refill action does not yet honor all of its lifecycle rules (AUD-06/AUD-07). Do not introduce a second `CombatResolver` or parallel action engine. Existing flow:
 
 ```text
 TurnRequest
@@ -74,9 +107,9 @@ TurnRequest
 
 The foundation covers basic attacks, skills, hit/evasion, criticals, HP, defeat, resource checks, passive hooks, regeneration and status resolution. Opposed stats: Attack/Defense; Precision/Evasion; Critical Chance/Critical Resistance; Debuff Chance/Debuff Resistance.
 
-**Resonance:** `ActiveResonance` pays for skills; `ResonanceReserve` is stored capacity. A successful refill transfers reserve into active and consumes a turn. Skills never silently consume reserve. Empty reserve and insufficient active resonance must be blocked consistently. Older `Essence`-only combat descriptions are **HISTORICAL**, not permission to create a second resource system.
+**Resonance:** `ActiveResonance` pays for skills; `ResonanceReserve` is stored capacity. A successful refill transfers reserve into active and consumes a turn. Skills never silently consume reserve. Empty reserve and insufficient active resonance must be blocked consistently. **Current code uses both resources:** actor-owned Essence remains active; optional runtime Resonance adds a separate skill cost. Essence has not been replaced. Enemy ownership of that shared Resonance is an OPEN DECISION (AUD-05).
 
-**Status foundation:** Poison, Burn, SkillSeal, RegenBlock and Regen; advanced stacking, immunity and interactions are **DEFERRED**. Current technical rules and ordering live in [V3 Combat Foundation](V3_Combat_Foundation.md) pending contract-by-contract migration.
+**Status foundation:** Poison, Burn, SkillSeal, RegenBlock and Regen; advanced stacking, immunity and interactions are **DEFERRED**. Current ordering and limitations are in [Combat rules](#combat-rules); full historical formulas and contracts are preserved in [Archive 02](#archive-02).
 
 #### Hybrid combat exploration — PROPOSED, not implemented
 
@@ -102,7 +135,7 @@ Basic attacks on a direct button and tactical menus for skills/items/refill are 
 
 **LOCKED DESIGN:** *Classes determine how Nova fights; cognition determines how Nova understands and modifies systems.*
 
-**IMPLEMENTED — DOCUMENTED:** stable class IDs include `Tlamatini` and `Wanderer`; class definitions and registries, skill definitions, skill trees, scoped unlock progress, class-to-tree bindings, mastery profiles, mentor definitions/relationships, teaching evaluation and application, mastered-skill retention across class changes, progression-aware combat validation and runtime/session ownership. See the existing [Player Progression Foundation](PlayerProgression_Foundation.md) for detailed contracts during transition.
+**IMPLEMENTED — DOCUMENTED:** stable class IDs include `Tlamatini` and `Wanderer`; class definitions and registries, skill definitions, skill trees, scoped unlock progress, class-to-tree bindings, mastery profiles, mentor definitions/relationships, teaching evaluation and application, mastered-skill retention across class changes, progression-aware combat validation and runtime/session ownership. See [Progression rules](#progression-rules) and the preserved signatures and workflow history in [Archive 05](#archive-05).
 
 Mentor archetypes: **Lyra** (analysis), **Atlas** (stability), **Gepetto** (crafting/system manipulation) and **Spark** (variance/chaos). The latter two are design directions rather than evidence of complete systems.
 
@@ -110,7 +143,7 @@ Teaching concepts: temporary, fixed and equipped; the entire final persistence/e
 
 ### 5.1 Learning through equipment — PROMISING / TO REFINE
 
-A Final Fantasy IX-like idea: equipment exposes learnable skills; practice/mastery can retain eligible abilities after unequipping and changing classes. Class identity must still matter: not every mastered skill should automatically become usable in every class. The eligibility/retention policies must be explicit. The existing mastery foundation does **not** establish a complete equipment-learning loop.
+A Final Fantasy IX-like idea: equipment exposes learnable skills; practice/mastery can retain eligible abilities after unequipping and changing classes. **Proposed refinement:** class identity should still matter and not every mastered skill should necessarily remain usable in every class. **Current implementation differs:** every registered skill mastered in `MasteryProfile` passes retention regardless of class. Restricting that policy requires an approved gameplay change. The existing mastery foundation does **not** establish a complete equipment-learning loop.
 
 ### 5.2 Mentor commitments and branching
 
@@ -134,7 +167,7 @@ The darker path may reduce or remove access to mentor-based permanent skills whi
 
 **LOCKED DESIGN:** the Codex is where the world reconstructs its memory through Nova. It is more than a wiki: a scholarly, ceremonial, fragmented knowledge instrument. Proposed knowledge domains include world memory, bestiary, classes/masters, skills/teachings, artifacts, regions, factions/philosophies, corrupted knowledge and myths/echoes. Entry stages may progress from unknown to glimpsed, discovered, studied and mastered/reconstructed.
 
-**DEFERRED:** full UI, thresholds, reward bridge, discovery-stage implementation, mission chains, partial objectives and story content. See [V2 Narrative Foundation](V2_Narrative_Foundation.md).
+**DEFERRED:** full UI, thresholds, reward bridge, discovery-stage implementation, mission chains, partial objectives and story content. See [Narrative and discovery rules](#narrative-rules) and [Archive 03](#archive-03).
 
 ### 7.1 Codex visual experience — PROMISING / TO REFINE
 
@@ -158,173 +191,205 @@ Buildings are manifestations of recovered cultural capabilities, not free-placem
 
 Music, environmental audio, encounter pacing, exploration layout, travel systems, encounter presentation and interaction affordances require their own design pass. Do not invent decisions from an absence of records.
 
-# Part II — Technical Architecture & Implementation
+<a id="systems"></a>
+# Part II: Game Systems & Rules
 
-### 9. Domain-first architecture and ownership
+<a id="combat-rules"></a>
+## Combat, Resources and Skill Access
 
-**LOCKED DESIGN:**
-- Pure C# domain and application rules; Unity is an adapter/presentation layer.
-- Visual code consumes backend state, results and events; it does not own gameplay rules.
-- Combat, progression/cognition, missions, Codex, inventory/equipment, narrative and Unity presentation have explicit boundaries.
-- One important public class per file, with narrow exceptions.
-- Small, focused, testable services; explicit mutation; no hidden dependencies or parallel engines.
-- Preserve Unity `.meta`, GUIDs, scenes, prefabs and serialized references; avoid manual YAML edits.
-- Do not regenerate or overwrite the active repository from historical PowerShell snapshots.
-- Keep `FoundationVerticalSlice` as a compatibility boundary unless a dedicated branch approves migration.
+**Current source contract:** [TurnBasedCombatEngine](../src/Game/Domain/Combat/TurnBasedCombatEngine.cs) owns the canonical attack/skill sequence. Preserve it rather than adding a parallel resolver. [Archive 02](#archive-02) retains formulas, passive/status contracts and historical acceptance cases.
 
-**IMPLEMENTED — DOCUMENTED:** `LoadedPlayerSession`, session composition/bootstrap and `ProgressionRuntimeDemoBootstrap` establish runtime ownership; registries have appropriate content/session scope; combat objects are per-combat. Full contract details are in [Player Progression Foundation](PlayerProgression_Foundation.md).
+Current skill sequence:
+1. Reject ended combat or defeated attacker/defender; construct context and apply the player Atlas cost modifier when relevant.
+2. Emit `TurnStarted`; reset flags; run legacy debuff turn-start and before-action hooks; stop if the attacker died.
+3. If configured, run `ICombatSkillTurnValidator`. Null/blocked results emit `ActionBlocked`, call end-turn and return.
+4. Check `SkillSeal`; on block emit `ActionBlocked`, call end-turn and return.
+5. Calculate Essence cost from `SkillProgress`, mastery multiplier and passive hooks; read Resonance cost from the supplied progress definition.
+6. Check optional active Resonance capacity, then spend actor Essence, then active Resonance. Failure ends the turn before skill execution.
+7. Apply skill, grant 10 skill XP, process requested cleanse, resolve hit/critical/damage and pending debuffs, then check defender defeat.
+8. If combat continues, end-turn regenerates Essence unless blocked, runs after-action debuffs and status tick, checks attacker defeat, emits `TurnEnded` and advances turn.
 
-### 10. Persistence, save compatibility and adapters
+Blocked validation spends no skill Essence/Resonance and grants no skill XP, but normal end-turn consequences can still occur. Earlier hooks may already have run. Optional validation preserves the two-argument engine's legacy path and its 38-event slice. Do not infer that legacy bypass guarantees structurally malformed requests are safe.
 
-**IMPLEMENTED — DOCUMENTED:** V2 snapshot DTOs, JSON serializer, file repository, save/restore profiles, Unity save-path adapter, and extensions for class/mentor/mastery/tree facts. Compatibility with existing JSON and stable IDs is mandatory. **DEFERRED:** slots, autosave, cloud and broad persistence migrations.
+`CombatSkillValidationOrchestrator` composes actor classification, context provision and `CombatSkillUseValidator`; `CombatSkillTurnValidatorGateway` adapts this to the engine validator. Player mode needs UnlockProfile, ClassProfile, MasteryProfile, class registry and skill registry. Enemy mode needs no player progression profiles. Legacy bypass is explicit in context construction. Foreign actors and incomplete contexts fail with structured stage/reason facts. Identity matching and V3 unlock checks precede V4 retention checks. **Known limitation AUD-04:** equal IDs alone do not prove that caller-supplied skill metadata is canonical.
 
-Version-prefixed persistence APIs have a high rename blast radius. Do not rename them as incidental cleanup. See [V2 Save Foundation](V2_Save_Foundation.md).
+`CombatSkillAccessService` delegates to `MasteredSkillRetentionPolicy`: a registered skill is usable when the current class allows it OR it is mastered in `MasteryProfile`. It returns access facts without mutation. A class-allowed skill can still be blocked by the separate V3 required-unlock policy. Tree discovery/unlocking alone grants neither access nor mastery.
 
-## 11. Implementation ledger — source-inspected, not runtime-verified
+**Resource ownership:** Essence belongs to each combat entity. Optional active/reserve Resonance belongs to the runtime; skills spend active only, never reserve implicitly. `ResonanceRefillAction` transfers reserve into active and advances the turn through a separate path. Refill is not integrated with all engine status/lifecycle checks (AUD-06/AUD-07). Enemy resource ownership is unresolved (AUD-05). Random refill buffs, auto-refill and reserve-growth bridges remain proposed. Atlas' current recurring cost modifier is not the proposed next-skill refill buff.
 
-**Status semantics:** `FOUNDATION` = relevant source and contracts found; `PARTIAL` = limited domain support, not end-to-end gameplay; `CONCEPTUAL` = creative direction without verified gameplay implementation; `UNVERIFIED` = insufficient evidence; `VERIFIED` = executed and observed (none newly certified here).
+**Status boundaries:** `StatusEffectCollection` and resolver cover Poison, Burn, SkillSeal, RegenBlock and Regen; legacy `Debuffs`/flags coexist. They are not interchangeable. In particular legacy Silence logs a block without preventing damage/XP (AUD-08). Stacking, immunity and synergy expansion remain deferred. `Defend` and `Wait` enum values have no public TurnRequest factories; they are incomplete contracts, not reproduced public-action failures.
 
-| Area | Design maturity | Code status as of this inspection | Concrete source evidence | Missing or unverified |
+<a id="progression-rules"></a>
+## Classes, Mastery, Mentors, Trees and Equipment
+
+Source ownership: `src/Game/Domain/Classes/`, `src/Game/Domain/Skills/`, `src/Game/Domain/Cognition/` and `src/Game/Domain/Equipment/`. Full overload contracts and chronological workflow evidence are in [Archive 05](#archive-05).
+
+| Contract | Current rule | Boundary / edge case |
+|---|---|---|
+| ClassDefinitionRegistry | Stable ClassId lookup; valid registration; duplicate IDs rejected without replacing the original | ClassProfile owns assignment, not registries or mastery |
+| SkillDefinitionRegistry | Stable skill ID registration/resolution; null/invalid/duplicate definitions fail safely | Shared content catalog, not ownership or canonical execution enforcement by itself |
+| MasteryProfile / MasteryRecord | Registry-validated progress by skill ID; 100 is mastered; rank derives from progress | Facts only; no class switching, automatic unlocks or stat bonuses; overflow defect AUD-09 remains |
+| SkillProgress | XP/level-based skill progression with its own IsMastered and cost/effect modifiers | Distinct from retention mastery; no automatic synchronization between the two models |
+| MentorDefinitionRegistry | Stable MentorId, valid name/definition, duplicate rejection | No teaching or mission execution |
+| MentorRelationshipProfile | Discovery, trust/progress and availability facts; registry-aware APIs; repeated discovery is idempotent | Does not replace the legacy cognition teaching/slot profile |
+| MentorTeachingService | Checks mentor/skill registries, discovery, availability and required trust | Returns taught skill ID, optional mastery grant and stable block reasons; does not mutate mastery |
+| MentorTeachingApplicationService | Explicit application of available teaching through skill registry; nonpositive grant rejected with NoProgressGranted | No mentor mutation, skill grants or mission starts; repeat after mastery safe; reported capped delta is wrong in AUD-10 |
+| MasteredSkillRetentionPolicy | Registered AND (class-allowed OR retention-mastered) | Read-only; no class needed for registered mastered skills; class eligibility restrictions are future design |
+| SkillTreeDefinition | Stable SkillTreeId; stable node IDs referencing registered skills | Duplicate nodes rejected; every prerequisite must already exist in that same tree |
+| SkillTreeUnlockPolicy | Requires known/discovered node and unlocked prerequisites in that tree scope | Prerequisite-first insertion rejects forward/self references and prevents incremental cycles; not a full arbitrary graph import validator |
+| SkillTreeUnlockApplicationService | Evaluates policy before recording unlock; blocked/duplicate applications are safe | Recommended mutation path; internal RecordUnlockedNode exists for trusted assembly restore/application paths, not a public grant API |
+| SkillTreeProgressProfile | Discovery/unlock facts keyed by SkillTreeId and node ID | Same node ID in two trees is independent; compatibility paths are not permission to merge scopes |
+| ClassSkillTreeBindingRegistry | One validated class-to-registered-tree binding per class; duplicates rejected | Resolution after class switch changes neither tree progress nor skill ownership |
+| Equipment | Definition/loadout/stat aggregation and TaughtSkillId metadata | No complete equip-to-learn-to-master-to-retain loop; no automatic equipment mastery grant |
+
+Legacy `SkillProgress` mastery uses its own maximum-level test, 0.8 cost multiplier and +0.15 effect bonus. Retention mastery uses the separate 100-point record. A future unification or eligibility restriction needs an explicit migration/design decision; do not conflate terminology.
+
+Current teaching and tree results are lightweight facts. Positive teaching grants may be applied explicitly, while tree unlocks and class bindings do not grant skills, rewards or mastery. No mentor ranks, complete skill roster, item skill learning or reward trees are certified by these foundations.
+
+<a id="narrative-rules"></a>
+## Narrative, Codex, Missions and Unlocks
+
+The fact-producing chain reads player alignment and runs `FirstNahualTeachingEvaluator`, `TransmutationAccessPolicy`, `NpcReactionService`, `NarrativeHookService`, `MissionTriggerService` and `CodexEntryService`, with candidate deduplication. Results are acceptance/rejection, tags, preview reactions, hooks and candidates, not implicit combat, dialogue, inventory or reward changes.
+
+Explicit `CodexDiscoveryService`, `MissionDiscoveryService` and `DiscoveryOrchestrationService` apply candidate facts idempotently by stable entry/trigger ID. Enriched Codex records preserve source hooks/triggers, type, concept and tags; mission leads preserve priority/family/source metadata. Active mission and unlock foundations extend journal facts, but are not a complete quest or economy system. Legacy mission evaluation/rewards are not automatically coupled to the journal and may replay numeric rewards without a claim guard.
+
+**Persistence limit AUD-03:** legacy string-based Codex discovery and completion sets coexist with enriched discovery records. The current snapshot only preserves the latter. Do not promise complete Codex round trips, stages, completion rewards or UI.
+
+Alignment/Nahual gates and vendor reaction facts do not implement enemy-to-item conversion, shops, loot, crafting, cooking, alchemy or world consequences. Legacy cognition teachings/slots and newer mentor relationship facts have separate responsibilities and no automatic mentor-mission bridge. Detailed narrative mappings and edge cases remain in [Archive 03](#archive-03); the historical V2 slice design is in [Archive 01](#archive-01).
+
+<a id="architecture"></a>
+# Part III: Software Architecture
+
+## Domain and Application Boundaries
+
+Domain/application are pure C#; Unity adapts inputs, storage paths and presentation. Combat, cognition/progression, missions, Codex, inventory/equipment, narrative and presentation keep explicit ownership. Use focused services, data/results, events and adapters; avoid hidden cross-domain mutation and parallel engines.
+
+The solution builds `src/Game/Game.csproj` and the smoke runner. Domain and Application currently share one `net10.0` assembly, so folders express boundaries rather than enforcing them. No Unity dependency was found in these layers. `src/Game.Unity/` is outside that solution: .NET smoke success does not verify its compilation or runtime compatibility in Unity.
+
+Two event contracts coexist: combat `GameEventLog`/`GameEventType` records and typed domain discovery/unlock events. Neither is a complete UI/milestone bridge. EquipmentLoadout/EquipmentProfile and EquipmentStatAggregator/modifier helpers include delegating compatibility APIs, not independent gameplay engines. The actual duplication risks are divergent state paths and validation policies, not merely repeated names.
+
+<a id="runtime-ownership"></a>
+## Runtime Ownership and Integration
+
+The neutral application path is:
+
+`ProgressionRuntimeDemoBootstrap -> PlayerSessionBootstrap -> PlayerSessionComposition -> LoadedPlayerSession -> PlayerProgressionRuntimeState`
+
+The wrappers delegate to the same session/state; they must not allocate competing progression owners. `ProgressionAwareCombatEngineFactory` creates progression-aware engines through the existing gateway/orchestrator/validator path. Registries contain shared content definitions; mutable class-tree bindings and player profiles are session-owned. Combat entities, runtime context, events and passive pipelines are combat-scoped. Definitions may be shared; mutable binding registries must not leak between sessions.
+
+The term `LoadedPlayerSession` does not imply automatic disk loading. Composition accepts prepared state; filesystem loading and schema compatibility remain explicit persistence responsibilities. A future visual adapter consumes state/results/events through the demo/bootstrap boundary, not by constructing TurnBasedCombatEngine, new sessions or duplicate profiles. `FoundationVerticalSlice` remains a deliberate compatibility path; migration requires its own authorization.
+
+<a id="persistence"></a>
+## Persistence, Serialization and Compatibility
+
+Current schema is **1**, centralized in `V2ProgressSnapshotVersions`; this consolidation changes neither DTOs nor schema. Pipeline:
+
+`Profiles -> V2ProgressSnapshotService -> V2ProgressSnapshot -> JSON serializer -> file repository`
+
+Snapshot facts include enriched Codex entries, mission leads, active missions, unlocks, class profile, mastery records, mentor relationships, scoped/legacy skill-tree progress and class-tree bindings. Serializer uses System.Text.Json; malformed/unsupported data fails through existing safe APIs or documented exceptions. Older JSON missing optional collections restores empty/default facts where existing overloads allow. Missing class data is not a request to erase an assigned class. There is no general migration engine.
+
+**Mastery:** persist skill ID, progress and rank; restore validates skill IDs through SkillDefinitionRegistry and recreates progress-derived mastery. Unknown IDs fail before that subsystem applies supported records. Mentor snapshots persist ID, discovered/trust/availability; restore uses MentorDefinitionRegistry. Bindings persist class/tree IDs and validate both against class and registered tree definitions. Individual restore methods retain their current merge/idempotency behavior; they are not whole-player replacement transactions.
+
+**Skill-tree compatibility policy:**
+- New scoped snapshots store tree IDs plus discovered/unlocked node IDs. Same node ID across trees remains independent.
+- Nonempty legacy unscoped progress and nonempty scoped progress in one snapshot are semantically invalid.
+- Legacy-only progress remains supported with an explicit tree or an unambiguous single registered tree, according to the restore overload. Do not guess across multiple trees.
+- Older JSON without tree progress is safe empty/default data.
+- No-registry validation retains structural compatibility. Registry-aware validation additionally checks known scope/node IDs, unlocked nodes also discovered, and unlocked prerequisite closure.
+- These semantic checks are not fully connected to coordinator restore/file loading (AUD-02); a valid JSON file is not necessarily valid gameplay state.
+
+**Coordinator:** V4ProgressRestoreCoordinator preflights class, mastery, mentor relationships, tree progress and bindings using temporary profiles and a copied binding registry. If an individual preflight returns false, it returns structured subsystem facts without applying target profiles. Successful apply order remains:
+1. ClassProfile.
+2. MasteryProfile.
+3. MentorRelationshipProfile.
+4. SkillTreeProgressProfile.
+5. ClassSkillTreeBindingRegistry, when that overload is used.
+
+The result retains ClassRestored, MasteryRestored, MentorRelationshipsRestored, SkillTreeProgressRestored, ClassSkillTreeBindingsRestored, FullyRestored and subsystem reasons/messages. **It is not a guaranteed atomic transaction:** real destination null checks are incomplete (AUD-01), semantic tree validation is incomplete (AUD-02), and success booleans can report preflight feasibility rather than actual application (AUD-12). No rollback/thread-safety guarantee is established. Existing individual restore methods are unchanged.
+
+**File boundary:** V2ProgressSnapshotFileRepository validates, writes a temporary file and replaces/moves the main file after the write, with backup support and fallback for missing/corrupt/unsupported main data. It uses structural validation without a complete content registry. Atomic file replacement does not imply semantic integrity, durable recovery under every filesystem/power-loss condition, multi-writer coordination, or atomic in-memory restore. Encryption, compression, slots, cloud and autosave are not implemented here.
+
+**Coverage limits:** complete cognition, inventory, equipment, wallet and alignment persistence is not supplied by this snapshot pipeline. Generic PlayerSaveData/ISaveRepository are not a complete mapped player save. UnityV2SaveService uses a narrower Codex/mission/unlock path; it has not been upgraded to a complete progression save, and its Exists check only considers the main file. Preserve stable IDs and serialization names; V2 API renames need a dedicated compatibility task. See [Archive 04](#archive-04) and [Archive 05](#archive-05) for full historical signatures.
+
+<a id="tooling"></a>
+## Historical Tooling and Unity Boundaries
+
+`tools/SnapshotGenerator/Generate-NovaFoundation.ps1` and its modules are historical V1/V2 snapshot reproduction tooling, not the current build or development workflow. The consolidated entry selects VerticalSliceV1 or VerticalSliceV2; V2 adds the Nahual module. The old sequential command examples remain archival, not instructions to regenerate this checkout.
+
+Inspection found documentation writers in modules 00 (master specification, backlog, generator usage), 05 (structure notes) and 06 (backlog). They would recreate competing historical documents. **Do not run generators over this repository.** The entry point's `-Force` recursively deletes its target before generation. If historical reproduction is explicitly authorized, first verify an isolated disposable target outside this checkout; never interpret the old README as permission to overwrite production. No generator was executed or rewritten in this consolidation. Any future operationalization needs a separate tooling task.
+
+The two tools README files are navigation-only pointers, not independent specifications. Historical usage prose is retained in the source scripts and [Archive 10](#archive-10).
+
+Unity work must preserve .meta/GUIDs, scenes, prefabs, ScriptableObjects and serialized references. Do not casually rename/move assets or hand-edit generated YAML. The old instruction to copy source into Assets/Scripts is historical, not a validated integration procedure for the current .NET target. No Unity project/assets/editor run was established in this audit. An approved adapter task must define compatible assembly/build boundaries, inspect affected scenes/assets and verify Play Mode before claiming playable integration.
+
+<a id="implementation-status"></a>
+# Part IV: Implementation Status
+
+## Evidence-Based Ledger
+
+One implementation status per row; VERIFIED is deliberately limited to the named backend scenario, not the whole feature. Source paths are repository-relative; test files are under `src/Game.SmokeTests/`. Current execution counts are recorded below. No findings were repaired during this documentation pass.
+
+| Area / scenario | Design maturity | Implementation status | Source evidence | Test evidence / known limit |
 |---|---|---|---|---|
-| Turn-based combat | Accepted current foundation | **FOUNDATION** | `src/Game/Domain/Combat/TurnBasedCombatEngine.cs`, `src/Game/Slice/FoundationVerticalSlice.cs` | Interactive Unity battle, fresh build/test results |
-| Resonance active/reserve | Accepted | **FOUNDATION** | `src/Game/Domain/Combat/Resources/ResonanceProfile.cs`, `ResonanceRefillAction.cs` | Balance, UX, auto-refill, buff effects |
-| Refill buffs / auto-refill | Promising | **CONCEPTUAL** | No specific implementation verified | Rules, probability, mentorship integration |
-| Hybrid basic attacks | Proposed | **CONCEPTUAL** | Existing engine remains turn-based | Time/turn authority, input, enemies, prototype approval |
-| Skill validation | Accepted | **FOUNDATION** | `src/Game/Domain/Combat/CombatSkillUseValidator.cs` | Full content and end-to-end player feedback |
-| Classes, skill trees, mastery | Accepted | **FOUNDATION / PARTIAL CONTENT** | `src/Game/Domain/Classes/SkillTreeProgressProfile.cs`, unlock policy/application services; progression smoke tests | Complete roster, UI, balancing |
-| Equipment-based skill learning | Promising | **PARTIAL / NOT VERIFIED** | `src/Game/Domain/Equipment/EquipmentDefinition.cs` exists; mastery/retention contracts documented | No verified full equip→learn→master→retain gameplay |
-| Mentors and teaching | Accepted foundation | **FOUNDATION / PARTIAL CONTENT** | `src/Game/Domain/Classes/MentorTeachingService.cs` | Quests, full narrative dialogue, final teaching UX |
-| Session/bootstrap ownership | Accepted | **FOUNDATION** | `src/Game/Application/Bootstrap/PlayerSessionBootstrap.cs`, `ProgressionRuntimeDemoBootstrap.cs` | Production Unity game-loop integration |
-| Narrative and Nahual gate | Accepted foundation | **PARTIAL** | `src/Game/Domain/Transmutation/TransmutationAccessPolicy.cs`, V2 narrative source | Full route consequences and transmutation effects |
-| Codex and mission discovery | Accepted foundation | **FOUNDATION / PARTIAL** | `src/Game/Domain/Codex/CodexDiscoveryService.cs`, `DiscoveryOrchestrationService.cs` | Codex UI, full quest system, completion stages |
-| Snapshot JSON/save | Accepted foundation | **FOUNDATION** | `src/Game/Domain/Progress/V2ProgressSnapshotJsonSerializer.cs`, file repository, `src/Game.Unity/Persistence/UnityV2SaveService.cs` | Unity Play Mode, save slots, autosave, compatibility run |
-| Legacy vertical slice | Historical compatibility | **FOUNDATION** | `FoundationVerticalSlice.Run()`, `src/Game.SmokeTests/SmokeTestRunner.cs` | 38-event count not freshly rerun |
-| Villa de las Memorias | Accepted direction | **CONCEPTUAL / DEFERRED** | Backlog references, no dedicated restoration engine verified | Building state, unlocks, persistence, visuals |
-| Sanctuary | Accepted direction | **CONCEPTUAL / DEFERRED** | No dedicated Sanctuary class located in code search | Milestone facts, reflection service, UI |
-| Full playable game | Vision | **UNVERIFIED / NOT COMPLETE** | Domain foundations and console smoke runner | Playable production loop, content, art/audio, release readiness |
+| Legacy slice contract | Accepted compatibility | VERIFIED | `src/Game/Slice/FoundationVerticalSlice.cs` | V1SmokeTests: 2 assertions, 38 events |
+| Attack/skill foundation | Accepted | PARTIAL | TurnBasedCombatEngine, DamageResolver, StatusEffectResolver | V3SmokeTests: 100 pass; AUD-05 through AUD-08 remain |
+| Resonance active/reserve transfer | Accepted | PARTIAL | `src/Game/Domain/Combat/Resources/` | V3 smoke cases pass; separate refill lifecycle and actor ownership unresolved |
+| Registry/class/mastery/mentor operations | Accepted foundation | PARTIAL | `src/Game/Domain/Classes/` | PlayerProgressionFoundationSmokeTests; numeric defects AUD-09/AUD-10 remain |
+| Scoped tree isolation and policy application | Accepted foundation | VERIFIED | SkillTreeProgressProfile, SkillTreeUnlockApplicationService | Two-tree same-node workflow; not arbitrary corrupt-save integrity |
+| Class-tree binding / supported JSON round trip | Accepted foundation | VERIFIED | ClassSkillTreeBindingRegistry, V2ProgressSnapshotService | Binding save and class-switch workflows; no automatic grants |
+| Retained access and validated combat composition | Accepted foundation | PARTIAL | CombatSkillUseValidator, CombatSkillTurnValidatorGateway | Progression unit/integrated tests; canonical metadata bypass AUD-04 remains |
+| Shared session/runtime ownership | Accepted foundation | VERIFIED | `src/Game/Application/Runtime/`, `Bootstrap/`, `Integration/` | ProgressionRuntimeBootstrapSmokeTests; not automatic disk loading or Unity |
+| Narrative evaluators and candidate discovery | Accepted foundation | PARTIAL | `src/Game/Domain/Narrative/`, `Codex/`, `Missions/` | V2SmokeTests; complete quests, dialogue and route consequences absent |
+| Snapshot/file persistence | Accepted foundation | PARTIAL | `src/Game/Domain/Progress/` | V2/progression save cases pass; AUD-01/AUD-02/AUD-03/AUD-12 remain |
+| Equipment-taught skill metadata | Promising full loop | CODE FOUNDATION | `src/Game/Domain/Equipment/EquipmentDefinition.cs` | TaughtSkillId is not a verified equipment-learning workflow |
+| Unity persistence adapter | Accepted boundary | NOT VERIFIED | `src/Game.Unity/Persistence/` | Outside .NET solution; narrower profile coverage; no Editor/Play Mode run |
+| Refill buffs, auto-refill, growth bridges | Promising | CONCEPT ONLY | Conversation design | No approved full rules or implementation evidence |
+| Villa, Sanctuary, hybrid combat | Deferred implementation | CONCEPT ONLY | Part I | Require design/audit gates; no production implementation certified |
+| Full playable game | Accepted vision | NOT VERIFIED | Backend foundations only | No verified visual/content/audio/playable loop |
 
-**Audit limitations:** This ledger uses current file fetches and code search, not a recursive repository tree, executed tests, or Unity. A missing search hit is not proof of absence. All `FOUNDATION` claims must be upgraded through workflow verification with file/test evidence. Documented smoke guardrails: **38 legacy events, 100 combat assertions, 899 total assertions at the latest progression documentation checkpoint**; not fresh test results.
+**Missing long-term systems:** full class and mentor content; cognition UI; equipment-learning loop; complete quest/event/reward lifecycle; item/equipment catalogs, loot and economy; transmutation execution; restoration and reflection; visual/game-loop adapters; presentation, audio, accessibility, localization and platform decisions. These are not authorized by this list.
 
-## 12. Architecture acceptance and validation gates
+<a id="verification"></a>
+## Verification Commands and Current Evidence
 
-- Pure C# domain/application owns gameplay facts and decisions; Unity displays results/events and adapts input/storage.
-- Do not add parallel combat, progression, mission or save engines.
-- For every implementation claim, record **source path + test path + executed result + known limits**.
-- Run `dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal`, `dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build`, `git diff --check`; check Unity adapters manually in Unity.
-- Preserve serialization IDs, `.meta` files and V1 slice compatibility; never treat an old generator as current authority.
-
-# Part III — Decisions, Roadmap & Development Governance
-
-### 13. PETTO Mode and audit-driven development
-
-**LOCKED PROCESS:** **Foundation → Workflow Verification → Documentation → Audit → Next Atomic Step.** The audit backlog is the roadmap.
-
-1. Read latest audit/backlog and identify the **earliest unresolved atomic item**.
-2. Confirm prior workflow verification and current documentation.
-3. Check whether the change would create a parallel system or violate ownership.
-4. Plan one purpose per branch; never mix gameplay changes with documentation/tooling cleanup.
-5. Implement narrowly; run build, smoke tests, save/restore and compatibility checks where relevant.
-6. Record results, update this Bible and audit, then propose the next atomic step.
-
-**Documented guardrails (not freshly rerun here):** legacy slice emits 38 events; combat smoke group has 100 assertions; progression foundation documents 899 total smoke assertions at its latest recorded checkpoint. These are historical documented counts, not proof of the current CI result.
-
-Validation commands documented by the project:
+Run from the repository root using the solution's .NET SDK:
 
 ```powershell
+dotnet restore Fragments-of-Wisdom.sln
 dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal
-dotnet run --project src\Game.SmokeTests\Game.SmokeTests.csproj --no-build
+dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build
 git diff --check
+git status --short
 ```
 
-### 14. Current audited track
+| Reporting group | Assertions |
+|---|---:|
+| V1 Legacy Slice | 2 |
+| Shared Domain Foundations | 16 |
+| V2 Narrative / Progression / Persistence | 264 |
+| V3 Combat / Skills / Resonance / Status / Stats | 100 |
+| Player Progression / Combat Validation | 517 |
+| **Total** | **899** |
 
-The [living backlog](TODO_BACKLOG.md) documents:
-1. Finish responsibility-based naming cleanup for progress restore and combat-validation diagnostics.
-2. Design/audit the visual smoke-demo boundary.
-3. Implement only the smallest approved visual adapter consuming existing state/events.
-4. Run workflow verification and audit.
-5. Revisit Town Restoration only after that boundary is stable.
-6. Explore Sanctuary after event/milestone input contracts are designed.
-7. Explore hybrid combat **in a separate design-only audit**; do not smuggle it into the current naming/visual track.
+Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, already included in 517. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
-**Explicit exclusions from the cleanup branch:** combat policy changes, new rewards/economy, save-format changes, generator-wide rewrite, broad bootstrap migration, Unity asset renames and gameplay refactors.
+**Executed audit baseline (2026-10-30):** implementation `45fb4548ab18984940471b79d5643e16f5aa50f4`, Bible v3 `c11c74d1317f8ca279d8c0698b88d4af96350f94`; restore/build succeeded with 0 warnings and 0 errors; smoke 899 and V1 events 38; diff checks passed. Twelve additional in-memory probes against the compiled assembly reproduced the findings in Part V. They were not added to the suite and must not be counted as smoke assertions.
 
-### 15. Deferred and open systems
+**Consolidation rerun (2026-10-31):** restore exit 0; build exit 0 with 0 warnings and 0 errors; complete smoke exit 0 with exactly the counts above. The first sandboxed smoke attempt failed at File.Move in the file-repository tests with UnauthorizedAccessException (exit -532462766); the identical command passed with expanded execution permission, without code/test changes. The twelve probes are preserved historical execution evidence, not claimed as newly rerun in this docs-only pass.
 
-**Deferred:** enemy AI expansion; advanced statuses; Atlas prediction; balance simulator; full class/skill content; item-taught skills; mentor hybrids and slots; mission chains and event tracking; Codex UI/completion/rewards; item/equipment registries, affixes, loot, mastery; richer transmutation and alignment consequences; town buildings and Sanctuary implementation.
+Documentation integrity checks passed: all 11 archived sources match with the documented whitespace normalization; 67 live local Markdown links resolve; all 31 explicit anchors are unique; git diff --check exits 0. Production code, tests, solution/build configuration and generator scripts have no diff. All 10 newly retired originals were verified before deletion; the master specification was already absent. No generator ran and no Unity files changed. The five remaining old-path references outside this Bible are historical generator output declarations in modules 00, 05 and 06, not live documentation links; their behavior is explicitly described in the tooling section. No GitHub Actions configuration or Unity Assets/ProjectSettings tree was present in the tracked inventory. Unity Editor, Play Mode and playable-game validation remain unperformed.
 
-**Open decisions:** hybrid combat timing/input architecture; final Nahual terminology; full narrative/world bible; equipment/loot economy; Codex completion semantics; Sanctuary event selection and repetition rules.
+Integrated smoke covers class/mentor/teaching/mastery, retention after switching class, binding save/JSON/restore, prerequisite-first tree unlock application, scoped trees with identical node IDs, validation modes/provider/classification/orchestration, optional engine integration and shared loaded-session/bootstrap ownership. See [progression tests](../src/Game.SmokeTests/PlayerProgressionFoundationSmokeTests.cs), [runtime workflow tests](../src/Game.SmokeTests/ProgressionRuntimeBootstrapSmokeTests.cs), [V2 tests](../src/Game.SmokeTests/V2SmokeTests.cs), [V3 tests](../src/Game.SmokeTests/V3SmokeTests.cs) and [runner](../src/Game.SmokeTests/SmokeTestRunner.cs).
 
-## 16. Decision register — conversations vs code
+Coverage gaps include the twelve audit regressions, full-state save replacement, target nullability, hostile/extreme numeric values, registry-authoritative metadata, platform/filesystem fault injection, Unity/editor integration and a production playable flow. Current green counts do not close these gaps.
 
-| Decision / idea | Design classification | Implementation classification | Required next evidence |
-|---|---|---|---|
-| HD-2D with Taíno/Caribbean motifs and unique visual language | **ACCEPTED DIRECTION** | **CONCEPTUAL VISUAL IDENTITY** | Approved art references, in-engine prototype |
-| Strategic Resonance refill consumes a turn | **ACCEPTED** | **FOUNDATION** | Smoke execution and UI proof |
-| Refill buff “next skill cheaper” | **PROMISING / TO REFINE** | **CONCEPTUAL** | Written balance rules and tests |
-| Auto-refill via mentor/class mastery | **PROMISING / TO REFINE** | **CONCEPTUAL** | Unlock, cost and timing contract |
-| Hybrid combat | **PROPOSED** | **CONCEPTUAL** | Dedicated design audit |
-| Equipment mastery like FFIX | **PROMISING / TO REFINE** | **PARTIAL FOUNDATION** | Equip/learn/master/retain E2E verification |
-| Codex ceremonial knowledge map | **ACCEPTED DIRECTION** | **CONCEPTUAL UI** | UI spec, state model and prototype |
-| Villa restoration from knowledge | **ACCEPTED DIRECTION** | **DEFERRED** | Visual smoke boundary, restoration model |
-| Sanctuary reflects real milestones | **ACCEPTED DIRECTION** | **DEFERRED** | Milestone fact model and narrative audit |
-| Nahual trade-off: lost mentors vs transmutation | **PROMISING / TO REFINE** | **PARTIAL POLICY ONLY** | Consequence design and execution |
+<a id="audit"></a>
+# Part V: Audit & Technical Debt
 
-### 17. Documentation consolidation ledger
+<a id="reproduced-findings"></a>
+## Reproduced Integrity Findings
 
-| Existing file | Proposed destination | Action before acceptance |
-|---|---|---|
-| `docs/FOUNDATION_MASTER_SPEC.md` | Chapters 1–6, 9 | Historical ideas migrated; inspect for missed details |
-| `docs/V3_Combat_Foundation.md` | Chapter 4 | Retain until all technical contracts migrated |
-| `docs/V2_Narrative_Foundation.md` | Chapters 5–6 | Retain until all service boundaries migrated |
-| `docs/V2_Save_Foundation.md` | Chapter 10 | Retain until all DTO/compatibility details migrated |
-| `docs/PlayerProgression_Foundation.md` | Chapters 3, 9–10 | **High-density:** requires contract-by-contract audit |
-| `docs/Foundation_Version_Prefix_Naming_Audit.md` | Chapters 11–12 and historical ledger | Verify completed vs pending rename items |
-| `docs/TODO_BACKLOG.md` | Chapters 11–13 | Retain until audit/roadmap migration verified |
-| `docs/CODEX_WORKFLOW.md`, `docs/STRUCTURE_NOTES.md` | Chapters 9, 11 | Verify no agent instructions lost |
-| `docs/GENERATOR_USAGE.md` | Historical tooling | Check live references before retiring |
-| `README.md` | Short project entry point | Rewrite after Bible acceptance |
-| `AGENTS.md` | Minimal agent entry point to Bible | **Keep:** agents need discoverable instructions |
-
-**No source documents are deleted in this draft.** The final cleanup requires a traceability checklist, broken-link scan, code/test validation and explicit approval before removal.
-
-### 18. Source provenance and change policy
-
-The source set is the repository's living docs listed above, earlier visual/Codex concepts and the project's design conversations. The prior consolidated DOCX was a starting point, **not evidence that every old technical contract has been migrated**.
-
-Each new approved design decision should update the relevant chapter and its status; each implementation branch should update the verified state and audit. A mismatch between code and Bible is an **audit finding**, never an excuse for silent code changes.
-
-**Acceptance gate:** confirm complete inventory; review each original file against this Bible; audit code/tests and reference links; approve unresolved design choices; only then designate this file the sole governing document.
-
-### 18.1 Provenance classification
-
-- **CODE INSPECTED:** concrete source paths in Chapter 11, from `main` at the time of drafting.
-- **REPOSITORY DOCUMENTED:** `docs/TODO_BACKLOG.md`, `docs/PlayerProgression_Foundation.md`, V2 narrative/save and V3 combat foundations.
-- **CONVERSATION DESIGN:** visual language, Codex concept, Resonance buff/auto-refill, equipment-learning fantasy, town, Sanctuary, philosophical routes and hybrid-combat exploration. Their status reflects what was discussed, **not an invented implementation claim**.
-- **OPEN / NOT VERIFIED:** design decisions or technical facts without enough evidence.
-
-### 18.2 Next documentation audit
-
-1. Compare every section of the dense progression foundation against Chapters 5, 9–12.
-2. Cross-check live tests and Unity adapter integration, record exact results.
-3. Recover any additional approved concepts from older visual, Codex and vertical-slice documents; mark unverified details `OPEN`.
-4. Update `README.md` and `AGENTS.md` only after the new chapter structure is accepted.
-5. Retire old documents **only after** a reference scan and user review; never as part of gameplay changes.
-
-
-# Part IV — Executed Code Audit and Integrity Backlog (2026-10-30)
-
-> **Evidence source:** Codex read-only audit of `main`, reported against implementation baseline `45fb4548` and Bible v3 `c11c74d`. The follow-up executed twelve in-memory probes against a compiled assembly. This chapter is the current **executed evidence**, superseding any older optimistic implementation labels. It does not claim Unity verification.
-
-## 19. Executed verification baseline
-
-- `dotnet restore` and `dotnet build`: **0 warnings, 0 errors**.
-- Smoke assertions **899**: V1 **2**, Shared **16**, V2 **264**, V3 **100**, Progression **517**; legacy V1 emits **38 events**.
-- Twelve additional in-memory behavioral checks **were not added to the smoke assertion count**.
-- `git diff --check` and `git diff --exit-code HEAD` succeeded. Codex did not change tracked files.
-- Unity project assets, scenes, prefabs, editor compilation, Play Mode, presentation and a playable vertical slice **were not verified**. A clean .NET build is not a playable-game certificate.
-
-## 20. Reproduced integrity findings — actionable audit register
+All twelve findings remain **OPEN**. The following table preserves the previous audit's severity and acceptance direction without changing gameplay. It records observations, not speculation or implementation approval.
 
 | ID | Severity from executed probe | Reproduced behavior | Affected code | Required acceptance direction |
 |---|---|---|---|---|
@@ -343,41 +408,187 @@ Each new approved design decision should update the relevant chapter and its sta
 
 **Correction:** `Defend` and `Wait` exist in an enum, but `TurnRequest` only publicly constructs basic attacks and skills. Classify these as **incomplete contracts**, not reproduced failures through the current public API.
 
-## 21. Code-grounded implementation clarifications
+### Probe Observations and Reproduction Boundaries
 
-- **Combat:** backend attack/skill execution is tested; complete dispatch, target/lifecycle semantics, refill and legacy status blocking are **PARTIAL**.
-- **Resonance:** active/reserve and spending transfer are tested; refill is a **separate mutation path**, not fully integrated into turn lifecycle. Random buffs, discount, auto-refill and Codex/mastery-driven reserve growth remain **NOT IMPLEMENTED**.
-- **Skills/mastery:** distinguish XP-based `SkillProgress.IsMastered` from retention `MasteryProfile`. Existing retention rules are not equivalent to a future class eligibility policy. Equipment stores `TaughtSkillId`, but the complete equip→learn→master→retain loop is **NOT VERIFIED**.
-- **Codex:** discovery and enriched records work for tested flows, but legacy completion/discovery data are lost in the reproduced round trip.
-- **Persistence:** supported snapshot flows work; restore merges into existing profiles, lacks fully atomic semantics, and does **not** cover complete player cognition/inventory/wallet/alignment. Unity adapter coverage is narrower and unverified in Editor.
-- **Narrative:** Nahual transmutation access policy exists; enemy-to-item transmutation and its economy do not.
-- **Town/Sanctuary/hybrid combat:** **DESIGN ONLY / DEFERRED**, no production gameplay implementation verified.
-- **Architecture:** Domain/Application have no Unity dependency found, but currently share one `net10.0` assembly rather than separately enforced assembly boundaries.
+| ID | Observed inputs / output supporting the finding |
+|---|---|
+| AUD-01 | Destination class changed from audit.before to audit.after, then null mastery destination threw ArgumentNullException; temporary-profile preflight had passed |
+| AUD-02 | Child unlocked without root: registry-aware semantic validation false; coordinator FullyRestored true; child true and root false afterward |
+| AUD-03 | Legacy DiscoverEntry(string) and CompleteEntry facts lost in JSON round trip; candidate-backed enriched discovery survived |
+| AUD-04 | Canonical skill with required unlock blocked as V3SkillLocked; alternate definition with same ID but no requirement accepted |
+| AUD-05 | Enemy skill with ResonanceCost 10 reduced the runtime's single active pool from 30 to 20 |
+| AUD-06 | Refill advanced turn 1 to 2 with Poison duration 2/potency 7; HP remained 100 and duration remained 2 |
+| AUD-07 | Refill succeeded after EndCombat, restored resource and advanced turn 2 to 3 |
+| AUD-08 | Silence produced one ActionBlocked and one SkillUsed; XP increased by 10 and defender HP fell from 100 to 95 |
+| AUD-09 | Progress 50 plus int.MaxValue became -2147483599 and Unranked |
+| AUD-10 | Teaching requested 50 at progress 90; profile capped at 100 but result said ProgressApplied 50, not actual delta 10 |
+| AUD-11 | ResourcePool at Current=Max=100 accepted TrySpend(-10), leaving Current=110 |
+| AUD-12 | Invalid mastery stopped preflight application; ClassRestored true despite destination still audit.before |
 
-## 22. Risk-first, audit-driven atomic backlog
+These were ad-hoc in-memory checks, not committed test additions. Converting each into a permanent failing-then-passing regression is part of its future atomic repair, not work completed here.
 
-**Approved proposed reordering requires explicit review before implementation.** The older naming-first backlog remains preserved below as historical provenance. Current recommended sequence:
+### Architectural Risks and Inferences
 
-1. `AUD-01` Restore destination validation and no partial mutation on failure. Separate branch, regression probe, workflow verification, documentation, audit.
-2. `AUD-02` Registry-aware tree semantic preflight in actual restore path.
-3. `AUD-03` Legacy Codex compatibility round-trip and schema decision.
-4. `AUD-04` Canonical skill-definition validation.
-5. `AUD-09`/`AUD-10`/`AUD-11`/`AUD-12` each individually scoped as needed; do not hide correctness repairs in rename work.
-6. `AUD-05`/`AUD-06`/`AUD-07`/`AUD-08` require explicit combat lifecycle and actor-resource ownership decisions before atomic fixes.
-7. Resume existing `codex/rename-progress-restore-api` and subsequent naming/visual boundary track after risk-based approval.
+The following are source-grounded risks, **not additional reproduced findings**:
+- A folder-only assembly boundary cannot prevent every domain/application dependency leak.
+- Several staged restore checks and semantic validators can diverge; duplicated validation rules need ownership, not another parallel restore implementation.
+- Public mutable profiles and legacy aggregate tree queries allow consumers to ignore intended scope/ownership.
+- Merge-style restoration needs an explicit policy for loading over nonempty state; thread safety and multi-writer save semantics are not established.
+- Two mastery concepts and two status/event systems need explicit adapters or eventual decisions, not opportunistic rewrites.
+- Legacy reward replay and incomplete state persistence may break a future economy/full-session restore.
+- Large historical documentation and smoke classes raise maintenance cost; atomic test organization must preserve counts and behavior.
 
-**Gate for every branch:** Foundation → Workflow Verification → Documentation → Audit → Next Atomic Step. Do not implement unrelated gameplay during repairs.
+<a id="reconciliation"></a>
+## Contradictions Resolved and Decisions Still Open
 
-## 23. Consolidation policy and historical record
+| Older claim / source | Current interpretation and evidence |
+|---|---|
+| Bible said tests were not executed; archive lists changing counts | Audit execution and current rerun in Part IV are authoritative; 899 is not the sum of archived historical checkpoints |
+| Old backlog says active tests still use V4SmokeTests | Source uses PlayerProgressionFoundationSmokeTests plus ProgressionRuntimeBootstrapSmokeTests; completed neutral test/bootstrap/doc renames are recorded below |
+| Essence replaced by Resonance | Engine still charges actor Essence and optional runtime active Resonance |
+| All restore state is atomic after preflight | Temporary restore checks exist, but AUD-01/AUD-02/AUD-12 invalidate the broad guarantee |
+| Codex save preserves discovered/completed facts | Enriched records survive; legacy sets lose information (AUD-03) |
+| Skill mastery means one unified system | XP SkillProgress mastery and 100-point MasteryProfile retention remain separate |
+| Class identity already restricts every mastered cross-class skill | Current retention admits any registered mastered skill; restricted eligibility is proposed, not implemented |
+| Silence and SkillSeal are equivalent blockers | SkillSeal returns before cost/application; legacy Silence only logs in reproduced case |
+| Unity adapters mean a playable or fully saved Unity game | Adapter source exists outside solution with narrower state; no Editor, scene or Play Mode verification |
+| Generator commands are the current workflow | Historical snapshot generation can overwrite output and recreate retired docs; not part of current solution build |
+| Session naming implies automatic file loading | Loaded session/bootstrap compose prepared state; disk load remains explicit |
 
-**This file is the single authoritative specification.** Parts I–IV are the active interpretation; the verbatim source records below are **historical evidence and detailed contracts**, not separate competing instructions. Where source records conflict with executed findings, prefer Chapter 20–22 and verify in code. Where a detail is absent from the active chapters, retain its technical contract from the historical record pending an explicit reconciliation; never silently discard it. Historical counts and branch plans are not current test results. The source records are preserved verbatim to prevent losing overload signatures, edge cases, naming audits, workflow instructions and design rationale during cleanup.
+**OPEN DECISIONS:** per-actor Resonance ownership; refill/status turn semantics; replacement vs merge save loading and durable migration; canonical definition/request identity contract; retained-skill class eligibility; bridging XP and retention mastery; mentor progression/slot commitments; Codex completion semantics; hybrid input/time authority; Sanctuary milestone selection and repetition; town capability mapping; final Nahual terminology; full narrative/content economy; Unity framework/platform and presentation boundary. No implicit approval follows from documenting a candidate solution.
 
-# Part V — Consolidated Historical Technical Source Records (verbatim archival)
+<a id="governance"></a>
+# Part VI: Development Governance
 
-## Archive 01 — docs/FOUNDATION_MASTER_SPEC.md
+## PETTO Mode and Atomic Work
 
-> Original SHA: `98cc5f90f0f62d10b0e39c443f5b5d5e229b28f6`. **Archived source text; not a separate governing document.**
+**Foundation -> Workflow Verification -> Documentation -> Audit -> Next Atomic Step.**
 
+Current priority remains the incremental vertical-slice backend foundation, not full-game expansion unless explicitly requested. Read this Bible's current status, audit and backlog before work. Confirm repository structure, branch and worktree; identify relevant code, provide a short plan and preserve unrelated user changes. Require explicit approval for the proposed implementation direction, merge, deployment or destructive cleanup. A specific authorized task is not permission to implement adjacent features.
+
+Use small branches and commits with one purpose. Keep gameplay fixes separate from naming, tooling and documentation-cleanup work. Documentation/verification updates necessary to explain the chosen mechanic belong in its closure, not an unrelated redesign. Before committing inspect status and exact diff; summarize changed files. Do not reset/revert user work.
+
+Prefer domain-first, small focused classes and one important public class per file. Narrow exceptions: tightly related tiny enums, private helpers and generated DTOs. Do not add giant MonoBehaviours, parallel gameplay/save engines or hidden cross-domain mutation. Keep gameplay independently testable. No generator-wide rewrite or broad bootstrap migration without explicit authorization.
+
+Preserve serialization compatibility, stable IDs and Unity GUID/.meta/serialized references. Historical version prefixes are provenance or compatibility identifiers, not evidence of unfinished behavior. Name new active APIs by responsibility; avoid sweeping rename churn or mixing numerical/logic repairs into naming work.
+
+<a id="workflow-verification"></a>
+## Workflow Verification Checklist and Definition of Done
+
+After any significant mechanic, pause expansion and create a verification iteration; suggested branch `codex/<mechanic>-workflow-verification`.
+
+- Build passes; smoke tests pass.
+- Record assertion counts by group and V1 event count 38; retain the V3 100-assertion baseline unless an explicitly scoped test addition changes it.
+- Update this Bible's current status, findings and single backlog for completed, deferred or reprioritized work.
+- Confirm no parallel system was introduced and domain/application boundaries remain Unity-free.
+- Stateful mechanics have save/restore coverage, including nonempty destinations and explicit failure behavior.
+- Validate stable IDs through the relevant registries; test unknown/duplicate IDs and malformed inputs.
+- Preserve old JSON compatibility and document schema/default/legacy handling explicitly.
+- No generator-wide rewrite unless requested.
+- Run at least one integrated E2E workflow crossing the mechanic's real boundaries.
+- Inspect diff/status and report every changed file, behavior/architecture risks and test results.
+- When Unity assets/adapters are touched: open affected scenes, check Console, inspect prefabs/ScriptableObjects, enter Play Mode and confirm serialized references; otherwise report Unity not exercised.
+
+Use the [verification commands](#verification). Green counts alone do not close an audit finding; its acceptance direction needs a targeted regression and integrated verification. Record environmental failures honestly and distinguish fresh execution from inherited evidence.
+
+<a id="current-backlog"></a>
+## Single Current Audit-Driven Backlog
+
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. All twelve reproduced findings remain open. Every implementation item must complete the PETTO loop before the next.
+
+| Priority | Atomic purpose or approval gate | Traceability / acceptance |
+|---|---|---|
+| 1 | Validate real restore destinations before mutation | AUD-01; zero target changes on rejected input; do not change individual restore behavior incidentally |
+| 2 | Wire registry-aware semantic preflight into actual restore | AUD-02; reject invalid scopes/nodes/prerequisite closure without mutation |
+| 3 | Preserve legacy Codex round trips | AUD-03; explicit schema/compatibility decision and discovery/completion regression |
+| 4 | Validate canonical skill metadata | AUD-04; same-ID alternative cannot bypass required unlock or cost facts |
+| 5a | Repair bounded mastery arithmetic | AUD-09; overflow-safe progress |
+| 5b | Report actual teaching delta | AUD-10; capped grant reports actual change |
+| 5c | Reject invalid ResourcePool spending | AUD-11; preserve Current/Max invariants |
+| 5d | Separate restore feasibility from applied facts | AUD-12; failure results cannot imply applied state |
+| 6 | Audit/approve actor resource ownership and refill lifecycle | AUD-05/AUD-06/AUD-07; design first, then separately scoped resource/lifecycle repairs |
+| 7 | Correct remaining action/status contracts | AUD-08; actual blocking and consistent events; Defend/Wait require a separate public-contract decision |
+| 8 | Resume deferred responsibility-based naming | Restore APIs and V3/V4 diagnostic facts only; preserve behavior and serialized names |
+| 9 | Design/audit the visual boundary and playable slice | Consume ProgressionRuntimeDemoBootstrap; no duplicate state/engine/session; implementation only after approval |
+| 10 | Revisit long-term systems behind their design gates | Town after visual boundary, Sanctuary after milestone inputs, hybrid combat only after dedicated redesign audit |
+
+Each 5a-5d is a separate repair candidate, not a combined cleanup branch. Each combat repair after priority 6 also needs one purpose. Historical proposed branch names `codex/rename-progress-restore-api`, `codex/rename-combat-validation-diagnostics` and `codex/visual-smoke-demo-design-audit` remain traceable here; no branch is created by this document.
+
+### Completed Foundations, Not Claims of Defect-Free Systems
+
+Historical completion records retained: legacy V1/V3 guards; classes/mastery/mentors/teaching, retention, scoped trees and bindings; restore coordinator foundation; validator/gateway/optional engine integration/composition; progression-aware application combat factory; one runtime state under LoadedPlayerSession; PlayerSessionComposition, PlayerSessionBootstrap and ProgressionRuntimeDemoBootstrap; dedicated runtime/bootstrap workflow test organization.
+
+Completed neutral naming: V5RuntimeDemoBootstrap -> ProgressionRuntimeDemoBootstrap; V4SmokeTests -> PlayerProgressionFoundationSmokeTests; RunV4SmokeTests -> RunPlayerProgressionFoundationSmokeTests; reporting labels -> progression/session/bootstrap responsibilities; runtime helpers -> ProgressionRuntimeBootstrapSmokeTests; V4_Classes_Mastery_Foundation.md -> PlayerProgression_Foundation.md (now archived here). These historical file names are not current links. Audit defects reopen specific correctness gaps, not the fact that the foundations exist.
+
+### Unresolved Naming and Compatibility Work
+
+- V4ProgressRestoreCoordinator, V4ProgressRestoreResult and V4ProgressRestoreFailureReason still expose version prefixes.
+- V3AccessChecked / V4AccessChecked, V3BlockReason / V4BlockReason and V3UnlockProfileMissing / V3SkillLocked / V4ContextIncomplete / V4SkillBlocked need responsibility-based diagnostics in a behavior-preserving branch.
+- Defer IV2SavePathProvider, UnityV2SavePathProvider, UnityV2SaveService, V2ProgressSnapshot* and V2*Snapshot DTO renames: serialization/public API blast radius requires an isolated persistence plan.
+- Retain version-prefixed branch names, migration notes, schema history and explicit compatibility guards as provenance.
+- Keep documentation closure factual; do not reintroduce independent TODO/specification files.
+
+### Preserved Deferred Gameplay Items
+
+This is the unresolved inventory from the historical backlog, not additional approved work:
+- Smarter enemy AI; status stacking, immunity windows and Poison/Burn synergy; Atlas prediction API; balance simulator.
+- Full Tlamatini tree, additional culturally reviewed Mesoamerican-inspired classes, item-taught skills and cognition UI.
+- Active/fixed/equipped teaching persistence beyond the current foundation; Lyra/Atlas hybrid skill; Gepetto/Spark after validation; teaching slot upgrades.
+- Partial objective progress; event-based mission tracking; mission chains/prerequisites; repeatable bounties; story mission examples.
+- Codex completion thresholds, reward bridge, discovery stages and UI models.
+- Item registry, equipment registry, affixes, loot tables and equipment mastery.
+- Richer alignment consequences and actual transmutation; no invented economy formulas.
+- Town restoration: buildings/capabilities linked to learned teachings and later mastery upgrades, not free placement. Future shop/workshop/cooking/alchemy functions need separate approval.
+- Sanctuary reflection: real selected milestones only, no score/XP/percentages; stable event/persistence contracts first.
+- Visual adapter workflow verification/audit after the approved smallest demo; preserve FoundationVerticalSlice and do not construct competing sessions, bindings or engines.
+
+### Explicit Exclusions Until Authorized
+
+No broad generator/bootstrap rewrite, legacy slice replacement, save-format change, combat-policy redesign, rewards/economy additions, full-game expansion, Unity asset renaming or unrelated feature work inside cleanup. Hybrid combat is a design-only track until its timing and authority contract is approved. Source inspection does not settle open cultural, narrative, balance or platform choices.
+
+<a id="historical-archive"></a>
+# Part VII: Historical Decisions & Reference Archive
+
+**HISTORICAL REFERENCE, NOT CURRENT INSTRUCTIONS.** These complete source records preserve technical detail, formulas, overloads, edge cases, compatibility requirements and unresolved decisions. Their old counts, "next branch" instructions, links and optimistic safety claims are not current authority. Read Parts II-VI for corrections and the only active backlog.
+
+The original documents are presented as fenced Markdown source inside collapsible sections so their headings/backlogs do not compete with current navigation and their obsolete links are not live links. Source wording, examples, tables and encoding artifacts are preserved. CRLF/LF presentation is normalized; the two trailing spaces on original Archive 01 line 72 (after `Classes = how Nova fights.`) are omitted to pass whitespace checks. No other source whitespace is changed. Original Git blob IDs permit byte-level source recovery. No game/code/test file is replaced by this archive.
+
+<a id="preservation-matrix"></a>
+## Preservation Matrix and Source Inventory
+
+Each original archived body was compared in full to `git cat-file blob <original-sha>`, normalizing line endings and the wrapper's final newline. All eleven matched before removal. Final fenced bodies are checked again with the single documented trailing-space normalization above. No truncated sections were accepted. The ten surviving files' tree blob IDs also matched the recorded originals before removal. FOUNDATION_MASTER_SPEC was already absent and was recovered from its recorded Git blob. "Retired" describes the separate Markdown original, not removal of its content.
+
+| Original document (historical path) | Original Git blob SHA | Verified | Integrated location | Separate original retired |
+|---|---|---|---|---|
+| `docs/FOUNDATION_MASTER_SPEC.md` | `98cc5f90f0f62d10b0e39c443f5b5d5e229b28f6` | Yes, full text | Parts I-II; [Archive 01](#archive-01) | Already absent before this pass |
+| `docs/V3_Combat_Foundation.md` | `08d2348ef926e3ad136e4ef0b62d017ee746cdaa` | Yes, full text | Combat rules; [Archive 02](#archive-02) | Yes, this pass |
+| `docs/V2_Narrative_Foundation.md` | `3e20aec0ae8357fa0afdb4ea1326fcc25e35e469` | Yes, full text | Narrative rules; [Archive 03](#archive-03) | Yes, this pass |
+| `docs/V2_Save_Foundation.md` | `640ff15d099b2e9e4f79fac1034fe29abd62047f` | Yes, full text | Persistence; [Archive 04](#archive-04) | Yes, this pass |
+| `docs/PlayerProgression_Foundation.md` | `9b6e1a70d52cd8d5e221db33c969fc7084628b4e` | Yes, full text | Progression / runtime / persistence; [Archive 05](#archive-05) | Yes, this pass |
+| `docs/Foundation_Version_Prefix_Naming_Audit.md` | `c231625cc1852edd2129cb633352a98d49f7b80e` | Yes, full text | Reconciliation / naming backlog; [Archive 06](#archive-06) | Yes, this pass |
+| `docs/TODO_BACKLOG.md` | `01bf92203ef6d2a9c00ae446e77b05505126d888` | Yes, full text | Current backlog; [Archive 07](#archive-07) | Yes, this pass |
+| `docs/CODEX_WORKFLOW.md` | `5277f5003f52e0f4dc65f0905ed79f13cda8b4e9` | Yes, full text | Governance; [Archive 08](#archive-08) | Yes, this pass |
+| `docs/STRUCTURE_NOTES.md` | `6881774e8f133fabb60c2b4815503f4f2463c51c` | Yes, full text | Architecture / governance; [Archive 09](#archive-09) | Yes, this pass |
+| `docs/GENERATOR_USAGE.md` | `c73c308cd3aa3030933f767cd740bf12dfe2f45a` | Yes, full text | Historical tooling; [Archive 10](#archive-10) | Yes, this pass |
+| `docs/Workflow_Verification_Checklist.md` | `edd9df140fe118bf764b12e6e7f0ddb2d440db0c` | Yes, full text | Workflow verification; [Archive 11](#archive-11) | Yes, this pass |
+
+Other provenance:
+- The pre-consolidation Bible is recoverable at editing-baseline blob `1dbb44611a631e3f815831ec71236b984363a6a2`. Creative material was retained and contradictory active claims reconciled above.
+- Binary design references remain untouched: `Fragments Of Wysdom — Codex Ui Concept V0.docx`, `Fragments Of Wysdom — Visual Foundation Bible V0.docx`, `Fragments of Wisdom — Vertical Slice Iteration 2 Spec.docx`, `LLM_Conception.pdf` and `📘 FOUNDATION MASTER SPEC — NOVA RPG.pdf`.
+- The 425-page LLM conception PDF was only partially text-inspected; the 11-page foundation PDF had text inspection, not complete visual verification. Binary references are not certified as fully consolidated and must not be deleted.
+- The unrelated local `Fragments_of_Wysdom_Game_Design_Architecture_Bible_v1.docx` remains untracked and untouched.
+- Design conversations informed Part I; they are not proof that content or mechanics exist. Unsettled decisions remain open.
+- Old tool-entry prose is preserved in [Tool entrypoint provenance](#tool-entrypoint-provenance). The live tools README files now only navigate here.
+
+<a id="archive-01"></a>
+## Archive 01: FOUNDATION_MASTER_SPEC.md
+
+Historical source path: `docs/FOUNDATION_MASTER_SPEC.md`. Original blob: `98cc5f90f0f62d10b0e39c443f5b5d5e229b28f6`.
+
+<details>
+<summary>Show complete historical Markdown source (01)</summary>
+
+``````markdown
 # FOUNDATION MASTER SPEC â€” NOVA RPG
 
 ## Vision
@@ -449,7 +660,7 @@ Initial class:
 
 Cognition is separate from classes.
 
-Classes = how Nova fights.  
+Classes = how Nova fights.
 Cognition = how Nova understands and modifies systems.
 
 Initial archetypes:
@@ -517,13 +728,19 @@ The slice demonstrates:
 10. Cognition passives affect combat.
 11. Enemy AI acts.
 12. Codex and battle rewards are updated.
+``````
 
----
+</details>
 
-## Archive 02 — docs/V3_Combat_Foundation.md
+<a id="archive-02"></a>
+## Archive 02: V3_Combat_Foundation.md
 
-> Original SHA: `08d2348ef926e3ad136e4ef0b62d017ee746cdaa`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/V3_Combat_Foundation.md`. Original blob: `08d2348ef926e3ad136e4ef0b62d017ee746cdaa`.
 
+<details>
+<summary>Show complete historical Markdown source (02)</summary>
+
+``````markdown
 # V3 Combat Foundation
 
 This document describes the starting architecture for the V3 combat foundation.
@@ -802,13 +1019,19 @@ Expected smoke output:
 - total smoke assertions executed: `357`
 
 The V1 event count is a guardrail. If it changes, treat that as a behavior change unless the user explicitly requested a V1 loop update.
+``````
 
----
+</details>
 
-## Archive 03 — docs/V2_Narrative_Foundation.md
+<a id="archive-03"></a>
+## Archive 03: V2_Narrative_Foundation.md
 
-> Original SHA: `3e20aec0ae8357fa0afdb4ea1326fcc25e35e469`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/V2_Narrative_Foundation.md`. Original blob: `3e20aec0ae8357fa0afdb4ea1326fcc25e35e469`.
 
+<details>
+<summary>Show complete historical Markdown source (03)</summary>
+
+``````markdown
 # V2 Narrative Foundation
 
 This document describes the current Vertical Slice V2 narrative foundation. It is meant to help future Codex branches and contributors extend the architecture without collapsing domain boundaries or changing the V1 gameplay loop by accident.
@@ -1022,13 +1245,19 @@ Current smoke expectations:
 - Total smoke assertions remain `338` unless a branch intentionally adds or renames smoke coverage and explains why.
 
 Documentation-only changes should not alter smoke counts, gameplay behavior, Unity assets, scenes, prefabs, or `.meta` files.
+``````
 
----
+</details>
 
-## Archive 04 — docs/V2_Save_Foundation.md
+<a id="archive-04"></a>
+## Archive 04: V2_Save_Foundation.md
 
-> Original SHA: `640ff15d099b2e9e4f79fac1034fe29abd62047f`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/V2_Save_Foundation.md`. Original blob: `640ff15d099b2e9e4f79fac1034fe29abd62047f`.
 
+<details>
+<summary>Show complete historical Markdown source (04)</summary>
+
+``````markdown
 # V2 Save Foundation
 
 This document describes the current V2 save and persistence foundation. It covers only the lightweight state profiles and save plumbing that exist today; it does not describe a final save system, save slots, UI, autosave, or Unity scene integration.
@@ -1204,13 +1433,19 @@ Current smoke expectations:
 - Total smoke assertions remain `338` unless a branch intentionally adds or renames smoke coverage and explains why.
 
 Unity-facing files are outside the current .NET solution. Validate them manually in Unity by compiling the `src/Game.Unity` adapter code in a Unity assembly that references the game assembly, then exercising `UnityV2SavePathProvider` and `UnityV2SaveService` in Play Mode.
+``````
 
----
+</details>
 
-## Archive 05 — docs/PlayerProgression_Foundation.md
+<a id="archive-05"></a>
+## Archive 05: PlayerProgression_Foundation.md
 
-> Original SHA: `9b6e1a70d52cd8d5e221db33c969fc7084628b4e`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/PlayerProgression_Foundation.md`. Original blob: `9b6e1a70d52cd8d5e221db33c969fc7084628b4e`.
 
+<details>
+<summary>Show complete historical Markdown source (05)</summary>
+
+``````markdown
 # Player Progression Foundation
 
 This document describes the current player progression foundation for classes,
@@ -3183,13 +3418,19 @@ dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal
 dotnet run --project src\Game.SmokeTests\Game.SmokeTests.csproj --no-build
 git diff --check
 ```
+``````
 
----
+</details>
 
-## Archive 06 — docs/Foundation_Version_Prefix_Naming_Audit.md
+<a id="archive-06"></a>
+## Archive 06: Foundation_Version_Prefix_Naming_Audit.md
 
-> Original SHA: `c231625cc1852edd2129cb633352a98d49f7b80e`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/Foundation_Version_Prefix_Naming_Audit.md`. Original blob: `c231625cc1852edd2129cb633352a98d49f7b80e`.
 
+<details>
+<summary>Show complete historical Markdown source (06)</summary>
+
+``````markdown
 # Foundation Version Prefix Naming Audit
 
 Branch: `codex/foundation-version-prefix-naming-audit`
@@ -3316,13 +3557,19 @@ Naming consistency is a real blocker for visual smoke demo work because the acti
 `codex/rename-runtime-demo-bootstrap-api`
 
 That branch should rename only `V5RuntimeDemoBootstrap` to `ProgressionRuntimeDemoBootstrap`, update direct usages and documentation, and rerun the full smoke suite before any visual design begins.
+``````
 
----
+</details>
 
-## Archive 07 — docs/TODO_BACKLOG.md
+<a id="archive-07"></a>
+## Archive 07: TODO_BACKLOG.md
 
-> Original SHA: `01bf92203ef6d2a9c00ae446e77b05505126d888`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/TODO_BACKLOG.md`. Original blob: `01bf92203ef6d2a9c00ae446e77b05505126d888`.
 
+<details>
+<summary>Show complete historical Markdown source (07)</summary>
+
+``````markdown
 # TODO Backlog
 
 This is the living backlog for the current foundation track. It should reflect what is true now, not an early wishlist.
@@ -3492,13 +3739,19 @@ Every future feature branch must update `TODO_BACKLOG.md` when it:
 - closes an audit milestone
 
 Backlog updates should stay factual and scoped to the branch. If a branch changes architecture direction, the backlog must say what changed, what moved next, and what is explicitly not being done yet.
+``````
 
----
+</details>
 
-## Archive 08 — docs/CODEX_WORKFLOW.md
+<a id="archive-08"></a>
+## Archive 08: CODEX_WORKFLOW.md
 
-> Original SHA: `5277f5003f52e0f4dc65f0905ed79f13cda8b4e9`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/CODEX_WORKFLOW.md`. Original blob: `5277f5003f52e0f4dc65f0905ed79f13cda8b4e9`.
 
+<details>
+<summary>Show complete historical Markdown source (08)</summary>
+
+``````markdown
 # Codex Workflow
 
 Use Codex as an incremental engineering partner for Fragments of Wysdom, not as a bulk generator.
@@ -3544,13 +3797,19 @@ Then manually validate in Unity when assets are involved:
 - Inspect changed prefabs and ScriptableObjects.
 - Enter Play Mode for the affected flow.
 - Confirm serialized references are intact.
+``````
 
----
+</details>
 
-## Archive 09 — docs/STRUCTURE_NOTES.md
+<a id="archive-09"></a>
+## Archive 09: STRUCTURE_NOTES.md
 
-> Original SHA: `6881774e8f133fabb60c2b4815503f4f2463c51c`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/STRUCTURE_NOTES.md`. Original blob: `6881774e8f133fabb60c2b4815503f4f2463c51c`.
 
+<details>
+<summary>Show complete historical Markdown source (09)</summary>
+
+``````markdown
 # Structure Notes
 
 This foundation uses the rule:
@@ -3569,13 +3828,19 @@ Current organization is intended for:
 - cleaner Git diffs
 - less painful Unity project growth
 - easier refactor and tests
+``````
 
----
+</details>
 
-## Archive 10 — docs/GENERATOR_USAGE.md
+<a id="archive-10"></a>
+## Archive 10: GENERATOR_USAGE.md
 
-> Original SHA: `c73c308cd3aa3030933f767cd740bf12dfe2f45a`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/GENERATOR_USAGE.md`. Original blob: `c73c308cd3aa3030933f767cd740bf12dfe2f45a`.
 
+<details>
+<summary>Show complete historical Markdown source (10)</summary>
+
+``````markdown
 # Multi-Part Generator Usage
 
 Run each script in order from the folder containing the scripts:
@@ -3598,13 +3863,19 @@ To generate somewhere else:
 ```
 
 Use the same `-Root` for all scripts.
+``````
 
----
+</details>
 
-## Archive 11 — docs/Workflow_Verification_Checklist.md
+<a id="archive-11"></a>
+## Archive 11: Workflow_Verification_Checklist.md
 
-> Original SHA: `edd9df140fe118bf764b12e6e7f0ddb2d440db0c`. **Archived source text; not a separate governing document.**
+Historical source path: `docs/Workflow_Verification_Checklist.md`. Original blob: `edd9df140fe118bf764b12e6e7f0ddb2d440db0c`.
 
+<details>
+<summary>Show complete historical Markdown source (11)</summary>
+
+``````markdown
 # Workflow Verification Checklist
 
 Use this checklist after completing any significant mechanic and before continuing
@@ -3632,6 +3903,112 @@ Suggested branch format:
 
 Detect technical debt and integration problems early before continuing to expand
 the backend.
+``````
 
----
+</details>
+
+<a id="tool-entrypoint-provenance"></a>
+## Tool Entrypoint Provenance
+
+Historical entrypoint text from the editing baseline, preserved before replacing those README files with navigation-only pointers. These are not current run or Unity integration instructions.
+
+### Historical tools/README_TO_RUN.md
+
+<details>
+<summary>Show former tool README source</summary>
+
+``````markdown
+# How to Run
+
+This is source-only C#.
+
+## Console quick test
+
+Create a console app and call:
+
+```csharp
+Game.Slice.FoundationVerticalSlice.RunToConsole();
+```
+
+## Unity
+
+Copy `src/Game` into:
+
+```text
+Assets/Scripts/Game
+```
+
+Then create a MonoBehaviour adapter that calls domain/application services.
+
+Do not move gameplay rules into MonoBehaviours.
+``````
+
+</details>
+
+### Historical tools/SnapshotGenerator/README.md
+
+<details>
+<summary>Show former tool README source</summary>
+
+``````markdown
+# NovaFoundation Consolidated Generator V2
+
+This package replaces the previous "run scripts 00-06 manually" flow with a single consolidated entry point:
+
+```powershell
+.\Generate-NovaFoundation.ps1 -Profile VerticalSliceV2 -Force
+```
+
+## Why this exists
+
+The Iteration 2 Nahual Path work should not become the beginning of an endless chain of patch scripts. This generator keeps the project generation modular, but exposes one stable command.
+
+## Profiles
+
+### VerticalSliceV1
+Generates the original NovaFoundation vertical slice foundation.
+
+```powershell
+.\Generate-NovaFoundation.ps1 -Profile VerticalSliceV1 -Force
+```
+
+### VerticalSliceV2
+Generates NovaFoundation with the Iteration 2 Nahual Path systems included:
+
+- Knowledge alignment system
+- Nahual discovery/unlock hook
+- Wisdom Fragments resource placeholder
+- forbidden transmutation prototype
+- lightweight NPC/vendor reaction system
+- minimal branching mission
+- codex expansion
+- documentation and TODO updates
+
+```powershell
+.\Generate-NovaFoundation.ps1 -Profile VerticalSliceV2 -Force
+```
+
+## Windows shortcut
+
+If PowerShell script execution policy blocks you, run:
+
+```bat
+Run_VerticalSliceV2_Bypass.bat
+```
+
+## Recommended future workflow
+
+Do not keep adding permanent incremental scripts like `07`, `08`, `09` forever.
+
+Instead:
+
+1. Add or update a module under `Modules/`.
+2. Add the module to the selected profile.
+3. Keep `Generate-NovaFoundation.ps1` as the only public entry point.
+4. Once an iteration is accepted, treat it as part of the profile, not as a temporary patch.
+
+This keeps the generator scalable while preserving a clean architectural history.
+``````
+
+</details>
 
