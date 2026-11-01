@@ -1,23 +1,5 @@
-# How to Run
+# Repository Verification Entry Point
 
-This is source-only C#.
+Current build and smoke commands are maintained in the [Bible verification section](../docs/Fragments_of_Wysdom_Bible.md#verification).
 
-## Console quick test
-
-Create a console app and call:
-
-```csharp
-Game.Slice.FoundationVerticalSlice.RunToConsole();
-```
-
-## Unity
-
-Copy `src/Game` into:
-
-```text
-Assets/Scripts/Game
-```
-
-Then create a MonoBehaviour adapter that calls domain/application services.
-
-Do not move gameplay rules into MonoBehaviours.
+For Unity integration limits and historical tooling, read the [tooling boundary](../docs/Fragments_of_Wysdom_Bible.md#tooling). Former instructions are retained as [historical provenance](../docs/Fragments_of_Wysdom_Bible.md#tool-entrypoint-provenance), not current setup guidance.
