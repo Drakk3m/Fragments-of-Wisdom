@@ -381,14 +381,14 @@ Snapshot facts include enriched Codex entries, mission leads, active missions, u
 - No-registry validation retains structural compatibility. Registry-aware validation additionally checks known scope/node IDs, unlocked nodes also discovered, and unlocked prerequisite closure.
 - These semantic checks are not fully connected to coordinator restore/file loading (AUD-02); a valid JSON file is not necessarily valid gameplay state.
 
-**Coordinator:** V4ProgressRestoreCoordinator preflights class, mastery, mentor relationships, tree progress and bindings using temporary profiles and a copied binding registry. If an individual preflight returns false, it returns structured subsystem facts without applying target profiles. Successful apply order remains:
+**Coordinator:** V4ProgressRestoreCoordinator first rejects null real destination profiles with `ArgumentNullException`; the binding overload also rejects a null destination binding registry. It then preflights class, mastery, mentor relationships, tree progress and bindings using temporary profiles and a copied binding registry. If an individual preflight returns false, it returns structured subsystem facts without applying target profiles. Successful apply order remains:
 1. ClassProfile.
 2. MasteryProfile.
 3. MentorRelationshipProfile.
 4. SkillTreeProgressProfile.
 5. ClassSkillTreeBindingRegistry, when that overload is used.
 
-The result retains ClassRestored, MasteryRestored, MentorRelationshipsRestored, SkillTreeProgressRestored, ClassSkillTreeBindingsRestored, FullyRestored and subsystem reasons/messages. **It is not a guaranteed atomic transaction:** real destination null checks are incomplete (AUD-01), semantic tree validation is incomplete (AUD-02), and success booleans can report preflight feasibility rather than actual application (AUD-12). No rollback/thread-safety guarantee is established. Existing individual restore methods are unchanged.
+The result retains ClassRestored, MasteryRestored, MentorRelationshipsRestored, SkillTreeProgressRestored, ClassSkillTreeBindingsRestored, FullyRestored and subsystem reasons/messages. AUD-01 is resolved for null destination rejection before mutation. **It is not a guaranteed atomic transaction:** semantic tree validation is incomplete (AUD-02), and success booleans can report preflight feasibility rather than actual application (AUD-12). No rollback/thread-safety guarantee is established. Existing individual restore methods are unchanged.
 
 **File boundary:** V2ProgressSnapshotFileRepository validates, writes a temporary file and replaces/moves the main file after the write, with backup support and fallback for missing/corrupt/unsupported main data. It uses structural validation without a complete content registry. Atomic file replacement does not imply semantic integrity, durable recovery under every filesystem/power-loss condition, multi-writer coordination, or atomic in-memory restore. Encryption, compression, slots, cloud and autosave are not implemented here.
 
@@ -410,7 +410,7 @@ Unity work must preserve .meta/GUIDs, scenes, prefabs, ScriptableObjects and ser
 
 ## Evidence-Based Ledger
 
-One implementation status per row; VERIFIED is deliberately limited to the named backend scenario, not the whole feature. Source paths are repository-relative; test files are under `src/Game.SmokeTests/`. Current execution counts are recorded below. No findings were repaired during this documentation pass.
+One implementation status per row; VERIFIED is deliberately limited to the named backend scenario, not the whole feature. Source paths are repository-relative; test files are under `src/Game.SmokeTests/`. Current execution counts are recorded below. The original documentation consolidation repaired no findings; subsequent verified corrections are recorded explicitly in Part V.
 
 | Area / scenario | Design maturity | Implementation status | Source evidence | Test evidence / known limit |
 |---|---|---|---|---|
@@ -423,7 +423,7 @@ One implementation status per row; VERIFIED is deliberately limited to the named
 | Retained access and validated combat composition | Accepted foundation | PARTIAL | CombatSkillUseValidator, CombatSkillTurnValidatorGateway | Progression unit/integrated tests; canonical metadata bypass AUD-04 remains |
 | Shared session/runtime ownership | Accepted foundation | VERIFIED | `src/Game/Application/Runtime/`, `Bootstrap/`, `Integration/` | ProgressionRuntimeBootstrapSmokeTests; not automatic disk loading or Unity |
 | Narrative evaluators and candidate discovery | Accepted foundation | PARTIAL | `src/Game/Domain/Narrative/`, `Codex/`, `Missions/` | V2SmokeTests; complete quests, dialogue and route consequences absent |
-| Snapshot/file persistence | Accepted foundation | PARTIAL | `src/Game/Domain/Progress/` | V2/progression save cases pass; AUD-01/AUD-02/AUD-03/AUD-12 remain |
+| Snapshot/file persistence | Accepted foundation | PARTIAL | `src/Game/Domain/Progress/` | V2/progression save cases pass; AUD-01 resolved; AUD-02/AUD-03/AUD-12 remain |
 | Equipment-taught skill metadata | Promising full loop | CODE FOUNDATION | `src/Game/Domain/Equipment/EquipmentDefinition.cs` | TaughtSkillId is not a verified equipment-learning workflow |
 | Unity persistence adapter | Accepted boundary | NOT VERIFIED | `src/Game.Unity/Persistence/` | Outside .NET solution; narrower profile coverage; no Editor/Play Mode run |
 | Refill buffs, auto-refill, growth bridges | Promising | CONCEPT ONLY | Conversation design | No approved full rules or implementation evidence |
@@ -451,20 +451,22 @@ git status --short
 | Shared Domain Foundations | 16 |
 | V2 Narrative / Progression / Persistence | 264 |
 | V3 Combat / Skills / Resonance / Status / Stats | 100 |
-| Player Progression / Combat Validation | 517 |
-| **Total** | **899** |
+| Player Progression / Combat Validation | 585 |
+| **Total** | **967** |
 
-Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, already included in 517. Historical V4/V5 labels and earlier counts are not current reporting groups.
+Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186** and the AUD-01 restore destination integrity subsection contains **68**, both already included in 585. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
 **Executed audit baseline (2026-10-30):** implementation `45fb4548ab18984940471b79d5643e16f5aa50f4`, Bible v3 `c11c74d1317f8ca279d8c0698b88d4af96350f94`; restore/build succeeded with 0 warnings and 0 errors; smoke 899 and V1 events 38; diff checks passed. Twelve additional in-memory probes against the compiled assembly reproduced the findings in Part V. They were not added to the suite and must not be counted as smoke assertions.
 
-**Consolidation rerun (2026-10-31):** restore exit 0; build exit 0 with 0 warnings and 0 errors; complete smoke exit 0 with exactly the counts above. The first sandboxed smoke attempt failed at File.Move in the file-repository tests with UnauthorizedAccessException (exit -532462766); the identical command passed with expanded execution permission, without code/test changes. The twelve probes are preserved historical execution evidence, not claimed as newly rerun in this docs-only pass.
+**Consolidation rerun (2026-10-31):** restore exit 0; build exit 0 with 0 warnings and 0 errors; complete smoke exit 0 with the historical 899 total (Progression 517, other groups unchanged). The first sandboxed smoke attempt failed at File.Move in the file-repository tests with UnauthorizedAccessException (exit -532462766); the identical command passed with expanded execution permission, without code/test changes. The twelve probes are preserved historical execution evidence, not claimed as newly rerun in this docs-only pass.
 
-Documentation integrity checks passed: all 11 archived sources match with the documented whitespace normalization; 67 live local Markdown links resolve; all 31 explicit anchors are unique; git diff --check exits 0. Production code, tests, solution/build configuration and generator scripts have no diff. All 10 newly retired originals were verified before deletion; the master specification was already absent. No generator ran and no Unity files changed. The five remaining old-path references outside this Bible are historical generator output declarations in modules 00, 05 and 06, not live documentation links; their behavior is explicitly described in the tooling section. No GitHub Actions configuration or Unity Assets/ProjectSettings tree was present in the tracked inventory. Unity Editor, Play Mode and playable-game validation remain unperformed.
+**AUD-01 correction (2026-11-01):** latest main baseline `634085f` passed 899 assertions and 38 V1 events. The committed regression was first executed against unchanged production code and failed on the class mutation before null mastery rejection. After the correction, the full suite passes 967 assertions with the group counts above; restore/build exit 0, build 0 warnings/errors, smoke exit 0, and `git diff --check` exit 0. See the AUD-01 closure below for exact reproduction and environment limits.
+
+**Consolidation documentation checks (2026-10-31):** all 11 archived sources match with the documented whitespace normalization; 67 live local Markdown links resolve; all 31 explicit anchors are unique; git diff --check exits 0. Production code, tests, solution/build configuration and generator scripts had no diff in that documentation pass. All 10 newly retired originals were verified before deletion; the master specification was already absent. No generator ran and no Unity files changed. The five remaining old-path references outside this Bible are historical generator output declarations in modules 00, 05 and 06, not live documentation links; their behavior is explicitly described in the tooling section. No GitHub Actions configuration or Unity Assets/ProjectSettings tree was present in the tracked inventory. Unity Editor, Play Mode and playable-game validation remain unperformed.
 
 Integrated smoke covers class/mentor/teaching/mastery, retention after switching class, binding save/JSON/restore, prerequisite-first tree unlock application, scoped trees with identical node IDs, validation modes/provider/classification/orchestration, optional engine integration and shared loaded-session/bootstrap ownership. See [progression tests](../src/Game.SmokeTests/PlayerProgressionFoundationSmokeTests.cs), [runtime workflow tests](../src/Game.SmokeTests/ProgressionRuntimeBootstrapSmokeTests.cs), [V2 tests](../src/Game.SmokeTests/V2SmokeTests.cs), [V3 tests](../src/Game.SmokeTests/V3SmokeTests.cs) and [runner](../src/Game.SmokeTests/SmokeTestRunner.cs).
 
-Coverage gaps include the twelve audit regressions, full-state save replacement, target nullability, hostile/extreme numeric values, registry-authoritative metadata, platform/filesystem fault injection, Unity/editor integration and a production playable flow. Current green counts do not close these gaps.
+Coverage gaps include the eleven remaining audit regressions, full-state save replacement, failures during restore application, hostile/extreme numeric values, registry-authoritative metadata, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 now covers null coordinator destinations with nonempty state; current green counts do not close the other gaps.
 
 <a id="audit"></a>
 # Part V: Audit & Technical Debt
@@ -472,11 +474,11 @@ Coverage gaps include the twelve audit regressions, full-state save replacement,
 <a id="reproduced-findings"></a>
 ## Reproduced Integrity Findings
 
-All twelve findings remain **OPEN**. The following table preserves the previous audit's severity and acceptance direction without changing gameplay. It records observations, not speculation or implementation approval.
+AUD-01 is **RESOLVED** by the verified destination-validation correction below; AUD-02 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
 
 | ID | Severity from executed probe | Reproduced behavior | Affected code | Required acceptance direction |
 |---|---|---|---|---|
-| AUD-01 | HIGH | Restore with null mastery destination changes class, then throws `ArgumentNullException` | `src/Game/Domain/Progress/V4ProgressRestoreCoordinator.cs` | Prevalidate all destinations; zero mutations on rejected restore |
+| AUD-01 | HIGH | Restore with null mastery destination changes class, then throws `ArgumentNullException` | `src/Game/Domain/Progress/V4ProgressRestoreCoordinator.cs` | RESOLVED 2026-11-01: prevalidate real destinations; null destination rejection causes zero target mutations |
 | AUD-02 | HIGH | Unlocked tree node without prerequisite: semantic validator returns false, coordinator returns `FullyRestored=true` | `V2ProgressSnapshotService.cs`, validation service, coordinator | Registry-aware semantic preflight in actual restore path |
 | AUD-03 | HIGH | Codex snapshot→JSON→restore loses legacy discovery and completion; enriched record survives | `V2ProgressSnapshotService.cs`, Codex profile | Explicit backward-compatible Codex round trip; preserve all supported facts |
 | AUD-04 | HIGH | Alternate definition with same skill ID bypasses canonical unlock requirement | `src/Game/Domain/Combat/CombatSkillUseValidator.cs` | Resolve and validate canonical registered definition; reject conflicting request metadata |
@@ -508,7 +510,28 @@ All twelve findings remain **OPEN**. The following table preserves the previous 
 | AUD-11 | ResourcePool at Current=Max=100 accepted TrySpend(-10), leaving Current=110 |
 | AUD-12 | Invalid mastery stopped preflight application; ClassRestored true despite destination still audit.before |
 
-These were ad-hoc in-memory checks, not committed test additions. Converting each into a permanent failing-then-passing regression is part of its future atomic repair, not work completed here.
+These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 now has a permanent failing-then-passing regression; converting the remaining probes remains part of their future atomic repairs.
+
+### AUD-01 Closure: Real Destination Validation
+
+**Original failure and root cause:** both public coordinator overloads delegate to `RestoreInternal`. Preflight restores into new class/mastery/mentor/tree profiles and a copied binding registry, so it cannot detect null real profile references. On a valid preflight, `RestoreClassProfile` assigns the requested class; `RestoreMasteryProfile` then throws `ArgumentNullException(nameof(masteryProfile))`. A null mentor or tree destination could likewise reject after earlier subsystems had applied. The binding overload already checked its binding destination before delegation.
+
+**Correction:** validate all four real profile references at the start of `RestoreInternal`, before building temporary state or applying any target. Reuse the existing `ArgumentNullException` type and parameter names; null rejection produces no restore result. Existing snapshot/registry preflight, public signatures, per-subsystem methods, apply order, merge semantics and schema 1 are unchanged. No parallel restore owner, transaction framework, combat change or Unity dependency was introduced. When several arguments are invalid, destination guards now run before snapshot/content preflight; no precedence guarantee for multiple invalid arguments is added.
+
+**Regression evidence:** [ProgressRestoreAtomicitySmokeTests.cs](../src/Game.SmokeTests/ProgressRestoreAtomicitySmokeTests.cs) runs inside the existing Progression group. On unchanged production code at baseline `634085f`, the first null-mastery case caught the expected `ArgumentNullException` but failed the independent value comparison: `class before=class_wanderer, after=class_tlamatini, bindings overload=False`. The smoke command exited `-532462766`; the build preceding it exited 0 with no warnings/errors. This was the real coordinator, not a mocked approximation.
+
+After correction, 68 new assertions pass: null class/mastery/mentor/tree destinations through both overloads; null binding destination through the binding overload; two attempts per rejection; null and unsupported-schema snapshots; unknown-class rejection with overall failure and class reason; valid JSON round trips into populated profiles; and repeat valid application. Value captures materialize class/allowed-skill IDs, mastery progress/rank/mastered facts, mentor discovery/trust/availability, per-tree discovered/unlocked nodes, bindings and registered tree IDs independently of production snapshot creation. Valid restore checks preserve unrelated mastery, mentor and tree-scope state while applying the requested facts. Existing old-JSON, scoped-tree, registry and file-save compatibility cases also pass in the complete suite.
+
+**Executed verification (2026-11-01):**
+- `dotnet restore Fragments-of-Wisdom.sln`: exit 0; dependencies already up to date.
+- `dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal`: exit 0; 0 warnings, 0 errors, before and after the correction.
+- `dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build`: baseline exit 0 / 899 assertions; intentional red regression exit `-532462766`; corrected full suite exit 0 / 967 assertions (2 V1, 16 Shared, 264 V2, 100 V3, 585 Progression); V1 events remain 38.
+- `git diff --check`: exit 0.
+- Environment: the first sandboxed baseline smoke exited 1 after `UnauthorizedAccessException` at the existing file-repository `File.Move` test. The identical baseline command passed with expanded execution permission; subsequent red/green runs used that permission. No test was weakened to work around this restriction. Unity Editor/Play Mode was not run; no Unity assets or adapters changed.
+
+**Demonstrated guarantee and remaining limits:** rejected null destinations do not mutate any existing target, including on retries. Existing null/version and unknown-class rejection paths also preserve populated state in the tested serial calls. Input/content checks still use the existing temporary restore path; this change does not wire in the broader semantic validator (AUD-02). Once application begins, profiles are mutated sequentially with no rollback: allocation/runtime failures or concurrent changes to mutable snapshots, registries or profiles are outside the guarantee. The existing application phase still ignores individual boolean returns, and preflight success booleans are not redesigned (AUD-12). A broader all-or-nothing application contract needs a separately approved follow-up; do not infer full transactional atomicity from this fix. Direct individual restore calls retain their existing behavior.
+
+**Focused self-audit:** both public paths reach the shared guards before any real profile mutation; binding null rejection remains at its existing entry point. Valid nonempty JSON restoration and repeated application pass. Only the coordinator's destination guards changed in production. AUD-02 through AUD-12, their severity and their backlog order remain untouched; no further audit repair is authorized by this closure.
 
 ### Architectural Risks and Inferences
 
@@ -529,7 +552,7 @@ The following are source-grounded risks, **not additional reproduced findings**:
 | Bible said tests were not executed; archive lists changing counts | Audit execution and current rerun in Part IV are authoritative; 899 is not the sum of archived historical checkpoints |
 | Old backlog says active tests still use V4SmokeTests | Source uses PlayerProgressionFoundationSmokeTests plus ProgressionRuntimeBootstrapSmokeTests; completed neutral test/bootstrap/doc renames are recorded below |
 | Essence replaced by Resonance | Engine still charges actor Essence and optional runtime active Resonance |
-| All restore state is atomic after preflight | Temporary restore checks exist, but AUD-01/AUD-02/AUD-12 invalidate the broad guarantee |
+| All restore state is atomic after preflight | AUD-01 destination guards are now verified; AUD-02/AUD-12 and the lack of rollback still invalidate the broad guarantee |
 | Codex save preserves discovered/completed facts | Enriched records survive; legacy sets lose information (AUD-03) |
 | Skill mastery means one unified system | XP SkillProgress mastery and 100-point MasteryProfile retention remain separate |
 | Class identity already restricts every mastered cross-class skill | Current retention admits any registered mastered skill; restricted eligibility is proposed, not implemented |
@@ -588,11 +611,11 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. All twelve reproduced findings remain open. Every implementation item must complete the PETTO loop before the next.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 mission is complete; the remaining eleven reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. AUD-02 is the next candidate, not permission to start it automatically.
 
 | Priority | Atomic purpose or approval gate | Traceability / acceptance |
 |---|---|---|
-| 1 | Validate real restore destinations before mutation | AUD-01; zero target changes on rejected input; do not change individual restore behavior incidentally |
+| 1 (complete) | Validate real restore destinations before mutation | AUD-01 RESOLVED; null destinations rejected before target mutation; 68 regression assertions; individual restore methods unchanged |
 | 2 | Wire registry-aware semantic preflight into actual restore | AUD-02; reject invalid scopes/nodes/prerequisite closure without mutation |
 | 3 | Preserve legacy Codex round trips | AUD-03; explicit schema/compatibility decision and discovery/completion regression |
 | 4 | Validate canonical skill metadata | AUD-04; same-ID alternative cannot bypass required unlock or cost facts |

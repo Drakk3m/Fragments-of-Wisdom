@@ -150,6 +150,10 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "AUD-01 restore destination integrity assertions",
+                RunRestoreDestinationIntegrityTests);
+
+            RunSection(
                 "Mastery foundation assertions",
                 delegate
                 {
