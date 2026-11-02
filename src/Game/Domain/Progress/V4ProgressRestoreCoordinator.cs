@@ -7,6 +7,8 @@ namespace Game.Domain.Progress
     public class V4ProgressRestoreCoordinator
     {
         private readonly V2ProgressSnapshotService snapshotService;
+        private readonly V2ProgressSnapshotValidationService validationService =
+            new V2ProgressSnapshotValidationService();
 
         public V4ProgressRestoreCoordinator()
             : this(new V2ProgressSnapshotService())
@@ -130,7 +132,11 @@ namespace Game.Domain.Progress
                 snapshot,
                 new MentorRelationshipProfile(),
                 mentorRegistry);
-            bool skillTreeProgressRestored = restoreClassSkillTreeBindings
+            bool skillTreeProgressValid = validationService.IsValidSkillTreeProgressForRestore(
+                snapshot.SkillTreeProgress,
+                skillTree,
+                restoreClassSkillTreeBindings ? classSkillTreeBindingRegistry : null);
+            bool skillTreeProgressRestored = skillTreeProgressValid && (restoreClassSkillTreeBindings
                 && snapshot.SkillTreeProgress.Scopes.Count > 0
                     ? snapshotService.RestoreSkillTreeProgressProfile(
                         snapshot,
@@ -139,7 +145,7 @@ namespace Game.Domain.Progress
                     : snapshotService.RestoreSkillTreeProgressProfile(
                         snapshot,
                         new SkillTreeProgressProfile(),
-                        skillTree);
+                        skillTree));
             bool classSkillTreeBindingsRestored = !restoreClassSkillTreeBindings
                 || snapshotService.RestoreClassSkillTreeBindings(
                     snapshot,

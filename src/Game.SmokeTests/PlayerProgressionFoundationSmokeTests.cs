@@ -154,6 +154,10 @@ namespace Game.SmokeTests
                 RunRestoreDestinationIntegrityTests);
 
             RunSection(
+                "AUD-02 semantic skill tree restore assertions",
+                RunSemanticSkillTreeRestoreTests);
+
+            RunSection(
                 "Mastery foundation assertions",
                 delegate
                 {
