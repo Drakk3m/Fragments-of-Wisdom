@@ -67,6 +67,8 @@ namespace Game.Domain.Progress
             var dto = new SnapshotDto();
             dto.SchemaVersion = snapshot.SchemaVersion;
             dto.CodexEntries = new List<CodexEntryDto>();
+            dto.CodexDiscoveredEntryIds = CopyTags(snapshot.CodexDiscoveredEntryIds);
+            dto.CodexCompletedEntryIds = CopyTags(snapshot.CodexCompletedEntryIds);
             dto.MissionLeads = new List<MissionLeadDto>();
             dto.ActiveMissions = new List<ActiveMissionDto>();
             dto.Unlocks = new List<UnlockDto>();
@@ -302,7 +304,9 @@ namespace Game.Domain.Progress
                 masteryRecords,
                 mentorRelationships,
                 skillTreeProgress,
-                classSkillTreeBindings);
+                classSkillTreeBindings,
+                dto.CodexDiscoveredEntryIds,
+                dto.CodexCompletedEntryIds);
         }
 
         private static IReadOnlyList<V2SkillTreeProgressScopeSnapshot> BuildSkillTreeProgressScopes(
@@ -353,6 +357,8 @@ namespace Game.Domain.Progress
         {
             public int SchemaVersion { get; set; }
             public List<CodexEntryDto> CodexEntries { get; set; }
+            public List<string> CodexDiscoveredEntryIds { get; set; }
+            public List<string> CodexCompletedEntryIds { get; set; }
             public List<MissionLeadDto> MissionLeads { get; set; }
             public List<ActiveMissionDto> ActiveMissions { get; set; }
             public List<UnlockDto> Unlocks { get; set; }

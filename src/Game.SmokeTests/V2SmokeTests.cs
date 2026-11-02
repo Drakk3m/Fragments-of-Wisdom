@@ -235,6 +235,10 @@ namespace Game.SmokeTests
                 });
 
             RunSection(
+                "AUD-03 Codex round-trip integrity assertions",
+                RunCodexRoundTripIntegrityTests);
+
+            RunSection(
                 "V2 save file repository assertions",
                 delegate
                 {

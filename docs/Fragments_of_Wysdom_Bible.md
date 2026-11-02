@@ -295,7 +295,7 @@ The fact-producing chain reads player alignment and runs `FirstNahualTeachingEva
 
 Explicit `CodexDiscoveryService`, `MissionDiscoveryService` and `DiscoveryOrchestrationService` apply candidate facts idempotently by stable entry/trigger ID. Enriched Codex records preserve source hooks/triggers, type, concept and tags; mission leads preserve priority/family/source metadata. Active mission and unlock foundations extend journal facts, but are not a complete quest or economy system. Legacy mission evaluation/rewards are not automatically coupled to the journal and may replay numeric rewards without a claim guard.
 
-**Persistence limit AUD-03:** legacy string-based Codex discovery and completion sets coexist with enriched discovery records. The current snapshot only preserves the latter. Do not promise complete Codex round trips, stages, completion rewards or UI.
+**Codex persistence (AUD-03 resolved):** legacy string-based discovery/completion and enriched records now survive valid snapshot/JSON/restore round trips. Optional schema-1 ID lists preserve discovery and completion without inventing enriched metadata. Existing first-discovery precedence and merge behavior remain; discovery stages, completion reward mechanics and UI are not added. See the fact-ownership matrix in the AUD-03 closure.
 
 Alignment/Nahual gates and vendor reaction facts do not implement enemy-to-item conversion, shops, loot, crafting, cooking, alchemy or world consequences. Legacy cognition teachings/slots and newer mentor relationship facts have separate responsibilities and no automatic mentor-mission bridge. Detailed narrative mappings and edge cases remain in [Archive 03](#archive-03); the historical V2 slice design is in [Archive 01](#archive-01).
 
@@ -369,7 +369,9 @@ Current schema is **1**, centralized in `V2ProgressSnapshotVersions`; this conso
 
 `Profiles -> V2ProgressSnapshotService -> V2ProgressSnapshot -> JSON serializer -> file repository`
 
-Snapshot facts include enriched Codex entries, mission leads, active missions, unlocks, class profile, mastery records, mentor relationships, scoped/legacy skill-tree progress and class-tree bindings. Serializer uses System.Text.Json; malformed/unsupported data fails through existing safe APIs or documented exceptions. Older JSON missing optional collections restores empty/default facts where existing overloads allow. Missing class data is not a request to erase an assigned class. There is no general migration engine.
+Snapshot facts include enriched Codex entries, Codex discovered/completed IDs, mission leads, active missions, unlocks, class profile, mastery records, mentor relationships, scoped/legacy skill-tree progress and class-tree bindings. Serializer uses System.Text.Json; malformed/unsupported data fails through existing safe APIs or documented exceptions. Older JSON missing optional collections restores empty/default facts where existing overloads allow. Missing class data is not a request to erase an assigned class. There is no general migration engine.
+
+**Codex:** schema 1 adds optional `CodexDiscoveredEntryIds` and `CodexCompletedEntryIds`; `CodexEntries` retains its existing enriched shape. Missing/null lists normalize to empty lists, which mean no additional facts, never deletion. Restore validates Codex IDs/records before any mutation, then merges enriched records, discovered IDs and completed IDs in that order. Completion implies discovery through the existing domain method. Duplicate facts remain idempotent; previously known IDs retain their existing enriched metadata or lack of metadata. No completion reward, unlock evaluation or discovery event service is invoked. All existing constructors remain available. This is backward-compatible reading, not a guarantee that older binaries can rewrite new saves without losing the new fields.
 
 **Mastery:** persist skill ID, progress and rank; restore validates skill IDs through SkillDefinitionRegistry and recreates progress-derived mastery. Unknown IDs fail before that subsystem applies supported records. Mentor snapshots persist ID, discovered/trust/availability; restore uses MentorDefinitionRegistry. Bindings persist class/tree IDs and validate both against class and registered tree definitions. Individual restore methods retain their current merge/idempotency behavior; they are not whole-player replacement transactions.
 
@@ -423,7 +425,7 @@ One implementation status per row; VERIFIED is deliberately limited to the named
 | Retained access and validated combat composition | Accepted foundation | PARTIAL | CombatSkillUseValidator, CombatSkillTurnValidatorGateway | Progression unit/integrated tests; canonical metadata bypass AUD-04 remains |
 | Shared session/runtime ownership | Accepted foundation | VERIFIED | `src/Game/Application/Runtime/`, `Bootstrap/`, `Integration/` | ProgressionRuntimeBootstrapSmokeTests; not automatic disk loading or Unity |
 | Narrative evaluators and candidate discovery | Accepted foundation | PARTIAL | `src/Game/Domain/Narrative/`, `Codex/`, `Missions/` | V2SmokeTests; complete quests, dialogue and route consequences absent |
-| Snapshot/file persistence | Accepted foundation | PARTIAL | `src/Game/Domain/Progress/` | V2/progression save cases pass; AUD-01/AUD-02 resolved; AUD-03/AUD-12 remain |
+| Snapshot/file persistence | Accepted foundation | PARTIAL | `src/Game/Domain/Progress/` | V2/progression save cases pass; AUD-01/AUD-02/AUD-03 resolved; AUD-12 remains |
 | Equipment-taught skill metadata | Promising full loop | CODE FOUNDATION | `src/Game/Domain/Equipment/EquipmentDefinition.cs` | TaughtSkillId is not a verified equipment-learning workflow |
 | Unity persistence adapter | Accepted boundary | NOT VERIFIED | `src/Game.Unity/Persistence/` | Outside .NET solution; narrower profile coverage; no Editor/Play Mode run |
 | Refill buffs, auto-refill, growth bridges | Promising | CONCEPT ONLY | Conversation design | No approved full rules or implementation evidence |
@@ -449,12 +451,14 @@ git status --short
 |---|---:|
 | V1 Legacy Slice | 2 |
 | Shared Domain Foundations | 16 |
-| V2 Narrative / Progression / Persistence | 264 |
+| V2 Narrative / Progression / Persistence | 371 |
 | V3 Combat / Skills / Resonance / Status / Stats | 100 |
 | Player Progression / Combat Validation | 724 |
-| **Total** | **1106** |
+| **Total** | **1213** |
 
 Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, and AUD-02 semantic skill tree restore contains **139**, all already included in 724. Historical V4/V5 labels and earlier counts are not current reporting groups.
+
+The V2 group includes **107** AUD-03 Codex round-trip assertions; they are included in 371, not an additional reporting group.
 
 **Executed audit baseline (2026-10-30):** implementation `45fb4548ab18984940471b79d5643e16f5aa50f4`, Bible v3 `c11c74d1317f8ca279d8c0698b88d4af96350f94`; restore/build succeeded with 0 warnings and 0 errors; smoke 899 and V1 events 38; diff checks passed. Twelve additional in-memory probes against the compiled assembly reproduced the findings in Part V. They were not added to the suite and must not be counted as smoke assertions.
 
@@ -462,13 +466,15 @@ Legacy V1 events: **38**, a separate guardrail, not additional assertions. The P
 
 **AUD-01 correction (2026-11-01):** latest main baseline `634085f` passed 899 assertions and 38 V1 events. The committed regression was first executed against unchanged production code and failed on the class mutation before null mastery rejection. After the correction, the full suite passed 967 assertions (Progression 585, other groups unchanged); restore/build exit 0, build 0 warnings/errors, smoke exit 0, and `git diff --check` exit 0. See the AUD-01 closure below for exact reproduction and environment limits.
 
-**AUD-02 correction (2026-11-02):** latest main baseline `c9fd0f2` independently passed 967 assertions, including all 68 AUD-01 assertions, and 38 V1 events. The new regression failed against unchanged production code: standalone validation false, coordinator `FullyRestored=true`, destination changed, child unlocked and prerequisite still locked. After the correction, the full suite passes 1106 assertions with the counts above; restore/build/smoke/diff-check exit 0, build 0 warnings/errors. See the AUD-02 closure below for scope and limitations.
+**AUD-02 correction (2026-11-02):** latest main baseline `c9fd0f2` independently passed 967 assertions, including all 68 AUD-01 assertions, and 38 V1 events. The new regression failed against unchanged production code: standalone validation false, coordinator `FullyRestored=true`, destination changed, child unlocked and prerequisite still locked. After the correction, the full suite passed 1106 assertions (V2 264, other groups as above); restore/build/smoke/diff-check exit 0, build 0 warnings/errors. See the AUD-02 closure below for scope and limitations.
+
+**AUD-03 correction (2026-11-02):** latest main baseline `e74eb52` independently passed 1106 assertions and 38 V1 events. The new regression failed before production edits: discovered IDs fell from 4 to 2, legacy completion was false and both enriched records survived. After correction, 107 new V2 assertions pass and the full suite passes 1213; restore/build/smoke/diff-check exit 0, build 0 warnings/errors. AUD-01 and AUD-02 regressions remain unchanged and green.
 
 **Consolidation documentation checks (2026-10-31):** all 11 archived sources match with the documented whitespace normalization; 67 live local Markdown links resolve; all 31 explicit anchors are unique; git diff --check exits 0. Production code, tests, solution/build configuration and generator scripts had no diff in that documentation pass. All 10 newly retired originals were verified before deletion; the master specification was already absent. No generator ran and no Unity files changed. The five remaining old-path references outside this Bible are historical generator output declarations in modules 00, 05 and 06, not live documentation links; their behavior is explicitly described in the tooling section. No GitHub Actions configuration or Unity Assets/ProjectSettings tree was present in the tracked inventory. Unity Editor, Play Mode and playable-game validation remain unperformed.
 
 Integrated smoke covers class/mentor/teaching/mastery, retention after switching class, binding save/JSON/restore, prerequisite-first tree unlock application, scoped trees with identical node IDs, validation modes/provider/classification/orchestration, optional engine integration and shared loaded-session/bootstrap ownership. See [progression tests](../src/Game.SmokeTests/PlayerProgressionFoundationSmokeTests.cs), [runtime workflow tests](../src/Game.SmokeTests/ProgressionRuntimeBootstrapSmokeTests.cs), [V2 tests](../src/Game.SmokeTests/V2SmokeTests.cs), [V3 tests](../src/Game.SmokeTests/V3SmokeTests.cs) and [runner](../src/Game.SmokeTests/SmokeTestRunner.cs).
 
-Coverage gaps include the ten remaining audit regressions, full-state save replacement, failures during restore application, hostile/extreme numeric values, registry-authoritative combat metadata, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads. Current green counts do not close the other gaps.
+Coverage gaps include the nine remaining audit regressions, full-state save replacement, failures during restore application, hostile/extreme numeric values, registry-authoritative combat metadata, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips. Current green counts do not close the other gaps.
 
 <a id="audit"></a>
 # Part V: Audit & Technical Debt
@@ -476,13 +482,13 @@ Coverage gaps include the ten remaining audit regressions, full-state save repla
 <a id="reproduced-findings"></a>
 ## Reproduced Integrity Findings
 
-AUD-01 and AUD-02 are **RESOLVED** by the verified corrections below; AUD-03 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
+AUD-01, AUD-02 and AUD-03 are **RESOLVED** by the verified corrections below; AUD-04 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
 
 | ID | Severity from executed probe | Reproduced behavior | Affected code | Required acceptance direction |
 |---|---|---|---|---|
 | AUD-01 | HIGH | Restore with null mastery destination changes class, then throws `ArgumentNullException` | `src/Game/Domain/Progress/V4ProgressRestoreCoordinator.cs` | RESOLVED 2026-11-01: prevalidate real destinations; null destination rejection causes zero target mutations |
 | AUD-02 | HIGH | Unlocked tree node without prerequisite: semantic validator returns false, coordinator returns `FullyRestored=true` | `V2ProgressSnapshotService.cs`, validation service, coordinator | RESOLVED 2026-11-02: existing semantic tree validation reused before coordinator target mutation |
-| AUD-03 | HIGH | Codex snapshot→JSON→restore loses legacy discovery and completion; enriched record survives | `V2ProgressSnapshotService.cs`, Codex profile | Explicit backward-compatible Codex round trip; preserve all supported facts |
+| AUD-03 | HIGH | Codex snapshot→JSON→restore loses legacy discovery and completion; enriched record survives | `V2ProgressSnapshotService.cs`, Codex profile | RESOLVED 2026-11-02: optional discovery/completion ID lists preserve supported Codex facts alongside enriched records |
 | AUD-04 | HIGH | Alternate definition with same skill ID bypasses canonical unlock requirement | `src/Game/Domain/Combat/CombatSkillUseValidator.cs` | Resolve and validate canonical registered definition; reject conflicting request metadata |
 | AUD-05 | MEDIUM | Enemy skill spends 10 from the runtime's single Resonance pool | `TurnBasedCombatEngine.cs` | Decide per-actor resource ownership before implementation |
 | AUD-06 | MEDIUM | Refill with Poison advances turn but neither damages nor decrements duration | `ResonanceRefillAction.cs` | Define and integrate canonical turn/status lifecycle |
@@ -512,7 +518,7 @@ AUD-01 and AUD-02 are **RESOLVED** by the verified corrections below; AUD-03 thr
 | AUD-11 | ResourcePool at Current=Max=100 accepted TrySpend(-10), leaving Current=110 |
 | AUD-12 | Invalid mastery stopped preflight application; ClassRestored true despite destination still audit.before |
 
-These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 and AUD-02 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
+These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01, AUD-02 and AUD-03 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
 
 ### AUD-01 Closure: Real Destination Validation
 
@@ -556,6 +562,39 @@ After correction, 68 new assertions pass: null class/mastery/mentor/tree destina
 
 **Verified boundary and limitations:** semantic rejection now occurs before any real coordinator destination mutation. This is a serial preflight guarantee, not rollback or isolation: callers must keep definitions, snapshots and target profiles stable during the call. Direct V2ProgressSnapshotService restore methods and structural file loading remain unchanged lower-level APIs, not substitutes for the validated coordinator. Pre-existing corrupt destination state is not repaired by merging a valid snapshot. Sequential application, ignored application boolean returns and AUD-12 reporting limitations remain; AUD-03 through AUD-12 are not addressed. Future stronger transaction or individual-service guarantees require separate approval.
 
+### AUD-03 Closure: Codex Snapshot Round-Trip Integrity
+
+**Original loss and root cause:** `CodexProfile` owns a discovered-ID set, a completed-ID set and an enriched-record list. `CreateSnapshot` previously enumerated only `DiscoveredEntries`, and `Restore` only replayed enriched discovery. Neither the DTO nor JSON carried ID-only discovery or any completion facts. The new regression first ran against unchanged production code at `e74eb52` and failed with `discovered before=4, after=2, legacy completion=False, enriched records=2` (exit `-532462766`). Independent value capture also covers enriched completion, record order, type, concept, first-source IDs and tag order. Original audit evidence above and Part VII are unchanged.
+
+#### Codex Fact Ownership
+
+| Fact | Existing source of truth | Before AUD-03 | Corrected persistence / interpretation |
+|---|---|---|---|
+| Legacy and enriched discovery membership | `CodexProfile.discovered`, exposed as `DiscoveredEntryIds`; both DiscoverEntry overloads and CompleteEntry add IDs | Only IDs represented by enriched records survived | Copy all IDs into `CodexDiscoveredEntryIds`; restore through DiscoverEntry(string) after enriched records |
+| Completion membership, including enriched entries | `CodexProfile.completed`, queried by IsCompleted; CompleteEntry also adds discovery | Not captured or restored | Copy completed members by iterating discovered IDs and querying IsCompleted; `CodexCompletedEntryIds` restores through CompleteEntry without a new domain owner/API |
+| Enriched discovery records and order | `CodexProfile.discoveredEntries`, exposed as DiscoveredEntries | Preserved through CodexEntries | Existing CodexEntries payload remains; restore records first so the accompanying ID lists cannot suppress enrichment in a fresh profile |
+| Record metadata | CodexEntryRecord: EntryId, EntryType, ConceptKey, FirstSourceHookId, FirstSourceTriggerId, NarrativeTags | Preserved for enriched entries | Same fields and tag order preserved; no invented metadata for legacy-only IDs |
+| Discovery stages | No persisted stage property in CodexProfile; only discovery/completion membership exists | Not implemented as the proposed stage ladder | Glimpsed/studied/mastered stages remain design, not new save facts |
+| Progress counts and percentage | CodexProgressService derives CodexProgressSummary from enriched records plus caller-supplied totalKnownEntries | Derived, not profile-owned persistence | Unchanged; no new meaning assigned to legacy completion or summary percentages |
+| Definition name/category | CodexEntryDefinition content, not mutable CodexProfile state | Not player progression state | No new definition serialization |
+| Applied unlock facts | Separate UnlockProfile/UnlockRecord owner; snapshot Unlocks already carries IDs, requirements and tags | Independently persisted | Unchanged; restore does not run CodexUnlockService or UnlockApplicationService to generate new unlocks |
+
+**Implementation and compatibility decision:** retain schema version 1 and all existing public constructors/methods. Add two optional root lists, `CodexDiscoveredEntryIds` and `CodexCompletedEntryIds`, plus an additive full snapshot constructor. Every CreateSnapshot overload forwards them; JSON serializes them and defaults absent/null lists to empty. No migration is required to read existing enriched-only JSON. Missing and explicitly empty fields both mean no additional saved facts under existing merge semantics, never erasure. Completion-only input implies discovery using the existing CompleteEntry contract. Previously supported old JSON and old constructors remain accepted. Older executables ignore the new optional fields and can lose them on rewrite; downgrade round-trip safety is not promised. Facts omitted by historical buggy saves cannot be reconstructed automatically.
+
+**Restore and validation boundary:** the existing validation service now shares an internal Codex fact check with direct Restore and file-repository validation. Empty/whitespace/null IDs, null enriched records, null direct-DTO CodexEntries collections and null direct-DTO tag collections are rejected before Codex mutation; JSON's existing missing/null tag normalization remains unchanged. Direct invalid Codex restore raises InvalidOperationException; schema and destination argument checks retain their existing contracts. Valid enriched records are applied first, ID discoveries second and completions last. The existing domain sets/list enforce idempotency and first-discovery precedence. No new profile, registry, reward service, event emission or completion mechanic is introduced.
+
+**Merge decisions and OPEN DECISION:** a destination that already discovered an ID keeps its current metadata, including no enriched record when legacy discovery came first. Incoming enrichment does not upgrade that ID; completion still unions with existing completion. This is existing executable first-wins behavior, not a new preference rule. A future policy for enriching previously legacy-only discoveries or reconciling conflicting content versions remains OPEN DECISION and requires separate approval. Exact fresh-destination round trips and compatible merges are distinct guarantees; merge does not replace the whole profile.
+
+**Regression coverage:** [CodexRoundTripIntegritySmokeTests.cs](../src/Game.SmokeTests/CodexRoundTripIntegritySmokeTests.cs) adds 107 assertions in the V2 group: mixed/overlapping, legacy-only and enriched-record state across all seven snapshot creation overloads and both Restore overloads; independent before/after comparison; repeated application; historical enriched JSON; missing/null/empty lists; completion-implies-discovery; duplicate IDs/records; populated first-wins merges; late malformed facts rejected without partial Codex mutation and on retries; invalid file-load rejection; file save/load into PlayerProfile.Codex with unchanged wallet and no generated unlocks; and snapshots not aliasing later domain set mutations. Existing snapshot, old-JSON, schema, file fallback and progression tests all remain green.
+
+**Executed verification (2026-11-02):**
+- `dotnet restore Fragments-of-Wisdom.sln`: exit 0; dependencies up to date.
+- `dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal`: exit 0; 0 warnings/errors before and after correction.
+- `dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build`: baseline exit 0 / 1106; intentional red regression exit `-532462766`; final exit 0 / 1213 assertions (V1 2, Shared 16, V2 371, V3 100, Progression 724), V1 events 38. AUD-01's 68 and AUD-02's 139 assertions remain unchanged and pass.
+- `git diff --check`: exit 0. Smoke used expanded execution permission for existing temporary-file tests; no new environment test failure occurred.
+
+**Self-audit and limitations:** no domain state owner or Codex rule changed; existing enriched metadata and ordered records survive, and generated snapshots copy all supported discovery/completion membership. Valid fact IDs are nonempty; externally corrupted sets or concurrent mutations are not supported transactions. Invalid Codex validation precedes mutation, but later failures in unrelated mission/unlock application still have no rollback; this is not a general save transaction repair. PlayerProgressionRuntimeState/LoadedPlayerSession do not own or disk-load Codex state. Tests exercise the actual file repository and snapshot service used by UnityV2SaveService, but UnityV2SaveService itself is outside the solution and no Unity Editor/Play Mode run was performed. No gameplay rewards, combat, UI, Unity, generators, schema version, AUD-04 through AUD-12 or their priorities were changed.
+
 ### Architectural Risks and Inferences
 
 The following are source-grounded risks, **not additional reproduced findings**:
@@ -576,7 +615,7 @@ The following are source-grounded risks, **not additional reproduced findings**:
 | Old backlog says active tests still use V4SmokeTests | Source uses PlayerProgressionFoundationSmokeTests plus ProgressionRuntimeBootstrapSmokeTests; completed neutral test/bootstrap/doc renames are recorded below |
 | Essence replaced by Resonance | Engine still charges actor Essence and optional runtime active Resonance |
 | All restore state is atomic after preflight | AUD-01 destination guards and AUD-02 semantic tree preflight are verified; AUD-12 and the lack of rollback still invalidate the broad guarantee |
-| Codex save preserves discovered/completed facts | Enriched records survive; legacy sets lose information (AUD-03) |
+| Codex save preserves discovered/completed facts | AUD-03 now verifies supported facts through optional schema-1 ID lists plus enriched records; historical saves cannot regain facts never written |
 | Skill mastery means one unified system | XP SkillProgress mastery and 100-point MasteryProfile retention remain separate |
 | Class identity already restricts every mastered cross-class skill | Current retention admits any registered mastered skill; restricted eligibility is proposed, not implemented |
 | Silence and SkillSeal are equivalent blockers | SkillSeal returns before cost/application; legacy Silence only logs in reproduced case |
@@ -634,13 +673,13 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 and AUD-02 missions are complete; the remaining ten reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. AUD-03 is the next candidate, not permission to start it automatically.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01, AUD-02 and AUD-03 missions are complete; the remaining nine reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. AUD-04 is the next candidate, not permission to start it automatically.
 
 | Priority | Atomic purpose or approval gate | Traceability / acceptance |
 |---|---|---|
 | 1 (complete) | Validate real restore destinations before mutation | AUD-01 RESOLVED; null destinations rejected before target mutation; 68 regression assertions; individual restore methods unchanged |
 | 2 (complete) | Wire registry-aware semantic preflight into actual restore | AUD-02 RESOLVED; both coordinator overloads reject invalid scopes/nodes/discovery/prerequisite closure without mutation; 139 new assertions |
-| 3 | Preserve legacy Codex round trips | AUD-03; explicit schema/compatibility decision and discovery/completion regression |
+| 3 (complete) | Preserve legacy Codex round trips | AUD-03 RESOLVED; optional schema-1 ID lists, existing merge semantics, full supported Codex round trip; 107 new V2 assertions |
 | 4 | Validate canonical skill metadata | AUD-04; same-ID alternative cannot bypass required unlock or cost facts |
 | 5a | Repair bounded mastery arithmetic | AUD-09; overflow-safe progress |
 | 5b | Report actual teaching delta | AUD-10; capped grant reports actual change |
