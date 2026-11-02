@@ -92,6 +92,27 @@ namespace Game.Domain.Progress
             ClassSkillTreeBindingRegistry classSkillTreeBindingRegistry,
             bool restoreClassSkillTreeBindings)
         {
+            // Temporary-profile preflight cannot validate the real destination references.
+            if (classProfile == null)
+            {
+                throw new ArgumentNullException(nameof(classProfile));
+            }
+
+            if (masteryProfile == null)
+            {
+                throw new ArgumentNullException(nameof(masteryProfile));
+            }
+
+            if (mentorRelationshipProfile == null)
+            {
+                throw new ArgumentNullException(nameof(mentorRelationshipProfile));
+            }
+
+            if (skillTreeProgressProfile == null)
+            {
+                throw new ArgumentNullException(nameof(skillTreeProgressProfile));
+            }
+
             var preflightBindingRegistry = restoreClassSkillTreeBindings
                 ? BuildPreflightBindingRegistry(
                     classSkillTreeBindingRegistry,
