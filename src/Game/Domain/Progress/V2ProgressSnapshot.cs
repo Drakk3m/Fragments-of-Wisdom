@@ -6,6 +6,8 @@ namespace Game.Domain.Progress
     {
         public int SchemaVersion { get; private set; }
         public IReadOnlyList<V2CodexEntrySnapshot> CodexEntries { get; private set; }
+        public IReadOnlyList<string> CodexDiscoveredEntryIds { get; private set; }
+        public IReadOnlyList<string> CodexCompletedEntryIds { get; private set; }
         public IReadOnlyList<V2MissionLeadSnapshot> MissionLeads { get; private set; }
         public IReadOnlyList<V2ActiveMissionSnapshot> ActiveMissions { get; private set; }
         public IReadOnlyList<V2UnlockSnapshot> Unlocks { get; private set; }
@@ -157,9 +159,30 @@ namespace Game.Domain.Progress
             IReadOnlyList<V2MentorRelationshipSnapshot> mentorRelationships,
             V2SkillTreeProgressSnapshot skillTreeProgress,
             IReadOnlyList<V2ClassSkillTreeBindingSnapshot> classSkillTreeBindings)
+            : this(schemaVersion, codexEntries, missionLeads, activeMissions, unlocks,
+                classProfile, masteryRecords, mentorRelationships, skillTreeProgress,
+                classSkillTreeBindings, null, null)
+        {
+        }
+
+        public V2ProgressSnapshot(
+            int schemaVersion,
+            IReadOnlyList<V2CodexEntrySnapshot> codexEntries,
+            IReadOnlyList<V2MissionLeadSnapshot> missionLeads,
+            IReadOnlyList<V2ActiveMissionSnapshot> activeMissions,
+            IReadOnlyList<V2UnlockSnapshot> unlocks,
+            V2ClassProfileSnapshot classProfile,
+            IReadOnlyList<V2MasterySnapshot> masteryRecords,
+            IReadOnlyList<V2MentorRelationshipSnapshot> mentorRelationships,
+            V2SkillTreeProgressSnapshot skillTreeProgress,
+            IReadOnlyList<V2ClassSkillTreeBindingSnapshot> classSkillTreeBindings,
+            IReadOnlyList<string> codexDiscoveredEntryIds,
+            IReadOnlyList<string> codexCompletedEntryIds)
         {
             SchemaVersion = schemaVersion;
             CodexEntries = codexEntries;
+            CodexDiscoveredEntryIds = codexDiscoveredEntryIds ?? new List<string>();
+            CodexCompletedEntryIds = codexCompletedEntryIds ?? new List<string>();
             MissionLeads = missionLeads;
             ActiveMissions = activeMissions;
             Unlocks = unlocks;

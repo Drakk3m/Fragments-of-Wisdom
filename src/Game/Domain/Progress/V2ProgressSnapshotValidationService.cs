@@ -64,7 +64,7 @@ namespace Game.Domain.Progress
                 return false;
             }
 
-            if (!HasValidCodexEntries(snapshot)
+            if (!IsValidCodexFacts(snapshot)
                 || !HasValidMissionLeads(snapshot)
                 || !HasValidActiveMissions(snapshot)
                 || !HasValidUnlocks(snapshot)
@@ -125,11 +125,37 @@ namespace Game.Domain.Progress
             }
         }
 
-        private static bool HasValidCodexEntries(V2ProgressSnapshot snapshot)
+        internal bool IsValidCodexFacts(V2ProgressSnapshot snapshot)
         {
+            if (snapshot == null || snapshot.CodexEntries == null
+                || !HasValidCodexIds(snapshot.CodexDiscoveredEntryIds)
+                || !HasValidCodexIds(snapshot.CodexCompletedEntryIds))
+            {
+                return false;
+            }
+
             foreach (var entry in snapshot.CodexEntries)
             {
-                if (entry == null || string.IsNullOrWhiteSpace(entry.EntryId))
+                if (entry == null || string.IsNullOrWhiteSpace(entry.EntryId)
+                    || entry.NarrativeTags == null)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasValidCodexIds(IReadOnlyList<string> ids)
+        {
+            if (ids == null)
+            {
+                return false;
+            }
+
+            foreach (var id in ids)
+            {
+                if (string.IsNullOrWhiteSpace(id))
                 {
                     return false;
                 }

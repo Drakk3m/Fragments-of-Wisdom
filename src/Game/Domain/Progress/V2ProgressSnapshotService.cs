@@ -44,7 +44,10 @@ namespace Game.Domain.Progress
                 BuildCodexSnapshots(codexProfile.DiscoveredEntries),
                 BuildMissionLeadSnapshots(missionJournalProfile.AvailableLeads),
                 BuildActiveMissionSnapshots(missionJournalProfile.ActiveMissions),
-                BuildUnlockSnapshots(unlockProfile.Unlocks));
+                BuildUnlockSnapshots(unlockProfile.Unlocks),
+                null, null, null, null, null,
+                CopyIds(codexProfile.DiscoveredEntryIds),
+                BuildCompletedCodexIds(codexProfile));
         }
 
         public V2ProgressSnapshot CreateSnapshot(
@@ -69,7 +72,13 @@ namespace Game.Domain.Progress
                 snapshot.MissionLeads,
                 snapshot.ActiveMissions,
                 snapshot.Unlocks,
-                BuildClassProfileSnapshot(classProfile));
+                BuildClassProfileSnapshot(classProfile),
+                snapshot.MasteryRecords,
+                snapshot.MentorRelationships,
+                snapshot.SkillTreeProgress,
+                snapshot.ClassSkillTreeBindings,
+                snapshot.CodexDiscoveredEntryIds,
+                snapshot.CodexCompletedEntryIds);
         }
 
         public V2ProgressSnapshot CreateSnapshot(
@@ -97,7 +106,12 @@ namespace Game.Domain.Progress
                 snapshot.ActiveMissions,
                 snapshot.Unlocks,
                 snapshot.ClassProfile,
-                BuildMasterySnapshots(masteryProfile.Records));
+                BuildMasterySnapshots(masteryProfile.Records),
+                snapshot.MentorRelationships,
+                snapshot.SkillTreeProgress,
+                snapshot.ClassSkillTreeBindings,
+                snapshot.CodexDiscoveredEntryIds,
+                snapshot.CodexCompletedEntryIds);
         }
 
         public V2ProgressSnapshot CreateSnapshot(
@@ -128,7 +142,11 @@ namespace Game.Domain.Progress
                 snapshot.Unlocks,
                 snapshot.ClassProfile,
                 snapshot.MasteryRecords,
-                BuildMentorRelationshipSnapshots(mentorRelationshipProfile));
+                BuildMentorRelationshipSnapshots(mentorRelationshipProfile),
+                snapshot.SkillTreeProgress,
+                snapshot.ClassSkillTreeBindings,
+                snapshot.CodexDiscoveredEntryIds,
+                snapshot.CodexCompletedEntryIds);
         }
 
         public V2ProgressSnapshot CreateSnapshot(
@@ -162,7 +180,10 @@ namespace Game.Domain.Progress
                 snapshot.ClassProfile,
                 snapshot.MasteryRecords,
                 snapshot.MentorRelationships,
-                BuildSkillTreeProgressSnapshot(skillTreeProgressProfile));
+                BuildSkillTreeProgressSnapshot(skillTreeProgressProfile),
+                snapshot.ClassSkillTreeBindings,
+                snapshot.CodexDiscoveredEntryIds,
+                snapshot.CodexCompletedEntryIds);
         }
 
         public V2ProgressSnapshot CreateSnapshot(
@@ -199,7 +220,9 @@ namespace Game.Domain.Progress
                 snapshot.MasteryRecords,
                 snapshot.MentorRelationships,
                 snapshot.SkillTreeProgress,
-                BuildClassSkillTreeBindingSnapshots(classSkillTreeBindingRegistry));
+                BuildClassSkillTreeBindingSnapshots(classSkillTreeBindingRegistry),
+                snapshot.CodexDiscoveredEntryIds,
+                snapshot.CodexCompletedEntryIds);
         }
 
         public bool CanRestore(V2ProgressSnapshot snapshot)
@@ -255,6 +278,12 @@ namespace Game.Domain.Progress
                 throw new InvalidOperationException("Unsupported V2 progress snapshot schema version.");
             }
 
+            if (!new V2ProgressSnapshotValidationService().IsValidCodexFacts(snapshot))
+            {
+                throw new InvalidOperationException("V2 progress snapshot failed Codex validation.");
+            }
+
+            // Enriched records must precede ID-only facts: discovery is first-wins by ID.
             foreach (var entrySnapshot in snapshot.CodexEntries)
             {
                 codexProfile.DiscoverEntry(new CodexEntryRecord(
@@ -264,6 +293,16 @@ namespace Game.Domain.Progress
                     entrySnapshot.FirstSourceHookId,
                     entrySnapshot.FirstSourceTriggerId,
                     CopyTags(entrySnapshot.NarrativeTags)));
+            }
+
+            foreach (var entryId in snapshot.CodexDiscoveredEntryIds)
+            {
+                codexProfile.DiscoverEntry(entryId);
+            }
+
+            foreach (var entryId in snapshot.CodexCompletedEntryIds)
+            {
+                codexProfile.CompleteEntry(entryId);
             }
 
             foreach (var leadSnapshot in snapshot.MissionLeads)
@@ -607,6 +646,20 @@ namespace Game.Domain.Progress
             }
 
             return true;
+        }
+
+        private static IReadOnlyList<string> BuildCompletedCodexIds(CodexProfile profile)
+        {
+            var ids = new List<string>();
+            foreach (var id in profile.DiscoveredEntryIds)
+            {
+                if (profile.IsCompleted(id))
+                {
+                    ids.Add(id);
+                }
+            }
+
+            return ids;
         }
 
         private static IReadOnlyList<V2CodexEntrySnapshot> BuildCodexSnapshots(
