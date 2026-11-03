@@ -23,6 +23,10 @@ namespace Game.SmokeTests
         private static void RunPlayerProgressionFoundationSmokeTests()
         {
             RunSection(
+                "AUD-10 actual mastery delta assertions",
+                RunMasteryProgressContractSmokeTests);
+
+            RunSection(
                 "AUD-09 overflow-safe mastery assertions",
                 RunMasteryOverflowSmokeTests);
 

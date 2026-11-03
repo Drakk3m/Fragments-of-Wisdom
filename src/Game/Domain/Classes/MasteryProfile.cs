@@ -17,11 +17,31 @@ namespace Game.Domain.Classes
             int amount,
             SkillDefinitionRegistry skillRegistry)
         {
-            if (skillRegistry == null || !skillRegistry.Contains(skillId))
+            // Compatibility only: the legacy bool API creates an empty record on a
+            // registered first nonpositive grant. The detailed API never does this.
+            if (amount <= 0 && skillRegistry != null && skillRegistry.Contains(skillId))
             {
-                return false;
+                GetOrCreateRecord(skillId);
             }
 
+            return IncreaseProgressWithResult(skillId, amount, skillRegistry).Applied;
+        }
+
+        public MasteryProgressResult IncreaseProgressWithResult(
+            string skillId,
+            int amount,
+            SkillDefinitionRegistry skillRegistry)
+        {
+            if (skillRegistry == null || !skillRegistry.Contains(skillId) || amount <= 0)
+            {
+                return MasteryProgressResult.Rejected(amount);
+            }
+
+            return GetOrCreateRecord(skillId).AddProgressWithResult(amount);
+        }
+
+        private MasteryRecord GetOrCreateRecord(string skillId)
+        {
             var record = GetRecord(skillId);
 
             if (record == null)
@@ -30,7 +50,7 @@ namespace Game.Domain.Classes
                 records.Add(record);
             }
 
-            return record.AddProgress(amount);
+            return record;
         }
 
         public MasteryRecord GetRecord(string skillId)

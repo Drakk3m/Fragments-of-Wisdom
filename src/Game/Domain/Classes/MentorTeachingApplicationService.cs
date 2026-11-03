@@ -51,17 +51,17 @@ namespace Game.Domain.Classes
                     MentorTeachingApplicationBlockReason.NoProgressGranted);
             }
 
-            bool applied = masteryProfile.IncreaseProgress(
+            var progress = masteryProfile.IncreaseProgressWithResult(
                 teachingResult.TaughtSkillId,
                 teachingResult.MasteryProgressGranted,
                 skillRegistry);
 
             return new MentorTeachingApplicationResult(
-                applied,
+                progress.Applied,
                 teachingResult.TaughtSkillId,
-                applied ? teachingResult.MasteryProgressGranted : 0,
+                progress.AppliedProgress,
                 wasAlreadyMastered,
-                applied
+                progress.Applied
                     ? MentorTeachingApplicationBlockReason.None
                     : MentorTeachingApplicationBlockReason.AlreadyMastered);
         }
