@@ -19,6 +19,7 @@ A passing backend suite does not certify Unity, balance, complete content or a p
 ## Contents
 
 - [Part I: Game Design & Creative Vision](#creative-vision)
+- [Echoes of Wysdom: MUST HAVE design](#echoes-of-wysdom)
 - [The Path Unwalked: MUST HAVE narrative vision](#path-unwalked)
 - [Part II: Game Systems & Rules](#systems)
 - [Combat, resources and skill access](#combat-rules)
@@ -192,6 +193,158 @@ A Final Fantasy IX-like idea: equipment exposes learnable skills; practice/maste
 
 Mentor teachings may begin temporary; a mentor mission or meaningful commitment can “fix” a teaching in Nova. Paths should alter access to skills and world capabilities, not just grant passive numbers. Exact mentors, missions, slot limits and branching consequences are content/design work, not verified completed quests.
 
+**MUST HAVE / CONCEPT ONLY:** the special mentor mission and ancient teaching in [Echoes of Wysdom](#echoes-of-wysdom) reveal knowledge accumulated before Nova understood its purpose and unlock its village facility. This is a future narrative commitment, not an implemented mentor mission or teaching reward.
+
+<a id="echoes-of-wysdom"></a>
+### 5.3 Echoes of Wysdom
+
+**Design status: MUST HAVE / LOCKED DESIGN. Implementation status: CONCEPT ONLY.** Preserved from the creator-approved mission "Echoes of Wysdom: MUST HAVE Design Preservation", received 2026-11-03. This chapter authorizes no implementation, does not alter the canonical audit backlog and does not claim implemented or tested Echoes behavior. The following commitments are future design requirements; explicitly open choices remain undecided.
+
+#### Core Design Commitment
+
+**Knowledge is never truly wasted.**
+
+When Nova receives a valid mastery-progress grant that exceeds the threshold required to master a skill, the unused portion becomes **Echoes of Wysdom**.
+
+Echoes represent knowledge that Nova has acquired but does not yet understand how to apply.
+
+They are accumulated from the beginning of the game, before Nova discovers their purpose.
+
+Example: a skill has 90/100 mastery; a legitimate progress grant awards 35 points.
+
+- Mastery applied: 10.
+- Final mastery: 100/100.
+- Echoes generated: 25.
+
+The excess must not disappear from the game state, even though it initially appears to disappear visually.
+
+#### Single-Generation Invariant
+
+**MUST HAVE:** A skill may generate mastery-overflow Echoes **only once**, during the valid grant that first takes it to Mastered.
+
+After reaching Mastered:
+
+- The skill cannot receive further mastery-progress grants.
+- Repeated use cannot generate additional Echoes.
+- Repeated rewards cannot farm additional Echoes.
+- Replaying the same reward or restoring a saved game must not duplicate already claimed Echoes within the same progression history.
+
+Do not introduce an infinite resource-generation loop. This invariant is fundamental to the design.
+
+#### Narrative Presentation and Revelation
+
+**MUST HAVE, before the teaching:** When mastery reaches 100 and produces excess progress, show the unused points as small luminous fragments that gradually fade away.
+
+The animation should suggest the points have been lost or discarded.
+
+The player may notice this recurring phenomenon without immediately understanding its meaning.
+
+Do not reveal the Echoes balance or explain the hidden mechanic prematurely.
+
+**MUST HAVE, the revelation:** A special mentor offers a mission and an ancient teaching about the knowledge that remains after mastery.
+
+Upon completing the mission, Nova discovers the meaning of the apparently lost fragments.
+
+A special animation brings the previously accumulated Echoes back to Nova from across the world, symbolically reclaiming knowledge gained throughout the journey.
+
+The total accumulated Echoes becomes visible.
+
+The visual layer only presents domain events and state; it does not calculate, award or own Echoes.
+
+Provisional teaching name: **The Wisdom That Remains**.
+
+Suggested dialogue:
+
+*"Didst thou believe thy wisdom lost, merely because thou couldst no longer see it?"*
+
+Exact mentor identity, dialogue and teaching name remain OPEN DECISIONS.
+
+#### Village of Memories Facility
+
+**MUST HAVE:** The special teaching unlocks an appropriate restored facility in the **Village of Memories**.
+
+This facility is the primary place where Nova manages Echoes.
+
+The building is not freely placed. Its restoration is tied to knowledge, mentor progression and the established village-restoration philosophy.
+
+Its functions are:
+
+1. Transfer Echoes to eligible skills.
+2. Convert a chosen quantity of Echoes into general character XP.
+3. Leave any remaining Echoes stored for future use.
+
+The player is never forced to spend the entire balance.
+
+#### Primary Use: Mastery Transfer
+
+After unlocking the special teaching, Nova may spend Echoes to advance another eligible skill.
+
+Requirements:
+
+- Target skill is already legitimately unlocked.
+- Target skill has not reached Mastered.
+- No bypass of mentor missions, class access rules, skill-tree prerequisites or retention requirements.
+- Transferred mastery cannot independently grant permanent access to a skill.
+- Transfers cannot generate new Echoes from their own excess. Any transfer must be bounded by the recipient's remaining mastery capacity, with the charged amount and resulting progress explicitly defined.
+- The player chooses the target skill and quantity within permitted limits.
+
+**OPEN DECISIONS:** Transfer efficiency, whether some skill families are restricted, minimum quantities, and any future mentor upgrades.
+
+An illustrative 50% transfer efficiency is NOT an approved balance constant.
+
+#### Secondary Use: General XP Conversion
+
+Nova may voluntarily convert a selected quantity of stored Echoes into general character experience.
+
+This is an alternative of last resort when the player has no eligible skills or simply prefers not to advance any.
+
+The player may:
+
+- Convert some Echoes.
+- Convert all Echoes.
+- Convert none.
+- Preserve the remainder indefinitely.
+
+**Do not lock in `Echoes × character level` as the conversion formula.**
+
+Exact XP rates, scaling, caps and economic balance remain OPEN DECISIONS.
+
+The conversion must not undermine the normal experience curve.
+
+#### Storage and Persistence Commitments
+
+**MUST HAVE:**
+
+- Accumulate Echoes before the mentor revelation.
+- Preserve accumulated Echoes across normal save/restore operations.
+- Preserve unspent balances.
+- Track generation so that each skill's first mastery transition cannot be claimed repeatedly.
+- Support partial spending without duplicating or losing the remaining balance.
+- Maintain atomicity between mastery progression, Echo generation and claiming/spending.
+
+No arbitrary maximum storage capacity is currently approved.
+
+**OPEN DECISIONS:** Exact persistence representation, migration strategy, ownership model and how to handle historical saves created before Echoes exist.
+
+#### Architectural Boundaries and Current Compatibility
+
+AUD-09 already guarantees overflow-safe mastery accumulation with a maximum of 100. Do not modify that correction.
+
+The future Echoes implementation must calculate eligible overflow safely before capping mastery progress, without reintroducing integer overflow.
+
+Distinguish:
+
+- Mastery progression and retention.
+- Skill XP and levels.
+- General character XP.
+- Echoes as a future spendable resource.
+
+These are not interchangeable concepts.
+
+Do not introduce a parallel mastery engine, duplicated progression system or UI-owned gameplay logic. Do not implement Echoes in this documentation branch.
+
+The current capped mastery APIs do not establish an Echoes ledger, claim history, transfer service or reveal state. The future no-independent-access-grant constraint must be reconciled explicitly with the current retention policy, which admits registered mastered skills; this chapter does not change that policy or invent an eligibility rule. See [progression rules](#progression-rules), [narrative boundaries](#narrative-rules), [architecture](#architecture) and [persistence](#persistence). The [canonical audit backlog](#current-backlog), including AUD-10 through AUD-12, remains unchanged.
+
 ### 6. Philosophy, routes, choice and transmutation
 
 **LOCKED DESIGN:** Shared Wisdom emphasizes mentorship, relationships, knowledge transmitted and community. The alternative **Nahual Path** (working name) explores knowledge extracted or forced from reality; it should be intellectually tempting, dangerous and isolating, **not** a generic evil route.
@@ -306,6 +459,8 @@ The Codex is a **ceremonial map of reconstructed knowledge** with discovery stag
 
 Buildings are manifestations of recovered cultural capabilities, not free-placement structures. A mastered skill may restore a workshop, mentor house, kitchen or alchemical/transmutation function. **OPEN:** whether one skill maps to one building, a building upgrade or a shared capability family; how quest gates and visual stages work.
 
+**MUST HAVE / CONCEPT ONLY:** the [Echoes of Wysdom facility](#echoes-of-wysdom) is restored through its special teaching, knowledge and mentor progression, not free placement. It is the primary location for eligible mastery transfers, voluntary general-XP conversion and retaining unspent Echoes; it does not change the Sanctuary's no-XP reflection contract.
+
 ### 8.2 Sanctuary as emotional counterweight
 
 **ACCEPTED DIRECTION / DEFERRED:** it recalls a few actual, meaningful player events in natural dialogue. No XP, score, trophy wall, percentages or moral evaluation. **Design maxim:** *“The Sanctuary never evaluates the player. It remembers them.”* It needs a stable milestone/event model before any UI.
@@ -368,6 +523,8 @@ Source ownership: `src/Game/Domain/Classes/`, `src/Game/Domain/Skills/`, `src/Ga
 | Equipment | Definition/loadout/stat aggregation and TaughtSkillId metadata | No complete equip-to-learn-to-master-to-retain loop; no automatic equipment mastery grant |
 
 Legacy `SkillProgress` mastery uses its own maximum-level test, 0.8 cost multiplier and +0.15 effect bonus. Retention mastery uses the separate 100-point record. A future unification or eligibility restriction needs an explicit migration/design decision; do not conflate terminology.
+
+**MUST HAVE / CONCEPT ONLY:** [Echoes of Wysdom](#echoes-of-wysdom) preserves eligible excess from a skill's first mastery transition, once per skill, with no repeated-grant or transfer-overflow farming. Its resource, general character XP and skill XP remain distinct from retention mastery. No Echoes award, spend or access-rule change is implemented or authorized here; AUD-09's safe cap remains intact.
 
 Current teaching and tree results are lightweight facts. Positive teaching grants may be applied explicitly, while tree unlocks and class bindings do not grant skills, rewards or mastery. No mentor ranks, complete skill roster, item skill learning or reward trees are certified by these foundations.
 
@@ -432,6 +589,8 @@ Design acceptance requires knowledge-driven choices, distinct class/cognition/ma
 
 Domain/application are pure C#; Unity adapts inputs, storage paths and presentation. Combat, cognition/progression, missions, Codex, inventory/equipment, narrative and presentation keep explicit ownership. Use focused services, data/results, events and adapters; avoid hidden cross-domain mutation and parallel engines.
 
+**Future design boundary:** [Echoes of Wysdom](#echoes-of-wysdom) requires safe pre-cap overflow accounting and atomic progression/generation/claiming/spending without a parallel mastery engine. Ownership remains an OPEN DECISION. Its fading-fragment and revelation animations only present domain state/events; presentation cannot calculate or award the resource.
+
 The solution builds `src/Game/Game.csproj` and the smoke runner. Domain and Application currently share one `net10.0` assembly, so folders express boundaries rather than enforcing them. No Unity dependency was found in these layers. `src/Game.Unity/` is outside that solution: .NET smoke success does not verify its compilation or runtime compatibility in Unity.
 
 Two event contracts coexist: combat `GameEventLog`/`GameEventType` records and typed domain discovery/unlock events. Neither is a complete UI/milestone bridge. EquipmentLoadout/EquipmentProfile and EquipmentStatAggregator/modifier helpers include delegating compatibility APIs, not independent gameplay engines. The actual duplication risks are divergent state paths and validation policies, not merely repeated names.
@@ -449,6 +608,8 @@ The term `LoadedPlayerSession` does not imply automatic disk loading. Compositio
 
 <a id="persistence"></a>
 ## Persistence, Serialization and Compatibility
+
+**Future requirement, not current save support:** [Echoes of Wysdom](#echoes-of-wysdom) must preserve hidden and visible accumulated balances, per-skill generation/claim history and partially spent remainders across normal save/restore without duplication or loss. Representation, migration and pre-Echoes historical-save handling remain OPEN DECISIONS; this documentation adds no DTO, schema change or atomicity guarantee to the existing pipeline.
 
 Current schema is **1**, centralized in `V2ProgressSnapshotVersions`; this consolidation changes neither DTOs nor schema. Pipeline:
 
