@@ -23,6 +23,10 @@ namespace Game.SmokeTests
         private static void RunPlayerProgressionFoundationSmokeTests()
         {
             RunSection(
+                "AUD-04 canonical skill definition assertions",
+                RunCanonicalSkillDefinitionSmokeTests);
+
+            RunSection(
                 "Class foundation assertions",
                 delegate
                 {

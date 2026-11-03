@@ -160,8 +160,34 @@ namespace Game.Domain.Combat
                     CombatSkillUseBlockReason.PlayerContextIncomplete);
             }
 
-            bool v3AccessChecked = !string.IsNullOrEmpty(
-                request.SkillProgress.Definition.RequiredUnlockId);
+            var definition = request.SkillProgress.Definition;
+
+            if (skillRegistry != null)
+            {
+                var canonical = skillRegistry.Get(skillId);
+
+                if (canonical == null)
+                {
+                    return Block(skillId, true,
+                        CombatSkillUseBlockReason.SkillDefinitionUnregistered);
+                }
+
+                if (canonical.Cost == null || definition.Cost == null)
+                {
+                    return Block(skillId, true,
+                        CombatSkillUseBlockReason.SkillDefinitionInvalid);
+                }
+
+                if (!HasCanonicalMetadata(definition, canonical))
+                {
+                    return Block(skillId, true,
+                        CombatSkillUseBlockReason.SkillDefinitionConflict);
+                }
+
+                definition = canonical;
+            }
+
+            bool v3AccessChecked = !string.IsNullOrEmpty(definition.RequiredUnlockId);
 
             if (v3AccessChecked)
             {
@@ -176,7 +202,7 @@ namespace Game.Domain.Combat
                 }
 
                 var v3Result = skillAccessPolicy.Evaluate(
-                    request.SkillProgress.Definition,
+                    definition,
                     unlockProfile);
 
                 if (!v3Result.IsAvailable)
@@ -235,6 +261,24 @@ namespace Game.Domain.Combat
             }
 
             return Allow(skillId, true, v3AccessChecked, false);
+        }
+
+        // The engine retains SkillProgress. Require value equality for all definition
+        // fields so authorization and execution cannot consume conflicting metadata.
+        private static bool HasCanonicalMetadata(
+            SkillDefinition definition,
+            SkillDefinition canonical)
+        {
+            return definition.Id == canonical.Id
+                && definition.Name == canonical.Name
+                && definition.MaxLevel == canonical.MaxLevel
+                && definition.Cost.BaseCost == canonical.Cost.BaseCost
+                && definition.Cost.CostPerLevel == canonical.Cost.CostPerLevel
+                && definition.Category == canonical.Category
+                && definition.Targeting == canonical.Targeting
+                && definition.EffectType == canonical.EffectType
+                && definition.RequiredUnlockId == canonical.RequiredUnlockId
+                && definition.ResonanceCost == canonical.ResonanceCost;
         }
 
         private static CombatSkillUseValidationResult Allow(
