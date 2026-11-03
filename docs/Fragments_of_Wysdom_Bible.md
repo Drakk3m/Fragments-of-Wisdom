@@ -19,6 +19,7 @@ A passing backend suite does not certify Unity, balance, complete content or a p
 ## Contents
 
 - [Part I: Game Design & Creative Vision](#creative-vision)
+- [The Path Unwalked: MUST HAVE narrative vision](#path-unwalked)
 - [Part II: Game Systems & Rules](#systems)
 - [Combat, resources and skill access](#combat-rules)
 - [Classes, mastery, mentors, trees and equipment](#progression-rules)
@@ -203,6 +204,86 @@ Mentor teachings may begin temporary; a mentor mission or meaningful commitment 
 
 The darker path may reduce or remove access to mentor-based permanent skills while opening transmutation/knowledge extraction. This is a **PROMISING DESIGN DIRECTION** that needs explicit economy, reversibility and narrative-cost decisions; do not assert all such restrictions are implemented. The player should understand the allure before facing consequences.
 
+<a id="path-unwalked"></a>
+### 6.2 The Path Unwalked: Three Distinct Encounters
+
+**Decision date: 2026-11-03. Design status: MUST HAVE / LOCKED DESIGN. Implementation status: CONCEPT ONLY, not authorized for implementation.** Source: creator-supplied `The_Path_Unwalked_MUST_HAVE.md` (SHA-256 `48e30f70ddd67c6957c58aeb911a1c2d88a71e3c297d28a06a0b6805155aa314`). This integrates the source's creative commitments into the canonical Bible; it does not create a parallel specification or alter the audit backlog. Its reference to AUD-09 records the source's development context, not an instruction to modify that implementation branch or change any audit status.
+
+> **Central question:** What did you sacrifice to become who you are?
+
+#### The Resonance Devourer
+
+**MUST HAVE / LOCKED DESIGN:** a distinct resource-theft encounter testing management and tactical adaptability. **OPEN DECISIONS:** The Resonance Devourer is a provisional name; the following ability names and exact effects are candidates, not implemented mechanics.
+
+An advanced boss that turns Nova's resources against them. This is a test of resource management, active Resonance, reserve tanks, Essence and tactical adaptability. Candidate mechanics:
+
+- **Resonant Leech:** steals active Resonance into an explicitly owned temporary pool.
+- **Essence Parasite:** makes Nova's Essence pay for a clearly telegraphed enemy action.
+- **Hollow Refill:** intercepts a portion of Nova's reserve-to-active refill.
+- **Severed Vessel:** temporarily restricts access to reserve tanks.
+- **Resonant Collapse:** converts captured energy into a dangerous, announced attack.
+
+**Important:** Transferring a resource and paying directly from the opponent's resource are different contracts. Any implementation must explicitly model authorized ownership and source-of-cost rules; never bypass AUD-05's current player-owned Resonance protection. Preserve readable telegraphs, counterplay and player agency. The above skill names and exact effects are provisional, but the resource-theft encounter is a MUST HAVE.
+
+#### The Living Archive
+
+**MUST HAVE / LOCKED DESIGN:** a second, distinct encounter testing broad strategic combat mastery. **OPEN DECISIONS:** The Living Archive is a provisional name; exact encounter mechanics and placement remain open.
+
+A powerful being embodying accumulated knowledge, able in principle to access every spell or skill discipline in the game. This is a test of combat mastery, not random skill spam.
+
+- **Phase I:** survey and probe Nova with varied disciplines.
+- **Phase II:** recognize repeated tactics and counter predictable patterns.
+- **Phase III:** combine normally incompatible disciplines in a climactic examination.
+
+Reuse canonical skill definitions. Design a bounded, legible selection strategy and explicit enemy access policy. Narrative access to the entire catalog does not mean executing every skill in a single fight. A strong candidate for the main story's final boss, though its exact placement remains open.
+
+#### The Path Unwalked / The Unchosen Self
+
+**MUST HAVE / LOCKED DESIGN:** a third, distinct encounter with the opposite-path Nova. **OPEN DECISIONS:** The Path Unwalked / The Unchosen Self are provisional names; exact encounter mechanics and metaphysics are not fixed by these titles.
+
+**MUST HAVE: a secret, optional post-credits encounter with the authentic Nova who chose the opposite life path.** Not a clone, illusion, palette swap, or automatically evil twin.
+
+The protagonist and alternate Nova are equally real outcomes of different choices. Both paths carry defensible truths and meaningful losses. The confrontation must be emotionally and philosophically consequential, asking what Nova sacrificed to become who they are.
+
+- If the player pursued mentors, mastery, bonds and restoration of the Village of Memories, the other Nova followed forbidden transmutation, isolation and power through sacrifice.
+- If the player pursued the forbidden path, the other Nova preserved mentorship, community and restoration.
+- The opposing Nova's abilities, visual identity, dialogue, worldview and relationship to the village must reflect the path **not chosen**.
+- Neither version is declared categorically right or wrong. The other Nova may argue that the player's choices were mistaken, with credible reasons.
+- The primary story must have its own satisfying resolution. The alternate-Nova confrontation deepens it **after the credits** instead of replacing it.
+- Codex knowledge, choices and discovery may unlock the encounter, but literal 100% Codex completion must not be mandatory.
+
+**Provisional opening line:** *“Thou hast walked thy path to its end. Yet mine remains untold.”*
+
+*“Has recorrido tu camino hasta su final. Pero el mío aún no ha sido contado.”*
+
+#### Narrative Promise and Open Metaphysics
+
+The story is not simply good versus evil. The other Nova is a life the player genuinely might have lived. The player should wonder whether wisdom also existed on the road abandoned. This gives **Fragments of Wysdom** its emotional meaning: no single journey contains every fragment of wisdom.
+
+**Candidate metaphysical twist, NOT YET CANON:** both Novas discover that the world can preserve only one of the two paths. The origin of the two realities, whether reconciliation is possible, endings and final consequences remain OPEN DECISIONS.
+
+#### Structural Promise
+
+Three bosses, three different tests:
+
+1. Resource predator: management and adaptability.
+2. Living Archive: broad strategic mastery.
+3. Unchosen Nova: identity, choices and sacrifices.
+
+Their final names, lore identities, chronology and balance remain open; the **three distinct dramatic functions** and the **post-credits opposite-path Nova** are locked creative commitments.
+
+#### Architecture and Governance Boundaries
+
+- **Do not implement now.** The narrative record does not authorize scope on AUD-09 or any other implementation branch; the [canonical audit backlog](#current-backlog) remains unchanged.
+- No duplicate combat engine, skill registry, resource pool ownership system or progression subsystem.
+- Any resource hijacking must be an explicit, approved domain mechanic with regression tests; AUD-05 remains intact.
+- The all-spells boss selects from canonical definitions under an explicit enemy authorization policy.
+- The other Nova is built from opposite-path narrative/progression rules rather than blindly copying mutable player state.
+- Unity only presents domain events and owns no combat rules.
+- Exact encounter design, tuning, rewards, quest chain and cultural references require later design reviews.
+
+**This record preserves the creator's MUST HAVE vision, not a completed implementation or permission to add scope to the current branch.** Future work must respect the existing [combat and resource contracts](#combat-rules), [narrative fact-producing boundaries](#narrative-rules), [progression rules](#progression-rules) and [development governance](#governance). The proposed resource interactions and catalog-wide enemy access require later explicit design approval; none overrides the current backend protections.
+
 ### 7. Codex, discovery and missions
 
 **IMPLEMENTED — DOCUMENTED:** the V2 narrative foundation favors small evaluators that return facts, tags, hooks and candidate records. Explicit downstream services apply Codex and mission-journal discovery idempotently. No narrative evaluator should directly execute combat, UI, dialogue or reward logic.
@@ -240,6 +321,8 @@ Music, environmental audio, encounter pacing, exploration layout, travel systems
 ## Combat, Resources and Skill Access
 
 **Current source contract:** [TurnBasedCombatEngine](../src/Game/Domain/Combat/TurnBasedCombatEngine.cs) owns the canonical attack/skill sequence. Preserve it rather than adding a parallel resolver. [Archive 02](#archive-02) retains formulas, passive/status contracts and historical acceptance cases.
+
+**Locked future vision, not current execution rules:** [The Path Unwalked's three encounters](#path-unwalked) include resource theft and catalog-wide combat mastery. Resource transfer versus direct opponent-funded costs must have separate approved ownership/source-of-cost contracts; the Living Archive must use canonical definitions with bounded selection and explicit enemy authorization. These concepts do not bypass AUD-05 or implement new enemy capabilities.
 
 Current skill sequence:
 1. Reject ended combat or defeated attacker/defender; construct context and apply the player Atlas cost modifier when relevant.
@@ -290,6 +373,8 @@ Current teaching and tree results are lightweight facts. Positive teaching grant
 
 <a id="narrative-rules"></a>
 ## Narrative, Codex, Missions and Unlocks
+
+**Locked future narrative, not implemented progression:** [The Path Unwalked](#path-unwalked) requires a secret, optional post-credits confrontation with an equally real opposite-path Nova, after a satisfying primary-story resolution. Its abilities, presentation and narrative facts must reflect the path not chosen, not a blind copy of mutable player state. Codex knowledge, choices and discovery are candidate gates; literal 100% Codex completion cannot be mandatory. Exact gates, metaphysics and endings remain OPEN DECISIONS.
 
 The fact-producing chain reads player alignment and runs `FirstNahualTeachingEvaluator`, `TransmutationAccessPolicy`, `NpcReactionService`, `NarrativeHookService`, `MissionTriggerService` and `CodexEntryService`, with candidate deduplication. Results are acceptance/rejection, tags, preview reactions, hooks and candidates, not implicit combat, dialogue, inventory or reward changes.
 
