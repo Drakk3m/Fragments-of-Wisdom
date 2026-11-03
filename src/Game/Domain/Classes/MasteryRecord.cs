@@ -45,12 +45,8 @@ namespace Game.Domain.Classes
                 return false;
             }
 
-            Progress += amount;
-
-            if (Progress > MasteredProgress)
-            {
-                Progress = MasteredProgress;
-            }
+            // Widen before adding so even int.MaxValue cannot wrap before capping.
+            Progress = (int)System.Math.Min((long)Progress + amount, MasteredProgress);
 
             return true;
         }
