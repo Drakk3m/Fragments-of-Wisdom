@@ -40,15 +40,23 @@ namespace Game.Domain.Classes
 
         public bool AddProgress(int amount)
         {
+            return AddProgressWithResult(amount).Applied;
+        }
+
+        public MasteryProgressResult AddProgressWithResult(int amount)
+        {
             if (amount <= 0 || IsMastered)
             {
-                return false;
+                return MasteryProgressResult.Rejected(amount);
             }
 
+            int previousProgress = Progress;
             // Widen before adding so even int.MaxValue cannot wrap before capping.
             Progress = (int)System.Math.Min((long)Progress + amount, MasteredProgress);
 
-            return true;
+            int appliedProgress = Progress - previousProgress;
+            return new MasteryProgressResult(amount, appliedProgress,
+                amount - appliedProgress, IsMastered);
         }
 
         public void SetProgress(int progress)

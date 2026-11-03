@@ -233,6 +233,8 @@ Do not introduce an infinite resource-generation loop. This invariant is fundame
 
 #### Narrative Presentation and Revelation
 
+The generation and transfer clarifications below do not change the hidden accumulation, revelation, teaching or village commitments in this chapter.
+
 **MUST HAVE, before the teaching:** When mastery reaches 100 and produces excess progress, show the unused points as small luminous fragments that gradually fade away.
 
 The animation should suggest the points have been lost or discarded.
@@ -291,6 +293,37 @@ Requirements:
 **OPEN DECISIONS:** Transfer efficiency, whether some skill families are restricted, minimum quantities, and any future mentor upgrades.
 
 An illustrative 50% transfer efficiency is NOT an approved balance constant.
+
+**LOCKED DESIGN clarification (AUD-10 mission, 2026-11-03):** transfers are strictly bounded by `RemainingMastery = 100 - CurrentMastery`. Never charge Echoes for progress that cannot actually be applied or consume more than required for the accepted transfer. Preserve the unused balance; mastered skills cannot receive transfers. Validate cost and capacity before committing, and keep spending and mastery application atomic. Transfers never generate Echoes and cannot bypass unlocks, mentor missions, class restrictions, tree prerequisites or retention rules, nor independently grant permanent skill access.
+
+Illustrative capacity examples **assuming hypothetical 1:1 transfer efficiency**, not an approved efficiency:
+
+| Current mastery | Available Echoes | Maximum mastery increase |
+|---|---:|---:|
+| 90 | 50 | 10 |
+| 75 | 100 | 25 |
+| 99 | 200 | 1 |
+| 100 | 200 | 0 |
+
+At 90/100 with 50 Echoes and hypothetical 1:1 transfer efficiency, spend at most 10, reach 100 and retain 40 Echoes. The approved 1:1 **generation** rate does not establish transfer efficiency. If efficiency differs, cost must follow the actual accepted mastery increase with an explicitly defined rounding policy; do not silently discard fractional value or charge for unapplied progress. Efficiency and rounding remain OPEN DECISIONS.
+
+#### Approved Generation Policy and Future Passive
+
+**MUST HAVE / LOCKED DESIGN; implementation CONCEPT ONLY (2026-11-03):** initial generation is 1:1. Each eligible unused mastery point generates exactly one Echo of Wysdom. An eligible ordinary grant of +50 at 90/100 applies 10 and generates 40 Echoes; +20 at 99/100 applies 1 and generates 19; +50 at 100/100 generates zero. Echoes transfers are excluded.
+
+**LOCKED DESIGN:** the future generation policy must support a configurable multiplier with initial/default `GenerationMultiplier = 1`, using the conceptual formula `EchoesGenerated = EligibleOverflow × GenerationMultiplier`. Validate the multiplier, reject negative rewards and use overflow-safe arithmetic. Configuration storage, upgrade sources and numerical limits remain OPEN DECISIONS. The multiplier belongs to the future Echoes policy, never MasteryRecord or ProgressApplied; the mastery result always reports raw, unmultiplied overflow. No runtime configuration, multiplier field/service or unused Echoes policy is introduced by AUD-10.
+
+**FUTURE DESIGN, NOT YET LOCKED MECHANIC:** a mentor may teach a passive that probabilistically multiplies an eligible transition's Echoes. Conceptual sequence:
+
+1. An eligible mastery transition produces raw overflow.
+2. The future generation policy reads its configured multiplier.
+3. An optional mentor passive may trigger an additional multiplier.
+4. Resolve the final award once.
+5. Persist the award so repeating or restoring the operation cannot reroll it.
+
+Probability, passive multiplier, mentor identity, unlock conditions and interaction with the base multiplier remain OPEN DECISIONS. Future implementation requires deterministic testing and save/reload exploit prevention. AUD-10 adds no RNG, passive, additional multiplier or reward persistence.
+
+**Eligibility boundary:** distinguish raw unused mastery progress, eligible overflow from an approved grant origin, base generation at the configured multiplier, any passive bonus, and the award actually persisted. Raw overflow alone is not proof of eligibility or a spendable reward. The future application/domain boundary must validate grant origin and claiming. Only the eligible ordinary grant first reaching Mastered may generate once per skill; subsequent grants/use, duplicate rewards and save/restore cannot generate another award within that progression history. The mastery operation fact is not an exactly-once claim token.
 
 #### Secondary Use: General XP Conversion
 
@@ -508,12 +541,12 @@ Source ownership: `src/Game/Domain/Classes/`, `src/Game/Domain/Skills/`, `src/Ga
 |---|---|---|
 | ClassDefinitionRegistry | Stable ClassId lookup; valid registration; duplicate IDs rejected without replacing the original | ClassProfile owns assignment, not registries or mastery |
 | SkillDefinitionRegistry | Stable skill ID registration/resolution; null/invalid/duplicate definitions fail safely | Shared content catalog, not ownership or canonical execution enforcement by itself |
-| MasteryProfile / MasteryRecord | Registry-validated integer progress in 0..100; positive accumulation widens before capping; ranks are Unranked at 0, Practiced at 1..99 and Mastered at 100 | AUD-09 resolved; nonpositive increments and additions after mastery return false; facts only, no automatic unlocks or bonuses |
+| MasteryProfile / MasteryRecord | Registry-validated integer progress in 0..100; positive accumulation widens before capping; ranks are Unranked at 0, Practiced at 1..99 and Mastered at 100 | AUD-09/AUD-10 resolved; detailed operation returns requested/applied/raw-overflow/first-mastery facts; bool APIs delegate; no automatic unlocks, bonuses or Echoes |
 | SkillProgress | XP/level-based skill progression with its own IsMastered and cost/effect modifiers | Distinct from retention mastery; no automatic synchronization between the two models |
 | MentorDefinitionRegistry | Stable MentorId, valid name/definition, duplicate rejection | No teaching or mission execution |
 | MentorRelationshipProfile | Discovery, trust/progress and availability facts; registry-aware APIs; repeated discovery is idempotent | Does not replace the legacy cognition teaching/slot profile |
 | MentorTeachingService | Checks mentor/skill registries, discovery, availability and required trust | Returns taught skill ID, optional mastery grant and stable block reasons; does not mutate mastery |
-| MentorTeachingApplicationService | Explicit application of available teaching through skill registry; nonpositive grant rejected with NoProgressGranted | No mentor mutation, skill grants or mission starts; repeat after mastery safe; reported capped delta is wrong in AUD-10 |
+| MentorTeachingApplicationService | Explicit application of available teaching through skill registry; nonpositive grant rejected with NoProgressGranted | AUD-10 resolved: ProgressApplied is actual bounded delta; no mentor mutation, skill grants or mission starts; repeat after mastery safe |
 | MasteredSkillRetentionPolicy | Registered AND (class-allowed OR retention-mastered) | Read-only; no class needed for registered mastered skills; class eligibility restrictions are future design |
 | SkillTreeDefinition | Stable SkillTreeId; stable node IDs referencing registered skills | Duplicate nodes rejected; every prerequisite must already exist in that same tree |
 | SkillTreeUnlockPolicy | Requires known/discovered node and unlocked prerequisites in that tree scope | Prerequisite-first insertion rejects forward/self references and prevents incremental cycles; not a full arbitrary graph import validator |
@@ -665,7 +698,7 @@ One implementation status per row; VERIFIED is deliberately limited to the named
 | Legacy slice contract | Accepted compatibility | VERIFIED | `src/Game/Slice/FoundationVerticalSlice.cs` | V1SmokeTests: 2 assertions, 38 events |
 | Attack/skill foundation | Accepted | PARTIAL | TurnBasedCombatEngine, DamageResolver, StatusEffectResolver | V3SmokeTests: 100 pass; AUD-05 resolved; AUD-06 through AUD-08 remain |
 | Resonance active/reserve transfer | Accepted | PARTIAL | `src/Game/Domain/Combat/Resources/`, TurnBasedCombatEngine | Player-only ownership verified by AUD-05; separate refill lifecycle remains unresolved |
-| Registry/class/mastery/mentor operations | Accepted foundation | PARTIAL | `src/Game/Domain/Classes/` | AUD-09 overflow-safe mastery verified; teaching delta defect AUD-10 remains |
+| Registry/class/mastery/mentor operations | Accepted foundation | PARTIAL | `src/Game/Domain/Classes/` | AUD-09 safe mastery and AUD-10 actual delta/operation facts verified; Echoes economy remains CONCEPT ONLY |
 | Scoped tree isolation and policy application | Accepted foundation | VERIFIED | SkillTreeProgressProfile, SkillTreeUnlockApplicationService | Two-tree same-node workflow; not arbitrary corrupt-save integrity |
 | Class-tree binding / supported JSON round trip | Accepted foundation | VERIFIED | ClassSkillTreeBindingRegistry, V2ProgressSnapshotService | Binding save and class-switch workflows; no automatic grants |
 | Retained access and validated combat composition | Accepted foundation | VERIFIED | CombatSkillUseValidator, CombatSkillTurnValidatorGateway | AUD-04 canonical metadata regressions and mentor-retention engine flow; explicit legacy/enemy paths are outside player authorization |
@@ -699,10 +732,10 @@ git status --short
 | Shared Domain Foundations | 16 |
 | V2 Narrative / Progression / Persistence | 371 |
 | V3 Combat / Skills / Resonance / Status / Stats | 100 |
-| Player Progression / Combat Validation | 1284 |
-| **Total** | **1773** |
+| Player Progression / Combat Validation | 1657 |
+| **Total** | **2146** |
 
-Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, AUD-05 player Resonance ownership contains **175**, and the separate AUD-09 overflow-safe mastery subsection contains **186**, all already included in 1284. Historical V4/V5 labels and earlier counts are not current reporting groups.
+Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, AUD-05 player Resonance ownership contains **175**, AUD-09 overflow-safe mastery contains **186**, and AUD-10 actual mastery delta contains **373**, all already included in 1657. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
 The V2 group includes **107** AUD-03 Codex round-trip assertions; they are included in 371, not an additional reporting group.
 
@@ -726,7 +759,7 @@ The V2 group includes **107** AUD-03 Codex round-trip assertions; they are inclu
 
 Integrated smoke covers class/mentor/teaching/mastery, retention after switching class, binding save/JSON/restore, prerequisite-first tree unlock application, scoped trees with identical node IDs, validation modes/provider/classification/orchestration, optional engine integration and shared loaded-session/bootstrap ownership. See [progression tests](../src/Game.SmokeTests/PlayerProgressionFoundationSmokeTests.cs), [runtime workflow tests](../src/Game.SmokeTests/ProgressionRuntimeBootstrapSmokeTests.cs), [V2 tests](../src/Game.SmokeTests/V2SmokeTests.cs), [V3 tests](../src/Game.SmokeTests/V3SmokeTests.cs) and [runner](../src/Game.SmokeTests/SmokeTestRunner.cs).
 
-Coverage gaps include the six remaining audit regressions, full-state save replacement, failures during restore application, other hostile/extreme numeric values, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips; AUD-04 covers canonical player skill metadata and actual engine rejection/execution; AUD-05 covers the approved player-only Resonance skill ownership boundary; AUD-09 covers bounded mastery accumulation through direct, profile, mentor and snapshot workflows. Current green counts do not close the other gaps.
+Coverage gaps include the five remaining audit regressions, full-state save replacement, failures during restore application, other hostile/extreme numeric values, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips; AUD-04 covers canonical player skill metadata and actual engine rejection/execution; AUD-05 covers the approved player-only Resonance skill ownership boundary; AUD-09 covers bounded mastery accumulation through direct, profile, mentor and snapshot workflows; AUD-10 covers actual teaching delta, immutable raw operation facts and mentor/JSON/restore compatibility. Current green counts do not close the other gaps or verify an Echoes economy.
 
 <a id="audit"></a>
 # Part V: Audit & Technical Debt
@@ -734,7 +767,7 @@ Coverage gaps include the six remaining audit regressions, full-state save repla
 <a id="reproduced-findings"></a>
 ## Reproduced Integrity Findings
 
-AUD-01 through AUD-05 and AUD-09 are **RESOLVED** by the verified corrections below; AUD-06 through AUD-08 and AUD-10 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
+AUD-01 through AUD-05, AUD-09 and AUD-10 are **RESOLVED** by the verified corrections below; AUD-06 through AUD-08, AUD-11 and AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
 
 | ID | Severity from executed probe | Reproduced behavior | Affected code | Required acceptance direction |
 |---|---|---|---|---|
@@ -747,7 +780,7 @@ AUD-01 through AUD-05 and AUD-09 are **RESOLVED** by the verified corrections be
 | AUD-07 | MEDIUM | Refill after combat end succeeds, restores resource and advances turn | `ResonanceRefillAction.cs` | Enforce combat lifecycle boundary |
 | AUD-08 | MEDIUM | `SilenceDebuff` emits `ActionBlocked`, yet `SkillUsed`, XP and damage still occur | `SilenceDebuff.cs`, combat engine | Make blocked action truly non-executable; consistent events |
 | AUD-09 | MEDIUM | Mastery 50 + `int.MaxValue` wraps to `-2147483599` / `Unranked` | `MasteryRecord.cs` | RESOLVED 2026-11-03: widen the sum before capping at 100; preserve integer storage, rank thresholds and no-op behavior |
-| AUD-10 | MEDIUM | Teaching +50 at mastery 90 caps at 100 but reports `ProgressApplied=50` rather than 10 | `MentorTeachingApplicationService.cs` | Report actual applied delta |
+| AUD-10 | MEDIUM | Teaching +50 at mastery 90 caps at 100 but reports `ProgressApplied=50` rather than 10 | `MentorTeachingApplicationService.cs` | RESOLVED 2026-11-03: report actual delta from canonical immutable mastery operation; raw overflow is not an Echoes award |
 | AUD-11 | MEDIUM | `ResourcePool.TrySpend(-10)` succeeds, `Current=110` when `Max=100` | `ResourcePool.cs` | Reject invalid spend amounts; preserve pool invariants |
 | AUD-12 | MEDIUM | Failed preflight reports `ClassRestored=true` despite unchanged destination | `V4ProgressRestoreCoordinator.cs` | Separate feasibility/preflight result from actual mutation facts |
 
@@ -770,7 +803,7 @@ AUD-01 through AUD-05 and AUD-09 are **RESOLVED** by the verified corrections be
 | AUD-11 | ResourcePool at Current=Max=100 accepted TrySpend(-10), leaving Current=110 |
 | AUD-12 | Invalid mastery stopped preflight application; ClassRestored true despite destination still audit.before |
 
-These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 through AUD-05 and AUD-09 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
+These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 through AUD-05, AUD-09 and AUD-10 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
 
 ### AUD-01 Closure: Real Destination Validation
 
@@ -970,6 +1003,26 @@ At investigation time the flag ran only this probe and did not catch or convert 
 
 **Compatibility and limits:** public APIs and bool semantics are unchanged; only overflow-corrupted positive accumulation is corrected. No mentor rewards/delta reporting, ResourcePool arithmetic, combat costs, Resonance ownership, skill authorization, save schema or Unity code changed. Historical saves that already contain overflow-corrupted negative progress are not reconstructed: existing restore clamping remains unchanged and lost history cannot be inferred from the negative number. Concurrent mutation, reflection-corrupted state and unrelated numeric validation are outside this fix. No Unity Editor/Play Mode run was performed. AUD-10 remains the next proposed atomic candidate, not authorization to begin it; stop after AUD-09 for architectural review.
 
+### AUD-10 Closure: Actual Mastery Delta and Canonical Operation Facts
+
+**Status: RESOLVED (2026-11-03).** Baseline was latest `origin/main` at `16e6ae0`, containing resolved AUD-09 and the preserved Echoes / The Path Unwalked chapters. AUD-10 was the next unresolved priority (5b). Baseline restore/build/smoke succeeded: 1773 assertions, 38 V1 events, zero build warnings/errors. No other audit fix is included.
+
+**Reproduction and root cause:** before production edits, a permanent assertion in [MasteryProgressContractSmokeTests.cs](../src/Game.SmokeTests/MasteryProgressContractSmokeTests.cs) ran through the existing smoke runner. A registered skill at 90 received an available +50 teaching. Console facts were `initial=90, requested=50, final=100, reported=50, actual=10`; the assertion threw InvalidOperationException and `dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build` exited **1**. Production diff was empty. The mentor service returned the requested grant on success rather than the capped record's actual change. The same assertion now passes with `reported=10`.
+
+**Decision B, not A:** reading state before/after in the teaching service would fix the report but leave future raw-overflow accounting to another caller. A cohesive extension instead keeps the one authoritative arithmetic/mutation in `MasteryRecord.AddProgressWithResult(int)`. `AddProgress(int)` delegates and returns Applied. `MasteryProfile.IncreaseProgressWithResult(...)` validates the registry and delegates to that record; `IncreaseProgress(...)` preserves its bool signature. The mentor Apply signature and MentorTeachingApplicationResult constructor/properties remain unchanged; Apply consumes AppliedProgress from this operation. No parallel calculator/service or second mastery mutation path was added. RestoreRecord/SetProgress remain the existing explicit replacement APIs, not ordinary grants.
+
+**Immutable contract:** `MasteryProgressResult` is sealed, has getter-only facts and an internal constructor. RequestedProgress retains the exact supplied int, including rejected negative inputs, for diagnostics. AppliedProgress is the actual delta; Applied is true only when that delta is positive. OverflowProgress is raw unused progress, with no multiplier or reward claim. ReachedMastery is true only when this accepted operation first moves a record from below 100 to 100. Rejected results have zero applied/overflow and false transition; registry failures and nonpositive inputs through the detailed profile API create no record. Already-mastered records return no delta or overflow. No low-level reason enum is added; the mentor service preserves all existing reason values and precedence.
+
+**Arithmetic:** AUD-09's widened `(long)Progress + amount` and cap at 100 are retained. After valid positive mutation, actual delta is `Progress - previousProgress` in 1..100; raw overflow is `amount - appliedProgress` in 0..int.MaxValue-1, safely representable without addition/wraparound. The guard ensures previous progress is below 100 and amount is positive. Examples: 90 + 50 => applied 10, overflow 40, first mastery true; 99 + 2 => applied 1, overflow 1; 0 + int.MaxValue => applied 100, overflow int.MaxValue-100. Rejected 100 + 50, 40 + 0 and 40 - 10 return no overflow or transition. Rank thresholds/storage remain unchanged.
+
+**Compatibility exception:** the legacy boolean profile API has an established side effect: a first registered zero/negative grant creates an empty Unranked record while returning false. AUD-09 permanently tests this. Only that wrapper preserves this behavior through a shared GetOrCreateRecord helper before delegating; the new detailed API and rejected mentor application are mutation-free. Existing records never lose progress on rejection. This distinction is explicit rather than silently changing the older API. Existing callers depending on the erroneous requested ProgressApplied will now receive the correct smaller delta for capped grants.
+
+**Regression evidence:** 373 new assertions under the existing Player Progression / Combat Validation group, with a dedicated AUD-10 subsection. The acceptance matrix covers normal/exact/capped grants, 99, int.MaxValue from 0 and 50, already-mastered records, zero/negative/int.MinValue, all operation fields, unchanged ranks, final-state consistency and bool delegation. Further cases cover unknown/null/empty IDs, missing registry/profile, null/unavailable teaching, block-reason precedence, fresh/populated no-mutation rejections, compatibility-only empty records and immutable detached result facts. The integrated workflow discovers a mentor, raises trust, evaluates a teaching, applies the corrected delta without changing trust, round-trips schema-1 mastery JSON into fresh/populated profiles and rejects repeat progression after restore. Legacy inconsistent saved ranks still derive from progress, and missing mastery JSON remains safe.
+
+**Verification:** restore, build (`--no-restore -v:minimal`), full smoke (`--no-build`) and `git diff --check` all exit 0. Build has 0 warnings/errors. Final counts: V1 2 / events 38, Shared 16, V2 371, V3 100, Progression 1657, total **2146**. AUD-01 68, AUD-02 139, AUD-03 107, AUD-04 199, AUD-05 175 and AUD-09 186 remain unchanged and green. Smoke uses expanded permission for the existing temporary-file tests. No Unity Editor or Play Mode verification is claimed.
+
+**Echoes readiness and limits:** Part I records the approved 1:1 initial generation, configurable future multiplier default 1, strict transfer capacity, no charging for unapplied progress, and open passive/efficiency/rounding decisions. Echoes remains MUST HAVE / LOCKED DESIGN and **CONCEPT ONLY**. Raw overflow is not approved-origin eligibility, a balance or an exactly-once award. No multiplier configuration, RNG, passive, spendable resource, ledger, transfer, save schema or reward persistence was introduced. A result can be retained/replayed by callers; future ownership/claiming must enforce eligibility, atomicity and anti-replay. Repeating a still-unmastered grant can advance mastery again, as before. Loading an earlier pre-mastery save or using SetProgress can recreate a transition; no durable claim history is implied. Thread safety, broader transactions, eligibility/retention reconciliation and historical-save migration remain outside this fix. AUD-11, AUD-12 and all other open findings retain their priorities. Stop for independent review; do not start the next audit.
+
 ### Architectural Risks and Inferences
 
 The following are source-grounded risks, **not additional reproduced findings**:
@@ -1048,7 +1101,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-05 and AUD-09 missions are complete; the remaining six reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. Priority 5b (AUD-10) is the next candidate, not permission to start it automatically. Stop after AUD-09 for architectural review; do not begin another repair implicitly.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-05, AUD-09 and AUD-10 missions are complete; the remaining five reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. Priority 5c (AUD-11) is the next candidate, not permission to start it automatically. Stop after AUD-10 for architectural review; do not begin another repair implicitly.
 
 **Explicit AUD-05 approval and closure (2026-11-03):** investigation paused at the design gate, then the user approved Option B. Player-only skill resource ownership is now enforced and verified by 175 permanent assertions. Existing priorities and AUD-06/AUD-07/AUD-08 scope are unchanged; no further implementation is authorized by this report.
 
@@ -1059,7 +1112,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 | 3 (complete) | Preserve legacy Codex round trips | AUD-03 RESOLVED; optional schema-1 ID lists, existing merge semantics, full supported Codex round trip; 107 new V2 assertions |
 | 4 (complete) | Validate canonical skill metadata | AUD-04 RESOLVED; authoritative registry resolution and full metadata equality; 199 regression assertions; identical-value copies and engine lifecycle preserved |
 | 5a (complete) | Repair bounded mastery arithmetic | AUD-09 RESOLVED; widened sum capped at 100; unchanged rank thresholds, int storage, no-op contracts and schema; 186 new assertions |
-| 5b | Report actual teaching delta | AUD-10; capped grant reports actual change |
+| 5b (complete) | Report actual teaching delta | AUD-10 RESOLVED; canonical immutable requested/applied/raw-overflow/first-mastery facts, actual teaching delta, bool compatibility; 373 new assertions; no Echoes economy |
 | 5c | Reject invalid ResourcePool spending | AUD-11; preserve Current/Max invariants |
 | 5d | Separate restore feasibility from applied facts | AUD-12; failure results cannot imply applied state |
 | 6 (ownership complete; refill pending) | Audit/approve actor resource ownership and refill lifecycle | AUD-05 RESOLVED with approved player-only contract; AUD-06/AUD-07 still need separately scoped lifecycle repairs |
