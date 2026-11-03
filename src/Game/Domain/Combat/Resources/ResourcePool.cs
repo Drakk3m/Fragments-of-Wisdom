@@ -15,7 +15,7 @@ namespace Game.Domain.Combat.Resources
 
         public bool TrySpend(int amount)
         {
-            if (amount > Current)
+            if (amount < 0 || amount > Current)
             {
                 return false;
             }
@@ -28,7 +28,8 @@ namespace Game.Domain.Combat.Resources
         {
             if (amount > 0)
             {
-                Current = Math.Min(Max, Current + amount);
+                // Widen before adding so the cap cannot be bypassed by integer overflow.
+                Current = (int)Math.Min(Max, (long)Current + amount);
             }
         }
     }

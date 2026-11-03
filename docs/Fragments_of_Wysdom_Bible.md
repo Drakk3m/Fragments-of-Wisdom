@@ -532,6 +532,8 @@ Blocked validation spends no skill Essence/Resonance and grants no skill XP, but
 
 **Status boundaries:** `StatusEffectCollection` and resolver cover Poison, Burn, SkillSeal, RegenBlock and Regen; legacy `Debuffs`/flags coexist. They are not interchangeable. In particular legacy Silence logs a block without preventing damage/XP (AUD-08). Stacking, immunity and synergy expansion remain deferred. `Defend` and `Wait` enum values have no public TurnRequest factories; they are incomplete contracts, not reproduced public-action failures.
 
+**Canonical resource bounds (AUD-11 resolved):** ResourcePool clamps construction maximum to at least zero and starts full. TrySpend rejects negative or unaffordable amounts before subtraction, preserves Current/Max on rejection and accepts zero as a successful no-op. Successful spending never increases Current. Regenerate ignores nonpositive values and widens positive addition before capping at Max. These operations preserve `0 <= Current <= Max` and `Max >= 0` for sequential use from construction. Essence and active/reserve Resonance reuse this container; no resource resolver, cost formula, event or refill lifecycle was changed. See the AUD-11 closure for reproduction and compatibility limits.
+
 <a id="progression-rules"></a>
 ## Classes, Mastery, Mentors, Trees and Equipment
 
@@ -698,6 +700,7 @@ One implementation status per row; VERIFIED is deliberately limited to the named
 | Legacy slice contract | Accepted compatibility | VERIFIED | `src/Game/Slice/FoundationVerticalSlice.cs` | V1SmokeTests: 2 assertions, 38 events |
 | Attack/skill foundation | Accepted | PARTIAL | TurnBasedCombatEngine, DamageResolver, StatusEffectResolver | V3SmokeTests: 100 pass; AUD-05 resolved; AUD-06 through AUD-08 remain |
 | Resonance active/reserve transfer | Accepted | PARTIAL | `src/Game/Domain/Combat/Resources/`, TurnBasedCombatEngine | Player-only ownership verified by AUD-05; separate refill lifecycle remains unresolved |
+| ResourcePool spend / bounded regeneration | Accepted foundation | VERIFIED | `src/Game/Domain/Combat/Resources/ResourcePool.cs` | AUD-11 negative/zero/extreme spending and bounded regeneration; serial pool invariants, not complete resource-economy validation |
 | Registry/class/mastery/mentor operations | Accepted foundation | PARTIAL | `src/Game/Domain/Classes/` | AUD-09 safe mastery and AUD-10 actual delta/operation facts verified; Echoes economy remains CONCEPT ONLY |
 | Scoped tree isolation and policy application | Accepted foundation | VERIFIED | SkillTreeProgressProfile, SkillTreeUnlockApplicationService | Two-tree same-node workflow; not arbitrary corrupt-save integrity |
 | Class-tree binding / supported JSON round trip | Accepted foundation | VERIFIED | ClassSkillTreeBindingRegistry, V2ProgressSnapshotService | Binding save and class-switch workflows; no automatic grants |
@@ -729,15 +732,17 @@ git status --short
 | Reporting group | Assertions |
 |---|---:|
 | V1 Legacy Slice | 2 |
-| Shared Domain Foundations | 16 |
+| Shared Domain Foundations | 332 |
 | V2 Narrative / Progression / Persistence | 371 |
 | V3 Combat / Skills / Resonance / Status / Stats | 100 |
 | Player Progression / Combat Validation | 1657 |
-| **Total** | **2146** |
+| **Total** | **2462** |
 
 Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, AUD-05 player Resonance ownership contains **175**, AUD-09 overflow-safe mastery contains **186**, and AUD-10 actual mastery delta contains **373**, all already included in 1657. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
 The V2 group includes **107** AUD-03 Codex round-trip assertions; they are included in 371, not an additional reporting group.
+
+Shared Domain Foundations now contains the original **16** domain-event assertions plus **316** AUD-11 resource-pool assertions. Total 2462 is the freshly executed post-AUD-11 suite; earlier closure counts below remain historical evidence.
 
 **Executed audit baseline (2026-10-30):** implementation `45fb4548ab18984940471b79d5643e16f5aa50f4`, Bible v3 `c11c74d1317f8ca279d8c0698b88d4af96350f94`; restore/build succeeded with 0 warnings and 0 errors; smoke 899 and V1 events 38; diff checks passed. Twelve additional in-memory probes against the compiled assembly reproduced the findings in Part V. They were not added to the suite and must not be counted as smoke assertions.
 
@@ -759,7 +764,7 @@ The V2 group includes **107** AUD-03 Codex round-trip assertions; they are inclu
 
 Integrated smoke covers class/mentor/teaching/mastery, retention after switching class, binding save/JSON/restore, prerequisite-first tree unlock application, scoped trees with identical node IDs, validation modes/provider/classification/orchestration, optional engine integration and shared loaded-session/bootstrap ownership. See [progression tests](../src/Game.SmokeTests/PlayerProgressionFoundationSmokeTests.cs), [runtime workflow tests](../src/Game.SmokeTests/ProgressionRuntimeBootstrapSmokeTests.cs), [V2 tests](../src/Game.SmokeTests/V2SmokeTests.cs), [V3 tests](../src/Game.SmokeTests/V3SmokeTests.cs) and [runner](../src/Game.SmokeTests/SmokeTestRunner.cs).
 
-Coverage gaps include the five remaining audit regressions, full-state save replacement, failures during restore application, other hostile/extreme numeric values, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips; AUD-04 covers canonical player skill metadata and actual engine rejection/execution; AUD-05 covers the approved player-only Resonance skill ownership boundary; AUD-09 covers bounded mastery accumulation through direct, profile, mentor and snapshot workflows; AUD-10 covers actual teaching delta, immutable raw operation facts and mentor/JSON/restore compatibility. Current green counts do not close the other gaps or verify an Echoes economy.
+Coverage gaps include the four remaining audit regressions, full-state save replacement, failures during restore application, other hostile/extreme numeric values, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips; AUD-04 covers canonical player skill metadata and actual engine rejection/execution; AUD-05 covers the approved player-only Resonance skill ownership boundary; AUD-09 covers bounded mastery accumulation through direct, profile, mentor and snapshot workflows; AUD-10 covers actual teaching delta, immutable raw operation facts and mentor/JSON/restore compatibility; AUD-11 covers canonical pool spending/regeneration bounds and representative combat/refill workflows. Current green counts do not close the other gaps or verify an Echoes economy.
 
 <a id="audit"></a>
 # Part V: Audit & Technical Debt
@@ -767,7 +772,7 @@ Coverage gaps include the five remaining audit regressions, full-state save repl
 <a id="reproduced-findings"></a>
 ## Reproduced Integrity Findings
 
-AUD-01 through AUD-05, AUD-09 and AUD-10 are **RESOLVED** by the verified corrections below; AUD-06 through AUD-08, AUD-11 and AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
+AUD-01 through AUD-05 and AUD-09 through AUD-11 are **RESOLVED** by the verified corrections below; AUD-06 through AUD-08 and AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
 
 | ID | Severity from executed probe | Reproduced behavior | Affected code | Required acceptance direction |
 |---|---|---|---|---|
@@ -781,7 +786,7 @@ AUD-01 through AUD-05, AUD-09 and AUD-10 are **RESOLVED** by the verified correc
 | AUD-08 | MEDIUM | `SilenceDebuff` emits `ActionBlocked`, yet `SkillUsed`, XP and damage still occur | `SilenceDebuff.cs`, combat engine | Make blocked action truly non-executable; consistent events |
 | AUD-09 | MEDIUM | Mastery 50 + `int.MaxValue` wraps to `-2147483599` / `Unranked` | `MasteryRecord.cs` | RESOLVED 2026-11-03: widen the sum before capping at 100; preserve integer storage, rank thresholds and no-op behavior |
 | AUD-10 | MEDIUM | Teaching +50 at mastery 90 caps at 100 but reports `ProgressApplied=50` rather than 10 | `MentorTeachingApplicationService.cs` | RESOLVED 2026-11-03: report actual delta from canonical immutable mastery operation; raw overflow is not an Echoes award |
-| AUD-11 | MEDIUM | `ResourcePool.TrySpend(-10)` succeeds, `Current=110` when `Max=100` | `ResourcePool.cs` | Reject invalid spend amounts; preserve pool invariants |
+| AUD-11 | MEDIUM | `ResourcePool.TrySpend(-10)` succeeds, `Current=110` when `Max=100` | `ResourcePool.cs` | RESOLVED 2026-11-03: reject negative spending before arithmetic; preserve zero-cost success and pool bounds, including safely capped regeneration |
 | AUD-12 | MEDIUM | Failed preflight reports `ClassRestored=true` despite unchanged destination | `V4ProgressRestoreCoordinator.cs` | Separate feasibility/preflight result from actual mutation facts |
 
 **Correction:** `Defend` and `Wait` exist in an enum, but `TurnRequest` only publicly constructs basic attacks and skills. Classify these as **incomplete contracts**, not reproduced failures through the current public API.
@@ -803,7 +808,7 @@ AUD-01 through AUD-05, AUD-09 and AUD-10 are **RESOLVED** by the verified correc
 | AUD-11 | ResourcePool at Current=Max=100 accepted TrySpend(-10), leaving Current=110 |
 | AUD-12 | Invalid mastery stopped preflight application; ClassRestored true despite destination still audit.before |
 
-These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 through AUD-05, AUD-09 and AUD-10 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
+These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 through AUD-05 and AUD-09 through AUD-11 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
 
 ### AUD-01 Closure: Real Destination Validation
 
@@ -1023,6 +1028,30 @@ At investigation time the flag ran only this probe and did not catch or convert 
 
 **Echoes readiness and limits:** Part I records the approved 1:1 initial generation, configurable future multiplier default 1, strict transfer capacity, no charging for unapplied progress, and open passive/efficiency/rounding decisions. Echoes remains MUST HAVE / LOCKED DESIGN and **CONCEPT ONLY**. Raw overflow is not approved-origin eligibility, a balance or an exactly-once award. No multiplier configuration, RNG, passive, spendable resource, ledger, transfer, save schema or reward persistence was introduced. A result can be retained/replayed by callers; future ownership/claiming must enforce eligibility, atomicity and anti-replay. Repeating a still-unmastered grant can advance mastery again, as before. Loading an earlier pre-mastery save or using SetProgress can recreate a transition; no durable claim history is implied. Thread safety, broader transactions, eligibility/retention reconciliation and historical-save migration remain outside this fix. AUD-11, AUD-12 and all other open findings retain their priorities. Stop for independent review; do not start the next audit.
 
+### AUD-11 Closure: Resource Spending and Pool Invariants
+
+**Status: RESOLVED (2026-11-03).** Started from fetched `origin/main` at `0b5759c`, with AUD-01 through AUD-05, AUD-09 and AUD-10 integrated/resolved. Baseline restore/build/smoke exited 0: 2146 assertions, 38 V1 events and zero build warnings/errors. Priority 5c was next; AUD-12 and AUD-06/AUD-07/AUD-08 remain open. Echoes remains CONCEPT ONLY and all Part I creative commitments are unchanged.
+
+**Spending reproduction:** the permanent negative-spend regression in [ResourcePoolSpendSmokeTests.cs](../src/Game.SmokeTests/ResourcePoolSpendSmokeTests.cs), registered in the existing Shared group, ran before production edits. `new ResourcePool(100).TrySpend(-10)` printed `accepted=True, Current=110, Max=100` and threw InvalidOperationException; the normal smoke command exited **1**. Root cause: the sole guard was `amount > Current`, so subtracting a negative amount created resource; int.MinValue also risked arithmetic wraparound. Production diff was empty during this red run. After correction the same regression prints `accepted=False, Current=100, Max=100` and passes.
+
+**Chosen minimal correction:** `TrySpend` rejects `amount < 0 || amount > Current` before arithmetic. For valid state, remaining subtraction has `0 <= amount <= Current <= Max`, so it cannot underflow or create resource. Zero remains true with unchanged state, including an empty or zero-maximum pool. Positive exact-balance spending succeeds and depletes to zero; insufficient amounts return false without changing either property. Constructors still use `Math.Max(0, max)` and begin full, including negative/int.MinValue maximum inputs clamped to zero. No public signature, exception contract or alternate resource system was introduced.
+
+**Regeneration investigation and explicit scope justification:** a second permanent regression was independently run first against the same unchanged production implementation. Starting from max 100, spending 50 and then calling `Regenerate(int.MaxValue)` printed `Current=-2147483599, Max=100`, threw InvalidOperationException and exited **1**. Its positive int addition wrapped before Math.Min. This is independently reproducible, not the negative-spend symptom. Deferring it would leave the mission's invariant false for another supported operation of the same canonical container, including ActiveResonance.Refill and large-maximum end-turn Essence regeneration. Under the mission's explicit invariant exception, the smallest necessary adjustment is `(int)Math.Min(Max, (long)Current + amount)` with the existing positive-only guard. The largest valid intermediate is 2 * int.MaxValue, safely inside long; narrowing occurs only after the nonnegative cap. Nonpositive regeneration remains a no-op, legitimate gains/capping and rates are unchanged. This is a local arithmetic adjustment, not a regeneration/refill redesign or resolution of any other audit finding. Its regression now yields Current=100.
+
+**Consumer review:** direct ResourcePool spend consumers are TurnBasedCombatEngine for actor Essence, ActiveResonance.TrySpend and ResonanceReserve.TryConsume; ResonanceProfile delegates active spending and reserve transfer to these wrappers. Existing test setup callers spend only positive amounts. Engine ordering remains authorization/SkillSeal/ownership, cost hooks, Resonance availability, Essence spending, Resonance spending, effects/XP and normal end-turn. ResourcePool regeneration consumers are end-turn Essence (+5 when allowed) and ActiveResonance.Refill. ResonanceProfile already bounds reserve-to-active transfer by missing capacity. No engine, validator, SkillCost, status, ownership or refill implementation changed.
+
+**Compatibility evidence:** registered player skills with positive Essence cost, zero Essence at an empty pool, insufficient Essence and a negative computed cost use the real gateway/engine. Valid actions apply expected damage and XP; invalid/insufficient spends emit the existing ResourceNotEnough event before effects/XP and leave Resonance unspent. Normal blocked end-turn regeneration still occurs, so whole-turn balances can increase even though the rejected spend itself is mutation-free. The integrated workflow performs paid player skill -> rejected negative Essence/active/reserve spends -> rejected positive-cost enemy Resonance request -> fully zero-cost enemy skill -> explicit reserve refill. It checks exact balances, XP, damage, ownership reason and turn progression. All 175 AUD-05 assertions and the existing V3 refill/status tests remain unchanged and green; this does not resolve AUD-06/AUD-07/AUD-08.
+
+**Permanent coverage:** 316 new Shared assertions cover positive/zero/negative/extreme construction; full/partial/depleted negative spending including int.MinValue; the required acceptance matrix; exact int.MaxValue spending; repeated spending/depletion/recovery; unchanged Max and no mutation on rejection; successful spend monotonicity; ordinary/nonpositive/extreme regeneration at max 0, 100 and int.MaxValue; wrapper delegation, capped/insufficient refill and the integrated workflows above. The regeneration oracle uses remaining capacity instead of copying the production widened sum. Existing assertions were not weakened or removed. The only production file is ResourcePool.cs; its pre-existing stored CRLF endings were normalized to LF so plain `git diff --check` passes, without repository-wide formatting/config changes.
+
+**Verification commands and evidence:**
+- `dotnet restore Fragments-of-Wisdom.sln`: exit 0.
+- `dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal`: exit 0, 0 warnings/errors in baseline, red-test builds and final build.
+- `dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build`: baseline exit 0 / 2146; each independently executed red regression exit 1; final exit 0 / **2462**. Final groups: V1 2, Shared 332 (16 existing + 316 AUD-11), V2 371, V3 100, Progression 1657. V1 events remain **38**. AUD-01 68, AUD-02 139, AUD-03 107, AUD-04 199, AUD-05 175, AUD-09 186 and AUD-10 373 are unchanged and pass.
+- `git diff --check`: exit 0 after local line-ending normalization. Smoke uses expanded permission for existing temporary-file persistence tests; no parallel runner or special reproduction flag remains.
+
+**Limits:** the bounds guarantee is for sequential supported operations from construction, not repair of reflection-corrupted state or thread-safe multi-resource transactions. ActiveResonance.CanSpend still reports true for nonpositive query inputs; actual TrySpend now rejects negatives. ResonanceProfile.TryRefillFromReserve still treats nonpositive refill requests as successful no-ops. Those pre-existing query/refill semantics are not redesigned here. Negative final Essence costs fail through the existing insufficient-resource event path; invalid definition metadata, SkillCost arithmetic and multi-resource transaction failures are separate contracts, not certified by this fix. No snapshot schema, persistence, mastery, Echoes, enemy resource pool, new combat event, UI or Unity change occurred. Unity Editor/Play Mode was not exercised. AUD-12 remains the next candidate for separate approval; stop after AUD-11 for independent review.
+
 ### Architectural Risks and Inferences
 
 The following are source-grounded risks, **not additional reproduced findings**:
@@ -1101,7 +1130,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-05, AUD-09 and AUD-10 missions are complete; the remaining five reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. Priority 5c (AUD-11) is the next candidate, not permission to start it automatically. Stop after AUD-10 for architectural review; do not begin another repair implicitly.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-05 and AUD-09 through AUD-11 missions are complete; the remaining four reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. Priority 5d (AUD-12) is the next candidate, not permission to start it automatically. Stop after AUD-11 for architectural review; do not begin another repair implicitly.
 
 **Explicit AUD-05 approval and closure (2026-11-03):** investigation paused at the design gate, then the user approved Option B. Player-only skill resource ownership is now enforced and verified by 175 permanent assertions. Existing priorities and AUD-06/AUD-07/AUD-08 scope are unchanged; no further implementation is authorized by this report.
 
@@ -1113,7 +1142,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 | 4 (complete) | Validate canonical skill metadata | AUD-04 RESOLVED; authoritative registry resolution and full metadata equality; 199 regression assertions; identical-value copies and engine lifecycle preserved |
 | 5a (complete) | Repair bounded mastery arithmetic | AUD-09 RESOLVED; widened sum capped at 100; unchanged rank thresholds, int storage, no-op contracts and schema; 186 new assertions |
 | 5b (complete) | Report actual teaching delta | AUD-10 RESOLVED; canonical immutable requested/applied/raw-overflow/first-mastery facts, actual teaching delta, bool compatibility; 373 new assertions; no Echoes economy |
-| 5c | Reject invalid ResourcePool spending | AUD-11; preserve Current/Max invariants |
+| 5c (complete) | Reject invalid ResourcePool spending | AUD-11 RESOLVED; negative rejection, zero-cost compatibility, safe pool bounds including necessary capped regeneration; 316 new assertions |
 | 5d | Separate restore feasibility from applied facts | AUD-12; failure results cannot imply applied state |
 | 6 (ownership complete; refill pending) | Audit/approve actor resource ownership and refill lifecycle | AUD-05 RESOLVED with approved player-only contract; AUD-06/AUD-07 still need separately scoped lifecycle repairs |
 | 7 | Correct remaining action/status contracts | AUD-08; actual blocking and consistent events; Defend/Wait require a separate public-contract decision |

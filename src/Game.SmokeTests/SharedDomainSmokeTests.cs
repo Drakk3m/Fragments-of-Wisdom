@@ -26,6 +26,10 @@ namespace Game.SmokeTests
         private static void RunSharedDomainSmokeTests()
         {
             RunSection(
+                "AUD-11 resource pool invariant assertions",
+                RunResourcePoolSpendSmokeTests);
+
+            RunSection(
                 "Domain event foundation assertions",
                 delegate
                 {
