@@ -10,6 +10,7 @@ namespace Game.Domain.Combat
         public CombatEntity Enemy { get; private set; }
         public GameEventLog EventLog { get; private set; }
         public PlayerProfile PlayerProfile { get; private set; }
+        // Player-owned for this slice; not a shared resource for other combatants.
         public ResonanceProfile ResonanceProfile { get; private set; }
         public int TurnNumber { get; private set; }
         public bool CombatEnded { get; private set; }

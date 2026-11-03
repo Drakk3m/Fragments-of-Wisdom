@@ -23,6 +23,10 @@ namespace Game.SmokeTests
         private static void RunPlayerProgressionFoundationSmokeTests()
         {
             RunSection(
+                "AUD-05 player Resonance ownership assertions",
+                RunResonanceOwnershipSmokeTests);
+
+            RunSection(
                 "AUD-04 canonical skill definition assertions",
                 RunCanonicalSkillDefinitionSmokeTests);
 
