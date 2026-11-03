@@ -23,6 +23,10 @@ namespace Game.SmokeTests
         private static void RunPlayerProgressionFoundationSmokeTests()
         {
             RunSection(
+                "AUD-09 overflow-safe mastery assertions",
+                RunMasteryOverflowSmokeTests);
+
+            RunSection(
                 "AUD-05 player Resonance ownership assertions",
                 RunResonanceOwnershipSmokeTests);
 
