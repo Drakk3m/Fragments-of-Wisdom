@@ -23,6 +23,10 @@ namespace Game.SmokeTests
         private static void RunPlayerProgressionFoundationSmokeTests()
         {
             RunSection(
+                "AUD-12 restore result integrity assertions",
+                RunRestoreResultIntegritySmokeTests);
+
+            RunSection(
                 "AUD-10 actual mastery delta assertions",
                 RunMasteryProgressContractSmokeTests);
 
@@ -4952,10 +4956,10 @@ namespace Game.SmokeTests
 
             Assert(
                 !result.ClassRestored
-                && result.MasteryRestored
-                && result.MentorRelationshipsRestored
-                && result.SkillTreeProgressRestored,
-                "V4 restore coordinator should report class restore failure separately.");
+                && !result.MasteryRestored
+                && !result.MentorRelationshipsRestored
+                && !result.SkillTreeProgressRestored,
+                "Class preflight failure means no subsystem was applied.");
 
             Assert(
                 result.ClassFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
@@ -4973,11 +4977,11 @@ namespace Game.SmokeTests
                     "node_deep_sight"));
 
             Assert(
-                result.ClassRestored
+                !result.ClassRestored
                 && !result.MasteryRestored
-                && result.MentorRelationshipsRestored
-                && result.SkillTreeProgressRestored,
-                "V4 restore coordinator should report mastery restore failure separately.");
+                && !result.MentorRelationshipsRestored
+                && !result.SkillTreeProgressRestored,
+                "Mastery preflight failure means no subsystem was applied.");
 
             Assert(
                 result.MasteryFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
@@ -4995,11 +4999,11 @@ namespace Game.SmokeTests
                     "node_deep_sight"));
 
             Assert(
-                result.ClassRestored
-                && result.MasteryRestored
+                !result.ClassRestored
+                && !result.MasteryRestored
                 && !result.MentorRelationshipsRestored
-                && result.SkillTreeProgressRestored,
-                "V4 restore coordinator should report mentor relationship restore failure separately.");
+                && !result.SkillTreeProgressRestored,
+                "Mentor preflight failure means no subsystem was applied.");
 
             Assert(
                 result.MentorRelationshipsFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
@@ -5017,11 +5021,11 @@ namespace Game.SmokeTests
                     "node_unknown"));
 
             Assert(
-                result.ClassRestored
-                && result.MasteryRestored
-                && result.MentorRelationshipsRestored
+                !result.ClassRestored
+                && !result.MasteryRestored
+                && !result.MentorRelationshipsRestored
                 && !result.SkillTreeProgressRestored,
-                "V4 restore coordinator should report skill tree progress restore failure separately.");
+                "Tree preflight failure means no subsystem was applied.");
 
             Assert(
                 result.SkillTreeProgressFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
@@ -5085,12 +5089,12 @@ namespace Game.SmokeTests
                 BuildTestClassSkillTreeBindingRegistry());
 
             Assert(
-                result.ClassRestored
-                && result.MasteryRestored
-                && result.MentorRelationshipsRestored
-                && result.SkillTreeProgressRestored
+                !result.ClassRestored
+                && !result.MasteryRestored
+                && !result.MentorRelationshipsRestored
+                && !result.SkillTreeProgressRestored
                 && !result.ClassSkillTreeBindingsRestored,
-                "V4 restore coordinator should report binding restore failure separately.");
+                "Binding preflight failure means no subsystem was applied.");
 
             Assert(
                 result.ClassSkillTreeBindingsFailureReason
@@ -5248,10 +5252,10 @@ namespace Game.SmokeTests
                 result.MasteryFailureReason
                     == V4ProgressRestoreFailureReason.ValidationFailed
                 && result.MasteryFailureMessage.Contains("MasteryProfile")
-                && result.ClassFailureReason == V4ProgressRestoreFailureReason.None
+                && result.ClassFailureReason == V4ProgressRestoreFailureReason.NotApplied
                 && result.MentorRelationshipsFailureReason
-                    == V4ProgressRestoreFailureReason.None,
-                "Preflight failure should preserve per-subsystem result details.");
+                    == V4ProgressRestoreFailureReason.NotApplied,
+                "Preflight failure distinguishes invalid mastery from feasible but unapplied subsystems.");
         }
 
         private static void AssertV4PreflightFailurePreventsProfileMutation(

@@ -120,15 +120,15 @@ namespace Game.Domain.Progress
                     classSkillTreeBindingRegistry,
                     classRegistry)
                 : null;
-            bool classRestored = snapshotService.RestoreClassProfile(
+            bool canRestoreClass = snapshotService.RestoreClassProfile(
                 snapshot,
                 new ClassProfile(),
                 classRegistry);
-            bool masteryRestored = snapshotService.RestoreMasteryProfile(
+            bool canRestoreMastery = snapshotService.RestoreMasteryProfile(
                 snapshot,
                 new MasteryProfile(),
                 skillRegistry);
-            bool mentorRelationshipsRestored = snapshotService.RestoreMentorRelationshipProfile(
+            bool canRestoreMentors = snapshotService.RestoreMentorRelationshipProfile(
                 snapshot,
                 new MentorRelationshipProfile(),
                 mentorRegistry);
@@ -136,7 +136,7 @@ namespace Game.Domain.Progress
                 snapshot.SkillTreeProgress,
                 skillTree,
                 restoreClassSkillTreeBindings ? classSkillTreeBindingRegistry : null);
-            bool skillTreeProgressRestored = skillTreeProgressValid && (restoreClassSkillTreeBindings
+            bool canRestoreTreeProgress = skillTreeProgressValid && (restoreClassSkillTreeBindings
                 && snapshot.SkillTreeProgress.Scopes.Count > 0
                     ? snapshotService.RestoreSkillTreeProgressProfile(
                         snapshot,
@@ -146,56 +146,54 @@ namespace Game.Domain.Progress
                         snapshot,
                         new SkillTreeProgressProfile(),
                         skillTree));
-            bool classSkillTreeBindingsRestored = !restoreClassSkillTreeBindings
+            bool canRestoreBindings = !restoreClassSkillTreeBindings
                 || snapshotService.RestoreClassSkillTreeBindings(
                     snapshot,
                     preflightBindingRegistry,
                     classRegistry);
 
-            var preflightResult = BuildResult(
-                classRestored,
-                masteryRestored,
-                mentorRelationshipsRestored,
-                skillTreeProgressRestored,
-                classSkillTreeBindingsRestored);
-
-            if (!preflightResult.FullyRestored)
+            if (!canRestoreClass || !canRestoreMastery || !canRestoreMentors
+                || !canRestoreTreeProgress || !canRestoreBindings)
             {
-                return preflightResult;
+                return BuildResult(canRestoreClass, canRestoreMastery, canRestoreMentors,
+                    canRestoreTreeProgress, canRestoreBindings, false, restoreClassSkillTreeBindings);
             }
 
-            snapshotService.RestoreClassProfile(snapshot, classProfile, classRegistry);
-            snapshotService.RestoreMasteryProfile(snapshot, masteryProfile, skillRegistry);
-            snapshotService.RestoreMentorRelationshipProfile(
+            bool classRestored = snapshotService.RestoreClassProfile(snapshot, classProfile, classRegistry);
+            bool masteryRestored = snapshotService.RestoreMasteryProfile(snapshot, masteryProfile, skillRegistry);
+            bool mentorRelationshipsRestored = snapshotService.RestoreMentorRelationshipProfile(
                 snapshot,
                 mentorRelationshipProfile,
                 mentorRegistry);
 
+            bool skillTreeProgressRestored;
             if (restoreClassSkillTreeBindings
                 && snapshot.SkillTreeProgress.Scopes.Count > 0)
             {
-                snapshotService.RestoreSkillTreeProgressProfile(
+                skillTreeProgressRestored = snapshotService.RestoreSkillTreeProgressProfile(
                     snapshot,
                     skillTreeProgressProfile,
                     classSkillTreeBindingRegistry);
             }
             else
             {
-                snapshotService.RestoreSkillTreeProgressProfile(
+                skillTreeProgressRestored = snapshotService.RestoreSkillTreeProgressProfile(
                     snapshot,
                     skillTreeProgressProfile,
                     skillTree);
             }
 
+            bool classSkillTreeBindingsRestored = false;
             if (restoreClassSkillTreeBindings)
             {
-                snapshotService.RestoreClassSkillTreeBindings(
+                classSkillTreeBindingsRestored = snapshotService.RestoreClassSkillTreeBindings(
                     snapshot,
                     classSkillTreeBindingRegistry,
                     classRegistry);
             }
 
-            return preflightResult;
+            return BuildResult(classRestored, masteryRestored, mentorRelationshipsRestored,
+                skillTreeProgressRestored, classSkillTreeBindingsRestored, true, restoreClassSkillTreeBindings);
         }
 
         private static ClassSkillTreeBindingRegistry BuildPreflightBindingRegistry(
@@ -222,40 +220,57 @@ namespace Game.Domain.Progress
             bool masteryRestored,
             bool mentorRelationshipsRestored,
             bool skillTreeProgressRestored,
-            bool classSkillTreeBindingsRestored)
+            bool classSkillTreeBindingsRestored,
+            bool applicationAttempted,
+            bool bindingsRequested)
         {
+            // Preflight outcomes classify feasibility only; none are applied-state evidence.
             return new V4ProgressRestoreResult(
-                classRestored,
-                masteryRestored,
-                mentorRelationshipsRestored,
-                skillTreeProgressRestored,
-                classSkillTreeBindingsRestored,
-                BuildReason(classRestored),
-                BuildReason(masteryRestored),
-                BuildReason(mentorRelationshipsRestored),
-                BuildReason(skillTreeProgressRestored),
-                BuildReason(classSkillTreeBindingsRestored),
-                BuildMessage(classRestored, "ClassProfile"),
-                BuildMessage(masteryRestored, "MasteryProfile"),
-                BuildMessage(mentorRelationshipsRestored, "MentorRelationshipProfile"),
-                BuildMessage(skillTreeProgressRestored, "SkillTreeProgressProfile"),
-                BuildMessage(classSkillTreeBindingsRestored, "ClassSkillTreeBindings"));
+                applicationAttempted && classRestored,
+                applicationAttempted && masteryRestored,
+                applicationAttempted && mentorRelationshipsRestored,
+                applicationAttempted && skillTreeProgressRestored,
+                applicationAttempted && bindingsRequested && classSkillTreeBindingsRestored,
+                BuildReason(classRestored, applicationAttempted),
+                BuildReason(masteryRestored, applicationAttempted),
+                BuildReason(mentorRelationshipsRestored, applicationAttempted),
+                BuildReason(skillTreeProgressRestored, applicationAttempted),
+                bindingsRequested ? BuildReason(classSkillTreeBindingsRestored, applicationAttempted)
+                    : V4ProgressRestoreFailureReason.None,
+                BuildMessage(classRestored, applicationAttempted, "ClassProfile"),
+                BuildMessage(masteryRestored, applicationAttempted, "MasteryProfile"),
+                BuildMessage(mentorRelationshipsRestored, applicationAttempted, "MentorRelationshipProfile"),
+                BuildMessage(skillTreeProgressRestored, applicationAttempted, "SkillTreeProgressProfile"),
+                bindingsRequested ? BuildMessage(classSkillTreeBindingsRestored, applicationAttempted,
+                    "ClassSkillTreeBindings") : "",
+                bindingsRequested);
         }
 
-        private static V4ProgressRestoreFailureReason BuildReason(bool restored)
+        private static V4ProgressRestoreFailureReason BuildReason(bool succeeded, bool applicationAttempted)
         {
-            return restored
-                ? V4ProgressRestoreFailureReason.None
-                : V4ProgressRestoreFailureReason.ValidationFailed;
+            if (!applicationAttempted)
+            {
+                return succeeded ? V4ProgressRestoreFailureReason.NotApplied
+                    : V4ProgressRestoreFailureReason.ValidationFailed;
+            }
+
+            return succeeded ? V4ProgressRestoreFailureReason.None
+                : V4ProgressRestoreFailureReason.ApplicationFailed;
         }
 
         private static string BuildMessage(
-            bool restored,
+            bool succeeded,
+            bool applicationAttempted,
             string subsystemName)
         {
-            return restored
-                ? ""
-                : subsystemName + " failed registry or snapshot validation during restore.";
+            if (!applicationAttempted)
+            {
+                return succeeded
+                    ? subsystemName + " was not applied because another subsystem failed preflight."
+                    : subsystemName + " failed registry or snapshot validation during preflight.";
+            }
+
+            return succeeded ? "" : subsystemName + " failed during application to the real destination; partial changes may remain.";
         }
     }
 }

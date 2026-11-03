@@ -1,5 +1,6 @@
 namespace Game.Domain.Progress
 {
+    /// <summary>Restore operation completion facts, including successful no-ops, not a rollback guarantee.</summary>
     public class V4ProgressRestoreResult
     {
         public bool ClassRestored { get; private set; }
@@ -7,6 +8,8 @@ namespace Game.Domain.Progress
         public bool MentorRelationshipsRestored { get; private set; }
         public bool SkillTreeProgressRestored { get; private set; }
         public bool ClassSkillTreeBindingsRestored { get; private set; }
+        // Coordinator overload participation; legacy public constructors retain their binding convention.
+        public bool ClassSkillTreeBindingsRequested { get; private set; }
         public V4ProgressRestoreFailureReason ClassFailureReason { get; private set; }
         public V4ProgressRestoreFailureReason MasteryFailureReason { get; private set; }
         public V4ProgressRestoreFailureReason MentorRelationshipsFailureReason { get; private set; }
@@ -26,7 +29,7 @@ namespace Game.Domain.Progress
                     && MasteryRestored
                     && MentorRelationshipsRestored
                     && SkillTreeProgressRestored
-                    && ClassSkillTreeBindingsRestored;
+                    && (!ClassSkillTreeBindingsRequested || ClassSkillTreeBindingsRestored);
             }
         }
 
@@ -117,7 +120,34 @@ namespace Game.Domain.Progress
             string mentorRelationshipsFailureMessage,
             string skillTreeProgressFailureMessage,
             string classSkillTreeBindingsFailureMessage)
+            : this(classRestored, masteryRestored, mentorRelationshipsRestored,
+                skillTreeProgressRestored, classSkillTreeBindingsRestored,
+                classFailureReason, masteryFailureReason, mentorRelationshipsFailureReason,
+                skillTreeProgressFailureReason, classSkillTreeBindingsFailureReason,
+                classFailureMessage, masteryFailureMessage, mentorRelationshipsFailureMessage,
+                skillTreeProgressFailureMessage, classSkillTreeBindingsFailureMessage, true)
         {
+        }
+
+        internal V4ProgressRestoreResult(
+            bool classRestored,
+            bool masteryRestored,
+            bool mentorRelationshipsRestored,
+            bool skillTreeProgressRestored,
+            bool classSkillTreeBindingsRestored,
+            V4ProgressRestoreFailureReason classFailureReason,
+            V4ProgressRestoreFailureReason masteryFailureReason,
+            V4ProgressRestoreFailureReason mentorRelationshipsFailureReason,
+            V4ProgressRestoreFailureReason skillTreeProgressFailureReason,
+            V4ProgressRestoreFailureReason classSkillTreeBindingsFailureReason,
+            string classFailureMessage,
+            string masteryFailureMessage,
+            string mentorRelationshipsFailureMessage,
+            string skillTreeProgressFailureMessage,
+            string classSkillTreeBindingsFailureMessage,
+            bool classSkillTreeBindingsRequested)
+        {
+            ClassSkillTreeBindingsRequested = classSkillTreeBindingsRequested;
             ClassRestored = classRestored;
             MasteryRestored = masteryRestored;
             MentorRelationshipsRestored = mentorRelationshipsRestored;
