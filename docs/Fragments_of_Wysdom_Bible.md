@@ -19,6 +19,7 @@ A passing backend suite does not certify Unity, balance, complete content or a p
 ## Contents
 
 - [Part I: Game Design & Creative Vision](#creative-vision)
+- [The Path Unwalked: MUST HAVE narrative vision](#path-unwalked)
 - [Part II: Game Systems & Rules](#systems)
 - [Combat, resources and skill access](#combat-rules)
 - [Classes, mastery, mentors, trees and equipment](#progression-rules)
@@ -203,6 +204,86 @@ Mentor teachings may begin temporary; a mentor mission or meaningful commitment 
 
 The darker path may reduce or remove access to mentor-based permanent skills while opening transmutation/knowledge extraction. This is a **PROMISING DESIGN DIRECTION** that needs explicit economy, reversibility and narrative-cost decisions; do not assert all such restrictions are implemented. The player should understand the allure before facing consequences.
 
+<a id="path-unwalked"></a>
+### 6.2 The Path Unwalked: Three Distinct Encounters
+
+**Decision date: 2026-11-03. Design status: MUST HAVE / LOCKED DESIGN. Implementation status: CONCEPT ONLY, not authorized for implementation.** Source: creator-supplied `The_Path_Unwalked_MUST_HAVE.md` (SHA-256 `48e30f70ddd67c6957c58aeb911a1c2d88a71e3c297d28a06a0b6805155aa314`). This integrates the source's creative commitments into the canonical Bible; it does not create a parallel specification or alter the audit backlog. Its reference to AUD-09 records the source's development context, not an instruction to modify that implementation branch or change any audit status.
+
+> **Central question:** What did you sacrifice to become who you are?
+
+#### The Resonance Devourer
+
+**MUST HAVE / LOCKED DESIGN:** a distinct resource-theft encounter testing management and tactical adaptability. **OPEN DECISIONS:** The Resonance Devourer is a provisional name; the following ability names and exact effects are candidates, not implemented mechanics.
+
+An advanced boss that turns Nova's resources against them. This is a test of resource management, active Resonance, reserve tanks, Essence and tactical adaptability. Candidate mechanics:
+
+- **Resonant Leech:** steals active Resonance into an explicitly owned temporary pool.
+- **Essence Parasite:** makes Nova's Essence pay for a clearly telegraphed enemy action.
+- **Hollow Refill:** intercepts a portion of Nova's reserve-to-active refill.
+- **Severed Vessel:** temporarily restricts access to reserve tanks.
+- **Resonant Collapse:** converts captured energy into a dangerous, announced attack.
+
+**Important:** Transferring a resource and paying directly from the opponent's resource are different contracts. Any implementation must explicitly model authorized ownership and source-of-cost rules; never bypass AUD-05's current player-owned Resonance protection. Preserve readable telegraphs, counterplay and player agency. The above skill names and exact effects are provisional, but the resource-theft encounter is a MUST HAVE.
+
+#### The Living Archive
+
+**MUST HAVE / LOCKED DESIGN:** a second, distinct encounter testing broad strategic combat mastery. **OPEN DECISIONS:** The Living Archive is a provisional name; exact encounter mechanics and placement remain open.
+
+A powerful being embodying accumulated knowledge, able in principle to access every spell or skill discipline in the game. This is a test of combat mastery, not random skill spam.
+
+- **Phase I:** survey and probe Nova with varied disciplines.
+- **Phase II:** recognize repeated tactics and counter predictable patterns.
+- **Phase III:** combine normally incompatible disciplines in a climactic examination.
+
+Reuse canonical skill definitions. Design a bounded, legible selection strategy and explicit enemy access policy. Narrative access to the entire catalog does not mean executing every skill in a single fight. A strong candidate for the main story's final boss, though its exact placement remains open.
+
+#### The Path Unwalked / The Unchosen Self
+
+**MUST HAVE / LOCKED DESIGN:** a third, distinct encounter with the opposite-path Nova. **OPEN DECISIONS:** The Path Unwalked / The Unchosen Self are provisional names; exact encounter mechanics and metaphysics are not fixed by these titles.
+
+**MUST HAVE: a secret, optional post-credits encounter with the authentic Nova who chose the opposite life path.** Not a clone, illusion, palette swap, or automatically evil twin.
+
+The protagonist and alternate Nova are equally real outcomes of different choices. Both paths carry defensible truths and meaningful losses. The confrontation must be emotionally and philosophically consequential, asking what Nova sacrificed to become who they are.
+
+- If the player pursued mentors, mastery, bonds and restoration of the Village of Memories, the other Nova followed forbidden transmutation, isolation and power through sacrifice.
+- If the player pursued the forbidden path, the other Nova preserved mentorship, community and restoration.
+- The opposing Nova's abilities, visual identity, dialogue, worldview and relationship to the village must reflect the path **not chosen**.
+- Neither version is declared categorically right or wrong. The other Nova may argue that the player's choices were mistaken, with credible reasons.
+- The primary story must have its own satisfying resolution. The alternate-Nova confrontation deepens it **after the credits** instead of replacing it.
+- Codex knowledge, choices and discovery may unlock the encounter, but literal 100% Codex completion must not be mandatory.
+
+**Provisional opening line:** *“Thou hast walked thy path to its end. Yet mine remains untold.”*
+
+*“Has recorrido tu camino hasta su final. Pero el mío aún no ha sido contado.”*
+
+#### Narrative Promise and Open Metaphysics
+
+The story is not simply good versus evil. The other Nova is a life the player genuinely might have lived. The player should wonder whether wisdom also existed on the road abandoned. This gives **Fragments of Wysdom** its emotional meaning: no single journey contains every fragment of wisdom.
+
+**Candidate metaphysical twist, NOT YET CANON:** both Novas discover that the world can preserve only one of the two paths. The origin of the two realities, whether reconciliation is possible, endings and final consequences remain OPEN DECISIONS.
+
+#### Structural Promise
+
+Three bosses, three different tests:
+
+1. Resource predator: management and adaptability.
+2. Living Archive: broad strategic mastery.
+3. Unchosen Nova: identity, choices and sacrifices.
+
+Their final names, lore identities, chronology and balance remain open; the **three distinct dramatic functions** and the **post-credits opposite-path Nova** are locked creative commitments.
+
+#### Architecture and Governance Boundaries
+
+- **Do not implement now.** The narrative record does not authorize scope on AUD-09 or any other implementation branch; the [canonical audit backlog](#current-backlog) remains unchanged.
+- No duplicate combat engine, skill registry, resource pool ownership system or progression subsystem.
+- Any resource hijacking must be an explicit, approved domain mechanic with regression tests; AUD-05 remains intact.
+- The all-spells boss selects from canonical definitions under an explicit enemy authorization policy.
+- The other Nova is built from opposite-path narrative/progression rules rather than blindly copying mutable player state.
+- Unity only presents domain events and owns no combat rules.
+- Exact encounter design, tuning, rewards, quest chain and cultural references require later design reviews.
+
+**This record preserves the creator's MUST HAVE vision, not a completed implementation or permission to add scope to the current branch.** Future work must respect the existing [combat and resource contracts](#combat-rules), [narrative fact-producing boundaries](#narrative-rules), [progression rules](#progression-rules) and [development governance](#governance). The proposed resource interactions and catalog-wide enemy access require later explicit design approval; none overrides the current backend protections.
+
 ### 7. Codex, discovery and missions
 
 **IMPLEMENTED — DOCUMENTED:** the V2 narrative foundation favors small evaluators that return facts, tags, hooks and candidate records. Explicit downstream services apply Codex and mission-journal discovery idempotently. No narrative evaluator should directly execute combat, UI, dialogue or reward logic.
@@ -241,6 +322,8 @@ Music, environmental audio, encounter pacing, exploration layout, travel systems
 
 **Current source contract:** [TurnBasedCombatEngine](../src/Game/Domain/Combat/TurnBasedCombatEngine.cs) owns the canonical attack/skill sequence. Preserve it rather than adding a parallel resolver. [Archive 02](#archive-02) retains formulas, passive/status contracts and historical acceptance cases.
 
+**Locked future vision, not current execution rules:** [The Path Unwalked's three encounters](#path-unwalked) include resource theft and catalog-wide combat mastery. Resource transfer versus direct opponent-funded costs must have separate approved ownership/source-of-cost contracts; the Living Archive must use canonical definitions with bounded selection and explicit enemy authorization. These concepts do not bypass AUD-05 or implement new enemy capabilities.
+
 Current skill sequence:
 1. Reject ended combat or defeated attacker/defender; construct context and apply the player Atlas cost modifier when relevant.
 2. Emit `TurnStarted`; reset flags; run legacy debuff turn-start and before-action hooks; stop if the attacker died.
@@ -270,7 +353,7 @@ Source ownership: `src/Game/Domain/Classes/`, `src/Game/Domain/Skills/`, `src/Ga
 |---|---|---|
 | ClassDefinitionRegistry | Stable ClassId lookup; valid registration; duplicate IDs rejected without replacing the original | ClassProfile owns assignment, not registries or mastery |
 | SkillDefinitionRegistry | Stable skill ID registration/resolution; null/invalid/duplicate definitions fail safely | Shared content catalog, not ownership or canonical execution enforcement by itself |
-| MasteryProfile / MasteryRecord | Registry-validated progress by skill ID; 100 is mastered; rank derives from progress | Facts only; no class switching, automatic unlocks or stat bonuses; overflow defect AUD-09 remains |
+| MasteryProfile / MasteryRecord | Registry-validated integer progress in 0..100; positive accumulation widens before capping; ranks are Unranked at 0, Practiced at 1..99 and Mastered at 100 | AUD-09 resolved; nonpositive increments and additions after mastery return false; facts only, no automatic unlocks or bonuses |
 | SkillProgress | XP/level-based skill progression with its own IsMastered and cost/effect modifiers | Distinct from retention mastery; no automatic synchronization between the two models |
 | MentorDefinitionRegistry | Stable MentorId, valid name/definition, duplicate rejection | No teaching or mission execution |
 | MentorRelationshipProfile | Discovery, trust/progress and availability facts; registry-aware APIs; repeated discovery is idempotent | Does not replace the legacy cognition teaching/slot profile |
@@ -290,6 +373,8 @@ Current teaching and tree results are lightweight facts. Positive teaching grant
 
 <a id="narrative-rules"></a>
 ## Narrative, Codex, Missions and Unlocks
+
+**Locked future narrative, not implemented progression:** [The Path Unwalked](#path-unwalked) requires a secret, optional post-credits confrontation with an equally real opposite-path Nova, after a satisfying primary-story resolution. Its abilities, presentation and narrative facts must reflect the path not chosen, not a blind copy of mutable player state. Codex knowledge, choices and discovery are candidate gates; literal 100% Codex completion cannot be mandatory. Exact gates, metaphysics and endings remain OPEN DECISIONS.
 
 The fact-producing chain reads player alignment and runs `FirstNahualTeachingEvaluator`, `TransmutationAccessPolicy`, `NpcReactionService`, `NarrativeHookService`, `MissionTriggerService` and `CodexEntryService`, with candidate deduplication. Results are acceptance/rejection, tags, preview reactions, hooks and candidates, not implicit combat, dialogue, inventory or reward changes.
 
@@ -419,7 +504,7 @@ One implementation status per row; VERIFIED is deliberately limited to the named
 | Legacy slice contract | Accepted compatibility | VERIFIED | `src/Game/Slice/FoundationVerticalSlice.cs` | V1SmokeTests: 2 assertions, 38 events |
 | Attack/skill foundation | Accepted | PARTIAL | TurnBasedCombatEngine, DamageResolver, StatusEffectResolver | V3SmokeTests: 100 pass; AUD-05 resolved; AUD-06 through AUD-08 remain |
 | Resonance active/reserve transfer | Accepted | PARTIAL | `src/Game/Domain/Combat/Resources/`, TurnBasedCombatEngine | Player-only ownership verified by AUD-05; separate refill lifecycle remains unresolved |
-| Registry/class/mastery/mentor operations | Accepted foundation | PARTIAL | `src/Game/Domain/Classes/` | PlayerProgressionFoundationSmokeTests; numeric defects AUD-09/AUD-10 remain |
+| Registry/class/mastery/mentor operations | Accepted foundation | PARTIAL | `src/Game/Domain/Classes/` | AUD-09 overflow-safe mastery verified; teaching delta defect AUD-10 remains |
 | Scoped tree isolation and policy application | Accepted foundation | VERIFIED | SkillTreeProgressProfile, SkillTreeUnlockApplicationService | Two-tree same-node workflow; not arbitrary corrupt-save integrity |
 | Class-tree binding / supported JSON round trip | Accepted foundation | VERIFIED | ClassSkillTreeBindingRegistry, V2ProgressSnapshotService | Binding save and class-switch workflows; no automatic grants |
 | Retained access and validated combat composition | Accepted foundation | VERIFIED | CombatSkillUseValidator, CombatSkillTurnValidatorGateway | AUD-04 canonical metadata regressions and mentor-retention engine flow; explicit legacy/enemy paths are outside player authorization |
@@ -453,10 +538,10 @@ git status --short
 | Shared Domain Foundations | 16 |
 | V2 Narrative / Progression / Persistence | 371 |
 | V3 Combat / Skills / Resonance / Status / Stats | 100 |
-| Player Progression / Combat Validation | 1098 |
-| **Total** | **1587** |
+| Player Progression / Combat Validation | 1284 |
+| **Total** | **1773** |
 
-Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, and AUD-05 player Resonance ownership contains **175**, all already included in 1098. Historical V4/V5 labels and earlier counts are not current reporting groups.
+Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, AUD-05 player Resonance ownership contains **175**, and the separate AUD-09 overflow-safe mastery subsection contains **186**, all already included in 1284. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
 The V2 group includes **107** AUD-03 Codex round-trip assertions; they are included in 371, not an additional reporting group.
 
@@ -474,11 +559,13 @@ The V2 group includes **107** AUD-03 Codex round-trip assertions; they are inclu
 
 **AUD-05 investigation and correction (2026-11-02; final verification 2026-11-03):** baseline `c9c0f81` contains merged AUD-01 through AUD-04 and independently passed 1412 assertions / 38 V1 events. Before production edits, the opt-in `--aud-05-repro` failed: enemy skill spent 10 from the caller-supplied player's active pool, 30 -> 20. Work paused until the user explicitly approved Option B. The engine now enforces that ownership boundary; the probe is converted to permanent normal smoke coverage and its temporary flag removed. Final suite: 1587 assertions, including 175 AUD-05 assertions; V1 events 38; build 0 warnings/errors. See the historical investigation and approved closure below.
 
+**AUD-09 correction (2026-11-03):** latest main baseline `bfdc8c1` independently passed 1587 assertions and 38 V1 events, including merged AUD-01 through AUD-05. Before production edits, the new regression failed with progress -2147483599, rank Practiced -> Unranked and AddProgress returning true for 50 + int.MaxValue. Widening the sum before capping now produces 100 / Mastered. The full suite passes 1773 assertions, including 186 new AUD-09 assertions; V1 events 38; restore/build/smoke/diff-check exit 0, build 0 warnings/errors. Existing audit regression sections remain unchanged and green.
+
 **Consolidation documentation checks (2026-10-31):** all 11 archived sources match with the documented whitespace normalization; 67 live local Markdown links resolve; all 31 explicit anchors are unique; git diff --check exits 0. Production code, tests, solution/build configuration and generator scripts had no diff in that documentation pass. All 10 newly retired originals were verified before deletion; the master specification was already absent. No generator ran and no Unity files changed. The five remaining old-path references outside this Bible are historical generator output declarations in modules 00, 05 and 06, not live documentation links; their behavior is explicitly described in the tooling section. No GitHub Actions configuration or Unity Assets/ProjectSettings tree was present in the tracked inventory. Unity Editor, Play Mode and playable-game validation remain unperformed.
 
 Integrated smoke covers class/mentor/teaching/mastery, retention after switching class, binding save/JSON/restore, prerequisite-first tree unlock application, scoped trees with identical node IDs, validation modes/provider/classification/orchestration, optional engine integration and shared loaded-session/bootstrap ownership. See [progression tests](../src/Game.SmokeTests/PlayerProgressionFoundationSmokeTests.cs), [runtime workflow tests](../src/Game.SmokeTests/ProgressionRuntimeBootstrapSmokeTests.cs), [V2 tests](../src/Game.SmokeTests/V2SmokeTests.cs), [V3 tests](../src/Game.SmokeTests/V3SmokeTests.cs) and [runner](../src/Game.SmokeTests/SmokeTestRunner.cs).
 
-Coverage gaps include the seven remaining audit regressions, full-state save replacement, failures during restore application, hostile/extreme numeric values, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips; AUD-04 covers canonical player skill metadata and actual engine rejection/execution; AUD-05 covers the approved player-only Resonance skill ownership boundary. Current green counts do not close the other gaps.
+Coverage gaps include the six remaining audit regressions, full-state save replacement, failures during restore application, other hostile/extreme numeric values, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips; AUD-04 covers canonical player skill metadata and actual engine rejection/execution; AUD-05 covers the approved player-only Resonance skill ownership boundary; AUD-09 covers bounded mastery accumulation through direct, profile, mentor and snapshot workflows. Current green counts do not close the other gaps.
 
 <a id="audit"></a>
 # Part V: Audit & Technical Debt
@@ -486,7 +573,7 @@ Coverage gaps include the seven remaining audit regressions, full-state save rep
 <a id="reproduced-findings"></a>
 ## Reproduced Integrity Findings
 
-AUD-01 through AUD-05 are **RESOLVED** by the verified corrections below; AUD-06 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
+AUD-01 through AUD-05 and AUD-09 are **RESOLVED** by the verified corrections below; AUD-06 through AUD-08 and AUD-10 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
 
 | ID | Severity from executed probe | Reproduced behavior | Affected code | Required acceptance direction |
 |---|---|---|---|---|
@@ -498,7 +585,7 @@ AUD-01 through AUD-05 are **RESOLVED** by the verified corrections below; AUD-06
 | AUD-06 | MEDIUM | Refill with Poison advances turn but neither damages nor decrements duration | `ResonanceRefillAction.cs` | Define and integrate canonical turn/status lifecycle |
 | AUD-07 | MEDIUM | Refill after combat end succeeds, restores resource and advances turn | `ResonanceRefillAction.cs` | Enforce combat lifecycle boundary |
 | AUD-08 | MEDIUM | `SilenceDebuff` emits `ActionBlocked`, yet `SkillUsed`, XP and damage still occur | `SilenceDebuff.cs`, combat engine | Make blocked action truly non-executable; consistent events |
-| AUD-09 | MEDIUM | Mastery 50 + `int.MaxValue` wraps to `-2147483599` / `Unranked` | `MasteryRecord.cs` | Overflow-safe bounded arithmetic |
+| AUD-09 | MEDIUM | Mastery 50 + `int.MaxValue` wraps to `-2147483599` / `Unranked` | `MasteryRecord.cs` | RESOLVED 2026-11-03: widen the sum before capping at 100; preserve integer storage, rank thresholds and no-op behavior |
 | AUD-10 | MEDIUM | Teaching +50 at mastery 90 caps at 100 but reports `ProgressApplied=50` rather than 10 | `MentorTeachingApplicationService.cs` | Report actual applied delta |
 | AUD-11 | MEDIUM | `ResourcePool.TrySpend(-10)` succeeds, `Current=110` when `Max=100` | `ResourcePool.cs` | Reject invalid spend amounts; preserve pool invariants |
 | AUD-12 | MEDIUM | Failed preflight reports `ClassRestored=true` despite unchanged destination | `V4ProgressRestoreCoordinator.cs` | Separate feasibility/preflight result from actual mutation facts |
@@ -522,7 +609,7 @@ AUD-01 through AUD-05 are **RESOLVED** by the verified corrections below; AUD-06
 | AUD-11 | ResourcePool at Current=Max=100 accepted TrySpend(-10), leaving Current=110 |
 | AUD-12 | Invalid mastery stopped preflight application; ClassRestored true despite destination still audit.before |
 
-These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 through AUD-05 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
+These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 through AUD-05 and AUD-09 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
 
 ### AUD-01 Closure: Real Destination Validation
 
@@ -700,6 +787,28 @@ At investigation time the flag ran only this probe and did not catch or convert 
 
 **Compatibility limits and remaining concerns:** existing non-player callers that previously paid positive costs from the shared pool now receive the intentional ownership rejection, not a waived cost. The legacy refill method remains a trusted explicit player operation, including its separately supplied-profile compatibility; it has no actor parameter and is not a general enemy action authorization API. No enemy refill capability was introduced and no refill status/ended-combat behavior changed. Runtime setup must supply the correct Player reference and profile; cross-runtime aliasing, malicious trusted skill/passive code and invalid numeric definitions remain outside this correction. There is no party resource model, no implicit enemy Active/Reserve state and no new persistence schema or Unity integration. Future per-actor resources require a separately approved capability/lifetime design. AUD-06/AUD-07/AUD-08 and the other remaining findings are unchanged. No Unity Editor/Play Mode verification was performed. Stop after AUD-05 for architectural review.
 
+### AUD-09 Closure: Overflow-Safe Mastery Progression
+
+**Status: RESOLVED (2026-11-03).** Scope is only MasteryRecord.AddProgress arithmetic. The original observation above is preserved; AUD-10 through AUD-12 and every other open finding are unchanged. No new progression service, storage type, rank threshold or reward rule is introduced.
+
+**Original reproduction and root cause:** [MasteryOverflowSmokeTests.cs](../src/Game.SmokeTests/MasteryOverflowSmokeTests.cs) constructs a record at progress 50 / Practiced and calls AddProgress(int.MaxValue). Before production edits, the int addition wrapped to -2147483599, Rank became Unranked, and the method returned true. The post-addition `> 100` check missed the negative result. The normal smoke command threw InvalidOperationException on the new expected-invariant assertion, exit `-532462766`. Production diff was empty at that checkpoint. After the correction the same regression reports 100 / Mastered and returns true.
+
+**Numeric and API contract:** Progress remains an int in the inclusive range 0..100. Rank is derived: 0 -> Unranked, 1..99 -> Practiced, 100 -> Mastered. Both constructors and SetProgress retain existing clamping, including negative input -> 0 and values above 100 -> 100. AddProgress still returns false without mutation for amount <= 0 or an already-mastered record. Otherwise it returns true and increases progress up to 100. The sole arithmetic change is `Progress = (int)System.Math.Min((long)Progress + amount, MasteredProgress);`. Conversion to long occurs before addition; the largest reachable sum after guards is 99 + int.MaxValue = 2147483746, safely representable in long. Capping happens before conversion back to int. Positive accumulation therefore cannot lower either progress or rank. SetProgress/restore remain explicit replacement operations and can lower a prior value; the monotonic guarantee applies to positive AddProgress, not those APIs.
+
+**Call paths and boundaries:** MasteryProfile.IncreaseProgress validates the stable skill ID, obtains/creates one record and returns AddProgress's bool. Its existing behavior of creating an Unranked record for a registered first zero/negative increment is preserved. MentorTeachingApplicationService delegates through that same method and consumes its bool plus IsMastered; retention consumes IsMastered. Snapshot capture reads Progress/Rank; RestoreMasteryProfile delegates to RestoreRecord/SetProgress and derives rank from restored progress rather than trusting saved rank. No caller, registry or persistence code needed changes. SkillProgress XP/level mastery is a separate model and is untouched. The mentor application's inaccurate ProgressApplied capped-delta reporting is AUD-10 and is intentionally not fixed or redefined by these tests.
+
+**Regression evidence:** 186 assertions in the normal Player Progression / Combat Validation group cover the exact overflow; initial zero; constructors/SetProgress at int.MinValue, -1, 0, 1, 2, 98, 99, 100, 101 and int.MaxValue; a 36-case matrix crossing valid starting progress with small, exact-cap, excess-cap and extreme positive increments; unchanged bool results; rank/progress monotonicity; zero, negative and int.MinValue increments; repeated additions after mastery; registry validation; and profile no-op record compatibility. The matrix uses a remaining-capacity oracle rather than duplicating the production widened-sum expression.
+
+**Integrated workflow and saves:** registered mentor discovery/trust -> available int.MaxValue teaching applied to mastery 50 -> progress 100 / Mastered -> repeated teaching blocked as AlreadyMastered -> snapshot -> JSON -> registry-aware validation -> fresh and populated mastery restore -> repeated oversized increment safely rejected. Snapshot schema stays 1, persisted Progress remains an integer and Rank values are unchanged. Legacy schema-1 JSON at progress 50 still restores and then safely advances; a deliberately inconsistent saved rank confirms existing derived-rank restore behavior. Older JSON without mastery data still validates/restores to an empty profile. No persistence implementation or schema changed.
+
+**Executed verification (2026-11-03):**
+- `dotnet restore Fragments-of-Wisdom.sln`: exit 0.
+- `dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal`: baseline and final exit 0, 0 warnings/errors.
+- `dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build`: baseline exit 0 / 1587; intentional pre-fix regression exit `-532462766`; corrected suite exit 0 / 1773 (V1 2, Shared 16, V2 371, V3 100, Progression 1284), V1 events 38. Unchanged AUD-01 68, AUD-02 139, AUD-03 107, AUD-04 199 and AUD-05 175 assertions pass.
+- `git diff --check`: exit 0. Smoke used expanded execution permission for existing temporary-file persistence tests.
+
+**Compatibility and limits:** public APIs and bool semantics are unchanged; only overflow-corrupted positive accumulation is corrected. No mentor rewards/delta reporting, ResourcePool arithmetic, combat costs, Resonance ownership, skill authorization, save schema or Unity code changed. Historical saves that already contain overflow-corrupted negative progress are not reconstructed: existing restore clamping remains unchanged and lost history cannot be inferred from the negative number. Concurrent mutation, reflection-corrupted state and unrelated numeric validation are outside this fix. No Unity Editor/Play Mode run was performed. AUD-10 remains the next proposed atomic candidate, not authorization to begin it; stop after AUD-09 for architectural review.
+
 ### Architectural Risks and Inferences
 
 The following are source-grounded risks, **not additional reproduced findings**:
@@ -778,7 +887,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-05 missions are complete; the remaining seven reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. Priority 5a (AUD-09) remains the next candidate, not permission to start it automatically. Stop after AUD-05 for architectural review; do not begin AUD-06 or another repair implicitly.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-05 and AUD-09 missions are complete; the remaining six reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. Priority 5b (AUD-10) is the next candidate, not permission to start it automatically. Stop after AUD-09 for architectural review; do not begin another repair implicitly.
 
 **Explicit AUD-05 approval and closure (2026-11-03):** investigation paused at the design gate, then the user approved Option B. Player-only skill resource ownership is now enforced and verified by 175 permanent assertions. Existing priorities and AUD-06/AUD-07/AUD-08 scope are unchanged; no further implementation is authorized by this report.
 
@@ -788,7 +897,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 | 2 (complete) | Wire registry-aware semantic preflight into actual restore | AUD-02 RESOLVED; both coordinator overloads reject invalid scopes/nodes/discovery/prerequisite closure without mutation; 139 new assertions |
 | 3 (complete) | Preserve legacy Codex round trips | AUD-03 RESOLVED; optional schema-1 ID lists, existing merge semantics, full supported Codex round trip; 107 new V2 assertions |
 | 4 (complete) | Validate canonical skill metadata | AUD-04 RESOLVED; authoritative registry resolution and full metadata equality; 199 regression assertions; identical-value copies and engine lifecycle preserved |
-| 5a | Repair bounded mastery arithmetic | AUD-09; overflow-safe progress |
+| 5a (complete) | Repair bounded mastery arithmetic | AUD-09 RESOLVED; widened sum capped at 100; unchanged rank thresholds, int storage, no-op contracts and schema; 186 new assertions |
 | 5b | Report actual teaching delta | AUD-10; capped grant reports actual change |
 | 5c | Reject invalid ResourcePool spending | AUD-11; preserve Current/Max invariants |
 | 5d | Separate restore feasibility from applied facts | AUD-12; failure results cannot imply applied state |
