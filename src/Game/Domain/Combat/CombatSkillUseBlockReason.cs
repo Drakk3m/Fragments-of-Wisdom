@@ -18,6 +18,7 @@ namespace Game.Domain.Combat
         V4SkillBlocked,
         SkillDefinitionUnregistered,
         SkillDefinitionConflict,
-        SkillDefinitionInvalid
+        SkillDefinitionInvalid,
+        UnsupportedResonanceOwnership
     }
 }

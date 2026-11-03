@@ -113,13 +113,22 @@ namespace Game.Domain.Combat
                     return;
                 }
 
+                int resonanceCost = request.SkillProgress.Definition.ResonanceCost;
+
+                if (resonanceCost > 0 && request.Attacker != runtime.Player)
+                {
+                    runtime.EventLog.Add(GameEventType.ActionBlocked,
+                        request.Attacker.Name + " cannot use the skill. Validation reason: "
+                        + CombatSkillUseBlockReason.UnsupportedResonanceOwnership + ".");
+                    EndTurn(runtime, context);
+                    return;
+                }
+
                 context.ResourceCost = request.SkillProgress.GetBaseCost();
                 context.ResourceCostMultiplier *= request.SkillProgress.GetMasteryCostMultiplier();
                 pipeline.OnBeforeSkillCostCalculated(context);
 
                 int finalCost = (int)System.Math.Ceiling(context.ResourceCost * context.ResourceCostMultiplier);
-                int resonanceCost = request.SkillProgress.Definition.ResonanceCost;
-
                 if (resonanceCost > 0
                     && (runtime.ResonanceProfile == null || !runtime.ResonanceProfile.CanSpendActive(resonanceCost)))
                 {

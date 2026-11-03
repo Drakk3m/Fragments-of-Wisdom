@@ -149,7 +149,7 @@ TurnRequest
 
 The foundation covers basic attacks, skills, hit/evasion, criticals, HP, defeat, resource checks, passive hooks, regeneration and status resolution. Opposed stats: Attack/Defense; Precision/Evasion; Critical Chance/Critical Resistance; Debuff Chance/Debuff Resistance.
 
-**Resonance:** `ActiveResonance` pays for skills; `ResonanceReserve` is stored capacity. A successful refill transfers reserve into active and consumes a turn. Skills never silently consume reserve. Empty reserve and insufficient active resonance must be blocked consistently. **Current code uses both resources:** actor-owned Essence remains active; optional runtime Resonance adds a separate skill cost. Essence has not been replaced. Enemy ownership of that shared Resonance is an OPEN DECISION (AUD-05).
+**Resonance:** `ActiveResonance` pays for skills; `ResonanceReserve` is stored capacity. A successful refill transfers reserve into active and consumes a turn. Skills never silently consume reserve. Empty reserve and insufficient active resonance must be blocked consistently. **Current code uses both resources:** actor-owned Essence remains active; optional runtime Resonance adds a separate skill cost. Essence has not been replaced. **Approved AUD-05 contract (Option B):** the runtime ResonanceProfile is player-owned. Non-player skills with positive ResonanceCost are blocked; zero-cost enemy skills still pay their normal Essence costs. This slice compatibility decision does not prohibit future explicitly approved per-actor resources.
 
 **Status foundation:** Poison, Burn, SkillSeal, RegenBlock and Regen; advanced stacking, immunity and interactions are **DEFERRED**. Current ordering and limitations are in [Combat rules](#combat-rules); full historical formulas and contracts are preserved in [Archive 02](#archive-02).
 
@@ -246,7 +246,7 @@ Current skill sequence:
 2. Emit `TurnStarted`; reset flags; run legacy debuff turn-start and before-action hooks; stop if the attacker died.
 3. If configured, run `ICombatSkillTurnValidator`. Null/blocked results emit `ActionBlocked`, call end-turn and return.
 4. Check `SkillSeal`; on block emit `ActionBlocked`, call end-turn and return.
-5. Calculate Essence cost from `SkillProgress`, mastery multiplier and passive hooks; read Resonance cost from the supplied progress definition.
+5. Read Resonance cost from the supplied progress definition. A positive cost with Attacker other than runtime.Player emits ActionBlocked / UnsupportedResonanceOwnership, ends the turn and returns before skill cost hooks or spending. Otherwise calculate Essence cost from `SkillProgress`, mastery multiplier and passive hooks.
 6. Check optional active Resonance capacity, then spend actor Essence, then active Resonance. Failure ends the turn before skill execution.
 7. Apply skill, grant 10 skill XP, process requested cleanse, resolve hit/critical/damage and pending debuffs, then check defender defeat.
 8. If combat continues, end-turn regenerates Essence unless blocked, runs after-action debuffs and status tick, checks attacker defeat, emits `TurnEnded` and advances turn.
@@ -257,7 +257,7 @@ Blocked validation spends no skill Essence/Resonance and grants no skill XP, but
 
 `CombatSkillAccessService` delegates to `MasteredSkillRetentionPolicy`: a registered skill is usable when the current class allows it OR it is mastered in `MasteryProfile`. It returns access facts without mutation. A class-allowed skill can still be blocked by the separate V3 required-unlock policy. Tree discovery/unlocking alone grants neither access nor mastery.
 
-**Resource ownership:** Essence belongs to each combat entity. Optional active/reserve Resonance belongs to the runtime; skills spend active only, never reserve implicitly. `ResonanceRefillAction` transfers reserve into active and advances the turn through a separate path. Refill is not integrated with all engine status/lifecycle checks (AUD-06/AUD-07). Enemy resource ownership is unresolved (AUD-05). Random refill buffs, auto-refill and reserve-growth bridges remain proposed. Atlas' current recurring cost modifier is not the proposed next-skill refill buff.
+**Resource ownership:** Essence belongs to each combat entity. The runtime's optional active/reserve ResonanceProfile is explicitly player-owned; only runtime.Player may pay positive skill costs from it. Non-player requests are blocked before skill cost calculation/spending, effects and XP, even without an optional validator. The engine reports UnsupportedResonanceOwnership independently of whether the player's pool exists or has enough resource. Zero-Resonance enemy skills still pay enemy Essence. `ResonanceRefillAction` preserves its existing explicit player refill contract and separately supplied profile compatibility; it gains no enemy capability or ownership resolver. Refill is not integrated with all engine status/lifecycle checks (AUD-06/AUD-07). Future per-actor resources require separate approval. Random refill buffs, auto-refill and reserve-growth bridges remain proposed. Atlas' current recurring cost modifier is not the proposed next-skill refill buff.
 
 **Status boundaries:** `StatusEffectCollection` and resolver cover Poison, Burn, SkillSeal, RegenBlock and Regen; legacy `Debuffs`/flags coexist. They are not interchangeable. In particular legacy Silence logs a block without preventing damage/XP (AUD-08). Stacking, immunity and synergy expansion remain deferred. `Defend` and `Wait` enum values have no public TurnRequest factories; they are incomplete contracts, not reproduced public-action failures.
 
@@ -417,8 +417,8 @@ One implementation status per row; VERIFIED is deliberately limited to the named
 | Area / scenario | Design maturity | Implementation status | Source evidence | Test evidence / known limit |
 |---|---|---|---|---|
 | Legacy slice contract | Accepted compatibility | VERIFIED | `src/Game/Slice/FoundationVerticalSlice.cs` | V1SmokeTests: 2 assertions, 38 events |
-| Attack/skill foundation | Accepted | PARTIAL | TurnBasedCombatEngine, DamageResolver, StatusEffectResolver | V3SmokeTests: 100 pass; AUD-05 through AUD-08 remain |
-| Resonance active/reserve transfer | Accepted | PARTIAL | `src/Game/Domain/Combat/Resources/` | V3 smoke cases pass; separate refill lifecycle and actor ownership unresolved |
+| Attack/skill foundation | Accepted | PARTIAL | TurnBasedCombatEngine, DamageResolver, StatusEffectResolver | V3SmokeTests: 100 pass; AUD-05 resolved; AUD-06 through AUD-08 remain |
+| Resonance active/reserve transfer | Accepted | PARTIAL | `src/Game/Domain/Combat/Resources/`, TurnBasedCombatEngine | Player-only ownership verified by AUD-05; separate refill lifecycle remains unresolved |
 | Registry/class/mastery/mentor operations | Accepted foundation | PARTIAL | `src/Game/Domain/Classes/` | PlayerProgressionFoundationSmokeTests; numeric defects AUD-09/AUD-10 remain |
 | Scoped tree isolation and policy application | Accepted foundation | VERIFIED | SkillTreeProgressProfile, SkillTreeUnlockApplicationService | Two-tree same-node workflow; not arbitrary corrupt-save integrity |
 | Class-tree binding / supported JSON round trip | Accepted foundation | VERIFIED | ClassSkillTreeBindingRegistry, V2ProgressSnapshotService | Binding save and class-switch workflows; no automatic grants |
@@ -453,10 +453,10 @@ git status --short
 | Shared Domain Foundations | 16 |
 | V2 Narrative / Progression / Persistence | 371 |
 | V3 Combat / Skills / Resonance / Status / Stats | 100 |
-| Player Progression / Combat Validation | 923 |
-| **Total** | **1412** |
+| Player Progression / Combat Validation | 1098 |
+| **Total** | **1587** |
 
-Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, and AUD-04 canonical skill definition contains **199**, all already included in 923. Historical V4/V5 labels and earlier counts are not current reporting groups.
+Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, and AUD-05 player Resonance ownership contains **175**, all already included in 1098. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
 The V2 group includes **107** AUD-03 Codex round-trip assertions; they are included in 371, not an additional reporting group.
 
@@ -472,11 +472,13 @@ The V2 group includes **107** AUD-03 Codex round-trip assertions; they are inclu
 
 **AUD-04 correction (2026-11-02):** latest main baseline `98ec42c` independently passed 1213 assertions and 38 V1 events. Before production edits, the new real-engine regression failed: weaker same-ID definition allowed, turn 2, Essence 14, active Resonance 4, enemy HP 94, skill applied and XP 10. After correction it is blocked before costs/effects/XP; 199 new Progression assertions pass, full suite 1412, V1 events 38. Restore/build/smoke/diff-check exit 0; final build 0 warnings/errors. AUD-01 through AUD-03 regression sections remain unchanged and green.
 
+**AUD-05 investigation and correction (2026-11-02; final verification 2026-11-03):** baseline `c9c0f81` contains merged AUD-01 through AUD-04 and independently passed 1412 assertions / 38 V1 events. Before production edits, the opt-in `--aud-05-repro` failed: enemy skill spent 10 from the caller-supplied player's active pool, 30 -> 20. Work paused until the user explicitly approved Option B. The engine now enforces that ownership boundary; the probe is converted to permanent normal smoke coverage and its temporary flag removed. Final suite: 1587 assertions, including 175 AUD-05 assertions; V1 events 38; build 0 warnings/errors. See the historical investigation and approved closure below.
+
 **Consolidation documentation checks (2026-10-31):** all 11 archived sources match with the documented whitespace normalization; 67 live local Markdown links resolve; all 31 explicit anchors are unique; git diff --check exits 0. Production code, tests, solution/build configuration and generator scripts had no diff in that documentation pass. All 10 newly retired originals were verified before deletion; the master specification was already absent. No generator ran and no Unity files changed. The five remaining old-path references outside this Bible are historical generator output declarations in modules 00, 05 and 06, not live documentation links; their behavior is explicitly described in the tooling section. No GitHub Actions configuration or Unity Assets/ProjectSettings tree was present in the tracked inventory. Unity Editor, Play Mode and playable-game validation remain unperformed.
 
 Integrated smoke covers class/mentor/teaching/mastery, retention after switching class, binding save/JSON/restore, prerequisite-first tree unlock application, scoped trees with identical node IDs, validation modes/provider/classification/orchestration, optional engine integration and shared loaded-session/bootstrap ownership. See [progression tests](../src/Game.SmokeTests/PlayerProgressionFoundationSmokeTests.cs), [runtime workflow tests](../src/Game.SmokeTests/ProgressionRuntimeBootstrapSmokeTests.cs), [V2 tests](../src/Game.SmokeTests/V2SmokeTests.cs), [V3 tests](../src/Game.SmokeTests/V3SmokeTests.cs) and [runner](../src/Game.SmokeTests/SmokeTestRunner.cs).
 
-Coverage gaps include the eight remaining audit regressions, full-state save replacement, failures during restore application, hostile/extreme numeric values, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips; AUD-04 covers canonical player skill metadata and actual engine rejection/execution. Current green counts do not close the other gaps.
+Coverage gaps include the seven remaining audit regressions, full-state save replacement, failures during restore application, hostile/extreme numeric values, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips; AUD-04 covers canonical player skill metadata and actual engine rejection/execution; AUD-05 covers the approved player-only Resonance skill ownership boundary. Current green counts do not close the other gaps.
 
 <a id="audit"></a>
 # Part V: Audit & Technical Debt
@@ -484,7 +486,7 @@ Coverage gaps include the eight remaining audit regressions, full-state save rep
 <a id="reproduced-findings"></a>
 ## Reproduced Integrity Findings
 
-AUD-01 through AUD-04 are **RESOLVED** by the verified corrections below; AUD-05 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
+AUD-01 through AUD-05 are **RESOLVED** by the verified corrections below; AUD-06 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
 
 | ID | Severity from executed probe | Reproduced behavior | Affected code | Required acceptance direction |
 |---|---|---|---|---|
@@ -492,7 +494,7 @@ AUD-01 through AUD-04 are **RESOLVED** by the verified corrections below; AUD-05
 | AUD-02 | HIGH | Unlocked tree node without prerequisite: semantic validator returns false, coordinator returns `FullyRestored=true` | `V2ProgressSnapshotService.cs`, validation service, coordinator | RESOLVED 2026-11-02: existing semantic tree validation reused before coordinator target mutation |
 | AUD-03 | HIGH | Codex snapshot→JSON→restore loses legacy discovery and completion; enriched record survives | `V2ProgressSnapshotService.cs`, Codex profile | RESOLVED 2026-11-02: optional discovery/completion ID lists preserve supported Codex facts alongside enriched records |
 | AUD-04 | HIGH | Alternate definition with same skill ID bypasses canonical unlock requirement | `src/Game/Domain/Combat/CombatSkillUseValidator.cs` | RESOLVED 2026-11-02: resolve canonical registered definition, reject conflicting metadata before execution and retain value-identical copies |
-| AUD-05 | MEDIUM | Enemy skill spends 10 from the runtime's single Resonance pool | `TurnBasedCombatEngine.cs` | Decide per-actor resource ownership before implementation |
+| AUD-05 | MEDIUM | Enemy skill spends 10 from the runtime's single Resonance pool | `TurnBasedCombatEngine.cs` | RESOLVED 2026-11-03: approved player-owned pool; positive non-player costs blocked before skill spending/effects/XP; zero-cost enemy Essence behavior preserved |
 | AUD-06 | MEDIUM | Refill with Poison advances turn but neither damages nor decrements duration | `ResonanceRefillAction.cs` | Define and integrate canonical turn/status lifecycle |
 | AUD-07 | MEDIUM | Refill after combat end succeeds, restores resource and advances turn | `ResonanceRefillAction.cs` | Enforce combat lifecycle boundary |
 | AUD-08 | MEDIUM | `SilenceDebuff` emits `ActionBlocked`, yet `SkillUsed`, XP and damage still occur | `SilenceDebuff.cs`, combat engine | Make blocked action truly non-executable; consistent events |
@@ -520,7 +522,7 @@ AUD-01 through AUD-04 are **RESOLVED** by the verified corrections below; AUD-05
 | AUD-11 | ResourcePool at Current=Max=100 accepted TrySpend(-10), leaving Current=110 |
 | AUD-12 | Invalid mastery stopped preflight application; ClassRestored true despite destination still audit.before |
 
-These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 through AUD-04 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
+These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 through AUD-05 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
 
 ### AUD-01 Closure: Real Destination Validation
 
@@ -621,6 +623,83 @@ After correction, 68 new assertions pass: null class/mastery/mentor/tree destina
 
 **Self-audit and limitations:** no duplicate registry, validator or state owner was added. The production change is confined to CombatSkillUseValidator and its block-reason enum. Basic attacks, trusted Enemy/LegacyBypass contexts, the optional unvalidated engine constructor and the historical V3-only overload without a registry retain their existing contracts; they do not certify canonical player access. Application composition must select the progression-aware path for players. ICombatSkill implementations/passive hooks remain trusted executable code, not registry-owned code or a security sandbox; arbitrary malicious Apply logic, reflection and concurrent mutation are outside this metadata guarantee. No new skill-tree combat prerequisite is invented: tree unlocks remain facts with no automatic grant. Canonical numeric range/overflow validation is not expanded (AUD-09/AUD-11 remain open). No persistence, schemas, Unity assets, balance, other audit fix or generator changed. Unity Editor/Play Mode was not exercised.
 
+### AUD-05 Historical Investigation: Resonance Ownership Decision Gate
+
+**Pre-approval evidence (2026-11-02), superseded by the approved closure below.** Investigation originally stopped at OPEN DECISION: the then-current Parts I/II left enemy Resonance ownership undecided and the archived V3 contract only established an optional runtime pool. No production correction was made before approval. The diagram, findings, alternatives and questions in this historical subsection describe that investigation baseline, not the final contract or current instructions.
+
+**Current ownership and dependency diagram (references, not approved actor ownership):**
+
+```text
+Caller / combat setup
+  +-- CombatEntity player ---- ResourcePool (actor Essence)
+  +-- CombatEntity enemy ----- ResourcePool (actor Essence)
+  +-- ResonanceProfile ------- ActiveResonance -> ResourcePool
+  |                        \- ResonanceReserve -> ResourcePool
+  \-- CombatRuntimeContext(player, enemy, log, PlayerProfile, optional profile)
+       +-- Player / Enemy references
+       \-- ResonanceProfile reference (no actor owner)
+
+TurnRequest.Attacker -> actor Essence
+TurnBasedCombatEngine -> runtime.ResonanceProfile for ANY accepted skill cost
+ResonanceRefillAction(profile, runtime, amount)
+  -> supplied profile reserve/active; supplied runtime events/turn
+  -> no actor argument or profile/runtime identity check
+```
+
+**Source-grounded findings:**
+- CombatRuntimeContext stores one caller-injected optional profile and exactly one Player/Enemy pair. CombatEntity owns Essence, not Resonance. Neither PlayerProfile nor PlayerProgressionRuntimeState owns Resonance. There is no owner ID, actor-to-resource map or exclusivity enforcement; callers can alias the same profile into multiple contexts.
+- Production FoundationVerticalSlice constructs the four-argument runtime without Resonance. Accessible nonzero pool construction is in smoke fixtures. Constructors initialize Active/Reserve ResourcePools to their maximum; no application/session factory creates those resources implicitly. LoadedPlayerSession and ProgressionAwareCombatEngineFactory create validated engines, not combat entities, runtime contexts or Resonance state.
+- TurnBasedCombatEngine checks optional skill validation and SkillSeal, then reads the supplied definition's ResonanceCost. A positive cost consults and spends runtime.ResonanceProfile regardless of Attacker. Missing/insufficient active resource emits ResourceNotEnough and ends the turn before Essence spending, Apply, damage or XP. Reserve is never auto-spent. Enemy classification bypasses player progression requirements, not this shared engine resource cost.
+- Refill accepts any nonnull profile and runtime, with no actor argument. Consequently it cannot establish which actor is authorized to refill, and the profile need not equal runtime.ResonanceProfile. Existing V3 tests intentionally exercise refill with a separately supplied profile. Normal refill success consumes a turn; ownership enforcement would need an explicit adapter/migration decision. AUD-06 status ticking and AUD-07 ended-combat behavior remain untouched.
+- The production enemy AI chooses BasicAttack only. No production enemy skill catalog or approved nonzero enemy Resonance configuration was found. Public TurnRequest.SkillAction and SkillDefinition permit enemy requests with a positive ResonanceCost; the regression exercises that supported path without proposing a new enemy skill mechanic. Default existing skill constructors use ResonanceCost 0, while Essence remains actor-owned and charged independently.
+- Both represented combatants act in the same context. There is no party/roster model. With progression validation, a foreign actor is rejected by CombatActorValidationClassifier; the legacy engine alone is not a party-membership authority. Multi-ally/enemy resource isolation is not implemented or verified.
+- No Resonance UI adapter/presenter or save DTO exists in the inspected source. GameEventLog exposes ResourceSpent/ResourceNotEnough/turn messages, not a typed resource-owner projection. Unity currently supplies persistence adapters, not a Resonance UI. Any future presentation must consume explicit owner facts and events rather than infer ownership from the global pool or create parallel state.
+
+**Deterministic reproduction:** [ResonanceOwnershipAuditSmokeTests.cs](../src/Game.SmokeTests/ResonanceOwnershipAuditSmokeTests.cs) supplies a profile intended by its caller for the player (active 30, reserve 50); this is a test ownership expectation, not a claim that PlayerProfile already stores it. The actual gateway classifies the enemy as Enemy without player profiles. The unchanged engine executes its structurally valid skill with Essence cost 10 and ResonanceCost 10. Results: active 30 -> 20; reserve 50 -> 50; turn 1 -> 2; player HP 100 -> 94; enemy XP 0 -> 10; enemy Essence 20 -> 15 after spending 10 and regenerating 5; player Essence remains 20. Apply executes. Events in order: TurnStarted, ResourceSpent (enemy Essence), ResourceSpent (enemy Resonance), SkillUsed, DamageDealt, ResourceRegenerated, TurnEnded. The final isolation assertion fails with InvalidOperationException, exit `-532462766`, against unchanged production. There is no cooldown model to record.
+
+Historical command used to execute the intentionally red probe before approval (its temporary flag has since been removed):
+
+```powershell
+dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build -- --aud-05-repro
+```
+
+At investigation time the flag ran only this probe and did not catch or convert the failure into success. The default suite still passed 1412 assertions. The approved correction now includes the isolation regression and policy-specific cases in normal coverage; no special flag or excluded failing test remains.
+
+**Alternatives considered (all proposals, not accepted contracts):**
+
+| Dimension | A: optional per-actor ownership | B: player-owned pool with explicit enemy policy | C: injected owner/resource resolver |
+|---|---|---|---|
+| Domain ownership | One optional resource reference on each participating actor; never assume all actors have it | Existing runtime profile is explicitly associated with runtime.Player, not every requester | Resolve a request actor to an existing resource owner; no second pool |
+| Multiple combatants | Natural resource isolation, but still needs a future roster model | Smallest fit for current one-player/one-enemy context; does not solve party resources | Extensible routing, but current architecture has no authoritative mapping to reuse |
+| Save/load | No current Resonance DTO; persistence/lifetime choices remain separate | No save change needed for per-combat binding; persistence still undecided | Owner IDs/lifetime would need later persistence design, not an implicit schema addition |
+| Runtime compatibility | Actor initialization and the existing runtime property need one canonical reference, not two independently mutable owners | Preserve the optional runtime profile and player cost semantics; change only inappropriate non-player access after approval | Additional constructor dependency/adapters; larger contract surface |
+| Unity boundary | Future owner-scoped events/read models; no Unity resource mutation | Future player resource projection; no new enemy gauges implied | Future presentation consumes resolver facts, not a separate UI mapping |
+| Migration complexity | Higher: actor construction, legacy runtime aliases and refill API; ResonanceProfile requires both Active and Reserve | Lower for skill spending; refill owner association still needs explicit compatibility handling | Highest for this slice; adds routing without settled enemy semantics |
+| Parallel ownership risk | Avoid retaining separate actor and runtime stores; detect shared references rather than silently accepting aliasing | Keep one profile reference; do not add a second PlayerProfile/session-owned pool | A new dictionary would duplicate ownership unless a single source is first approved |
+| Tests/factories | Update actor setup, pool isolation and missing-resource cases; no automatic enemy profiles | Existing player/factory/V1 behavior can remain; explicit positive enemy cost rejection needs new tests | Broader injection and resolution tests; no supporting production abstraction currently exists |
+
+**Recommendation, NOT authorization:** choose B for the present slice: make the supplied runtime ResonanceProfile explicitly player-owned; do not create enemy tanks, regenerate enemy Resonance or silently waive a positive cost. Until a distinct enemy resource policy is approved, a non-player request declaring ResonanceCost > 0 should fail closed before Essence/Resonance spending, effects or XP, using the existing blocked-turn lifecycle. A zero-Resonance enemy request would still pay its declared actor Essence cost normally. Exact diagnostic facts and refill ownership-compatible API must be agreed before implementation. A is preferable if a broader per-actor Resonance capability is an actual approved requirement; merely moving the current profile onto every actor would invent that requirement. C is not recommended now because it adds a resolver without an existing owner map and does not decide enemy mechanics.
+
+**Approval required / remaining questions:** is the player-only contract B approved, including rejecting unsupported positive enemy costs rather than making them free, or should actors explicitly opt into A with separately approved enemy capabilities? Who supplies those capabilities, can enemies have Active without Reserve, and what lifetime/persistence is intended? How should the legacy refill API express or validate ownership while retaining its separately supplied-profile compatibility? Do not select defaults or introduce new resources to answer these questions implicitly.
+
+**Historical investigation verification:** restore/build/default smoke/diff-check exited 0; build had 0 warnings/errors. Normal smoke was V1 2 / events 38, Shared 16, V2 371, V3 100, Progression 923, total 1412. AUD-01 68, AUD-02 139, AUD-03 107 and AUD-04 199 passed. Default smoke used expanded permission for existing temporary-file tests; the opt-in reproduction ran without it and failed with exit `-532462766`. At that checkpoint production diff was empty, changes were local/uncommitted and AUD-05 remained OPEN. The following closure records the separately authorized correction.
+
+### AUD-05 Closure: Approved Player-Owned Resonance
+
+**Status: RESOLVED (2026-11-03).** The user's subsequent architecture decision explicitly approved Option B for the current vertical slice: CombatRuntimeContext.ResonanceProfile is player-owned, positive enemy ResonanceCost is unsupported and must be blocked, zero-Resonance enemy skills retain normal Essence costs. This is a compatibility contract, not a permanent prohibition against optional per-actor resources. No enemy resource model is inferred.
+
+**Production enforcement:** after the existing optional validator and SkillSeal gate, TurnBasedCombatEngine reads ResonanceCost and rejects a positive cost whenever request.Attacker is not runtime.Player. The engine emits ActionBlocked with the stable appended CombatSkillUseBlockReason.UnsupportedResonanceOwnership value and calls the existing EndTurn. This runs before GetBaseCost, mastery cost modifiers, OnBeforeSkillCostCalculated, resource availability/spending, Apply, damage and XP. It therefore applies to progression-aware, explicit legacy-bypass and two-argument unvalidated engines; even a foreign legacy actor cannot spend the player pool. The runtime property has a player-ownership comment; no new resolver, pool, actor map, constructor or method was added. Existing enum numeric values are preserved.
+
+**Separation of responsibilities:** CombatSkillUseValidator still evaluates structural/progression access, not resource ownership. Enemy access can be allowed by that validator and then rejected by the engine's resource boundary. Earlier validation failures and SkillSeal retain their precedence. Canonical player metadata validation from AUD-04 is unchanged. Player skill costs and missing/insufficient resource behavior are unchanged: ResourceNotEnough before spending/effects/XP, reserve never implicitly spent. Enemy ResonanceCost 0 proceeds through the existing enemy Essence checks and spending, not free execution.
+
+**Mutation boundary:** rejected enemy skills emit no ResourceSpent/ResourceNotEnough, execute no skill-cost hook or Apply, inflict no skill damage and gain no XP. They consume their turn through normal EndTurn, including permitted Essence regeneration and status ticks. Earlier turn-start/cognition/debuff behavior remains intact; this is not whole-turn rollback. In the original scenario, player active stays 30, reserve stays 50, HP stays 100, enemy XP stays 0, enemy Essence stays 20 and turn advances to 2. A depleted enemy test verifies regeneration; a Poison instance verifies existing skill end-turn ticking without changing refill lifecycle.
+
+**Permanent regression coverage:** [ResonanceOwnershipAuditSmokeTests.cs](../src/Game.SmokeTests/ResonanceOwnershipAuditSmokeTests.cs) contributes 175 normal Player Progression / Combat Validation assertions. The original failing isolation invariant now passes without opt-in. Cases cover enemy positive/zero costs with full/empty/missing player pools in all three engine compositions; actual enemy Essence spending and insufficiency; player positive costs with sufficient/insufficient/missing Resonance and insufficient Essence; stable rejection reason and cost-hook ordering; no player resource replacement/implicit creation; basic attacks by both actors; foreign legacy actor rejection; unchanged blocked-turn regeneration/status behavior; and an integrated player skill -> rejected enemy skill -> zero-cost enemy skill -> explicit player refill flow. Existing V3 refill tests and all AUD-01 through AUD-04 regressions remain unchanged and green.
+
+**Executed verification:** baseline 1412 assertions / 38 V1 events; intentional pre-fix isolation failure exit `-532462766`. Final `dotnet restore Fragments-of-Wisdom.sln`, `dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal`, `dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build`, and `git diff --check` exit 0. Build: 0 warnings/errors. Final counts: V1 2, Shared 16, V2 371, V3 100, Progression 1098, total 1587; V1 events 38. One intermediate integrated test failed because its deterministic random sequence covered only the first attack; the test fixture was corrected to cover both attacks without a production change. Smoke uses expanded permission for existing temporary-file tests.
+
+**Compatibility limits and remaining concerns:** existing non-player callers that previously paid positive costs from the shared pool now receive the intentional ownership rejection, not a waived cost. The legacy refill method remains a trusted explicit player operation, including its separately supplied-profile compatibility; it has no actor parameter and is not a general enemy action authorization API. No enemy refill capability was introduced and no refill status/ended-combat behavior changed. Runtime setup must supply the correct Player reference and profile; cross-runtime aliasing, malicious trusted skill/passive code and invalid numeric definitions remain outside this correction. There is no party resource model, no implicit enemy Active/Reserve state and no new persistence schema or Unity integration. Future per-actor resources require a separately approved capability/lifetime design. AUD-06/AUD-07/AUD-08 and the other remaining findings are unchanged. No Unity Editor/Play Mode verification was performed. Stop after AUD-05 for architectural review.
+
 ### Architectural Risks and Inferences
 
 The following are source-grounded risks, **not additional reproduced findings**:
@@ -649,7 +728,7 @@ The following are source-grounded risks, **not additional reproduced findings**:
 | Generator commands are the current workflow | Historical snapshot generation can overwrite output and recreate retired docs; not part of current solution build |
 | Session naming implies automatic file loading | Loaded session/bootstrap compose prepared state; disk load remains explicit |
 
-**OPEN DECISIONS:** per-actor Resonance ownership; refill/status turn semantics; replacement vs merge save loading and durable migration; retained-skill class eligibility; bridging XP and retention mastery; mentor progression/slot commitments; Codex completion semantics; hybrid input/time authority; Sanctuary milestone selection and repetition; town capability mapping; final Nahual terminology; full narrative/content economy; Unity framework/platform and presentation boundary. AUD-04 settles the current definition/request identity contract as full metadata value equality, not reference identity. No implicit approval follows from documenting a candidate solution.
+**OPEN DECISIONS:** future per-actor Resonance capabilities beyond the approved player-only slice contract; refill/status turn semantics; replacement vs merge save loading and durable migration; retained-skill class eligibility; bridging XP and retention mastery; mentor progression/slot commitments; Codex completion semantics; hybrid input/time authority; Sanctuary milestone selection and repetition; town capability mapping; final Nahual terminology; full narrative/content economy; Unity framework/platform and presentation boundary. AUD-04 settles definition/request identity as full metadata value equality; AUD-05 settles current Resonance ownership as player-only with unsupported positive non-player costs blocked. No implicit approval follows from documenting a candidate solution.
 
 <a id="governance"></a>
 # Part VI: Development Governance
@@ -699,7 +778,9 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-04 missions are complete; the remaining eight reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. Priority 5a (AUD-09) remains the next candidate, not permission to start it automatically. Stop after AUD-04 for architectural review; do not begin AUD-05 or another repair implicitly.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-05 missions are complete; the remaining seven reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. Priority 5a (AUD-09) remains the next candidate, not permission to start it automatically. Stop after AUD-05 for architectural review; do not begin AUD-06 or another repair implicitly.
+
+**Explicit AUD-05 approval and closure (2026-11-03):** investigation paused at the design gate, then the user approved Option B. Player-only skill resource ownership is now enforced and verified by 175 permanent assertions. Existing priorities and AUD-06/AUD-07/AUD-08 scope are unchanged; no further implementation is authorized by this report.
 
 | Priority | Atomic purpose or approval gate | Traceability / acceptance |
 |---|---|---|
@@ -711,7 +792,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 | 5b | Report actual teaching delta | AUD-10; capped grant reports actual change |
 | 5c | Reject invalid ResourcePool spending | AUD-11; preserve Current/Max invariants |
 | 5d | Separate restore feasibility from applied facts | AUD-12; failure results cannot imply applied state |
-| 6 | Audit/approve actor resource ownership and refill lifecycle | AUD-05/AUD-06/AUD-07; design first, then separately scoped resource/lifecycle repairs |
+| 6 (ownership complete; refill pending) | Audit/approve actor resource ownership and refill lifecycle | AUD-05 RESOLVED with approved player-only contract; AUD-06/AUD-07 still need separately scoped lifecycle repairs |
 | 7 | Correct remaining action/status contracts | AUD-08; actual blocking and consistent events; Defend/Wait require a separate public-contract decision |
 | 8 | Resume deferred responsibility-based naming | Restore APIs and V3/V4 diagnostic facts only; preserve behavior and serialized names |
 | 9 | Design/audit the visual boundary and playable slice | Consume ProgressionRuntimeDemoBootstrap; no duplicate state/engine/session; implementation only after approval |
