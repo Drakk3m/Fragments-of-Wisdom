@@ -253,7 +253,7 @@ Current skill sequence:
 
 Blocked validation spends no skill Essence/Resonance and grants no skill XP, but normal end-turn consequences can still occur. Earlier hooks may already have run. Optional validation preserves the two-argument engine's legacy path and its 38-event slice. Do not infer that legacy bypass guarantees structurally malformed requests are safe.
 
-`CombatSkillValidationOrchestrator` composes actor classification, context provision and `CombatSkillUseValidator`; `CombatSkillTurnValidatorGateway` adapts this to the engine validator. Player mode needs UnlockProfile, ClassProfile, MasteryProfile, class registry and skill registry. Enemy mode needs no player progression profiles. Legacy bypass is explicit in context construction. Foreign actors and incomplete contexts fail with structured stage/reason facts. Identity matching and V3 unlock checks precede V4 retention checks. **Known limitation AUD-04:** equal IDs alone do not prove that caller-supplied skill metadata is canonical.
+`CombatSkillValidationOrchestrator` composes actor classification, context provision and `CombatSkillUseValidator`; `CombatSkillTurnValidatorGateway` adapts this to the engine validator. Player mode needs UnlockProfile, ClassProfile, MasteryProfile, class registry and skill registry. Enemy mode needs no player progression profiles. Legacy bypass is explicit in context construction. Foreign actors and incomplete contexts fail with structured stage/reason facts. Identity matching precedes canonical registry resolution and full metadata value comparison, then canonical V3 unlock and V4 retention checks. **AUD-04 resolved:** same-ID conflicting definitions are rejected; distinct value-identical copies remain valid. The engine keeps the existing SkillProgress and consumes equivalent metadata without replacing its XP/level state. See the AUD-04 closure for compatibility boundaries and trusted-execution limitations.
 
 `CombatSkillAccessService` delegates to `MasteredSkillRetentionPolicy`: a registered skill is usable when the current class allows it OR it is mastered in `MasteryProfile`. It returns access facts without mutation. A class-allowed skill can still be blocked by the separate V3 required-unlock policy. Tree discovery/unlocking alone grants neither access nor mastery.
 
@@ -422,7 +422,7 @@ One implementation status per row; VERIFIED is deliberately limited to the named
 | Registry/class/mastery/mentor operations | Accepted foundation | PARTIAL | `src/Game/Domain/Classes/` | PlayerProgressionFoundationSmokeTests; numeric defects AUD-09/AUD-10 remain |
 | Scoped tree isolation and policy application | Accepted foundation | VERIFIED | SkillTreeProgressProfile, SkillTreeUnlockApplicationService | Two-tree same-node workflow; not arbitrary corrupt-save integrity |
 | Class-tree binding / supported JSON round trip | Accepted foundation | VERIFIED | ClassSkillTreeBindingRegistry, V2ProgressSnapshotService | Binding save and class-switch workflows; no automatic grants |
-| Retained access and validated combat composition | Accepted foundation | PARTIAL | CombatSkillUseValidator, CombatSkillTurnValidatorGateway | Progression unit/integrated tests; canonical metadata bypass AUD-04 remains |
+| Retained access and validated combat composition | Accepted foundation | VERIFIED | CombatSkillUseValidator, CombatSkillTurnValidatorGateway | AUD-04 canonical metadata regressions and mentor-retention engine flow; explicit legacy/enemy paths are outside player authorization |
 | Shared session/runtime ownership | Accepted foundation | VERIFIED | `src/Game/Application/Runtime/`, `Bootstrap/`, `Integration/` | ProgressionRuntimeBootstrapSmokeTests; not automatic disk loading or Unity |
 | Narrative evaluators and candidate discovery | Accepted foundation | PARTIAL | `src/Game/Domain/Narrative/`, `Codex/`, `Missions/` | V2SmokeTests; complete quests, dialogue and route consequences absent |
 | Snapshot/file persistence | Accepted foundation | PARTIAL | `src/Game/Domain/Progress/` | V2/progression save cases pass; AUD-01/AUD-02/AUD-03 resolved; AUD-12 remains |
@@ -453,10 +453,10 @@ git status --short
 | Shared Domain Foundations | 16 |
 | V2 Narrative / Progression / Persistence | 371 |
 | V3 Combat / Skills / Resonance / Status / Stats | 100 |
-| Player Progression / Combat Validation | 724 |
-| **Total** | **1213** |
+| Player Progression / Combat Validation | 923 |
+| **Total** | **1412** |
 
-Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, and AUD-02 semantic skill tree restore contains **139**, all already included in 724. Historical V4/V5 labels and earlier counts are not current reporting groups.
+Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, and AUD-04 canonical skill definition contains **199**, all already included in 923. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
 The V2 group includes **107** AUD-03 Codex round-trip assertions; they are included in 371, not an additional reporting group.
 
@@ -470,11 +470,13 @@ The V2 group includes **107** AUD-03 Codex round-trip assertions; they are inclu
 
 **AUD-03 correction (2026-11-02):** latest main baseline `e74eb52` independently passed 1106 assertions and 38 V1 events. The new regression failed before production edits: discovered IDs fell from 4 to 2, legacy completion was false and both enriched records survived. After correction, 107 new V2 assertions pass and the full suite passes 1213; restore/build/smoke/diff-check exit 0, build 0 warnings/errors. AUD-01 and AUD-02 regressions remain unchanged and green.
 
+**AUD-04 correction (2026-11-02):** latest main baseline `98ec42c` independently passed 1213 assertions and 38 V1 events. Before production edits, the new real-engine regression failed: weaker same-ID definition allowed, turn 2, Essence 14, active Resonance 4, enemy HP 94, skill applied and XP 10. After correction it is blocked before costs/effects/XP; 199 new Progression assertions pass, full suite 1412, V1 events 38. Restore/build/smoke/diff-check exit 0; final build 0 warnings/errors. AUD-01 through AUD-03 regression sections remain unchanged and green.
+
 **Consolidation documentation checks (2026-10-31):** all 11 archived sources match with the documented whitespace normalization; 67 live local Markdown links resolve; all 31 explicit anchors are unique; git diff --check exits 0. Production code, tests, solution/build configuration and generator scripts had no diff in that documentation pass. All 10 newly retired originals were verified before deletion; the master specification was already absent. No generator ran and no Unity files changed. The five remaining old-path references outside this Bible are historical generator output declarations in modules 00, 05 and 06, not live documentation links; their behavior is explicitly described in the tooling section. No GitHub Actions configuration or Unity Assets/ProjectSettings tree was present in the tracked inventory. Unity Editor, Play Mode and playable-game validation remain unperformed.
 
 Integrated smoke covers class/mentor/teaching/mastery, retention after switching class, binding save/JSON/restore, prerequisite-first tree unlock application, scoped trees with identical node IDs, validation modes/provider/classification/orchestration, optional engine integration and shared loaded-session/bootstrap ownership. See [progression tests](../src/Game.SmokeTests/PlayerProgressionFoundationSmokeTests.cs), [runtime workflow tests](../src/Game.SmokeTests/ProgressionRuntimeBootstrapSmokeTests.cs), [V2 tests](../src/Game.SmokeTests/V2SmokeTests.cs), [V3 tests](../src/Game.SmokeTests/V3SmokeTests.cs) and [runner](../src/Game.SmokeTests/SmokeTestRunner.cs).
 
-Coverage gaps include the nine remaining audit regressions, full-state save replacement, failures during restore application, hostile/extreme numeric values, registry-authoritative combat metadata, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips. Current green counts do not close the other gaps.
+Coverage gaps include the eight remaining audit regressions, full-state save replacement, failures during restore application, hostile/extreme numeric values, platform/filesystem fault injection, Unity/editor integration and a production playable flow. AUD-01 covers null coordinator destinations with nonempty state; AUD-02 covers semantic tree preflight through both coordinator overloads; AUD-03 covers supported Codex facts through JSON and file round trips; AUD-04 covers canonical player skill metadata and actual engine rejection/execution. Current green counts do not close the other gaps.
 
 <a id="audit"></a>
 # Part V: Audit & Technical Debt
@@ -482,14 +484,14 @@ Coverage gaps include the nine remaining audit regressions, full-state save repl
 <a id="reproduced-findings"></a>
 ## Reproduced Integrity Findings
 
-AUD-01, AUD-02 and AUD-03 are **RESOLVED** by the verified corrections below; AUD-04 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
+AUD-01 through AUD-04 are **RESOLVED** by the verified corrections below; AUD-05 through AUD-12 remain **OPEN** with unchanged priorities. The following table preserves the previous audit's reproduced observations and severity, not a claim that every original defect still exists.
 
 | ID | Severity from executed probe | Reproduced behavior | Affected code | Required acceptance direction |
 |---|---|---|---|---|
 | AUD-01 | HIGH | Restore with null mastery destination changes class, then throws `ArgumentNullException` | `src/Game/Domain/Progress/V4ProgressRestoreCoordinator.cs` | RESOLVED 2026-11-01: prevalidate real destinations; null destination rejection causes zero target mutations |
 | AUD-02 | HIGH | Unlocked tree node without prerequisite: semantic validator returns false, coordinator returns `FullyRestored=true` | `V2ProgressSnapshotService.cs`, validation service, coordinator | RESOLVED 2026-11-02: existing semantic tree validation reused before coordinator target mutation |
 | AUD-03 | HIGH | Codex snapshot→JSON→restore loses legacy discovery and completion; enriched record survives | `V2ProgressSnapshotService.cs`, Codex profile | RESOLVED 2026-11-02: optional discovery/completion ID lists preserve supported Codex facts alongside enriched records |
-| AUD-04 | HIGH | Alternate definition with same skill ID bypasses canonical unlock requirement | `src/Game/Domain/Combat/CombatSkillUseValidator.cs` | Resolve and validate canonical registered definition; reject conflicting request metadata |
+| AUD-04 | HIGH | Alternate definition with same skill ID bypasses canonical unlock requirement | `src/Game/Domain/Combat/CombatSkillUseValidator.cs` | RESOLVED 2026-11-02: resolve canonical registered definition, reject conflicting metadata before execution and retain value-identical copies |
 | AUD-05 | MEDIUM | Enemy skill spends 10 from the runtime's single Resonance pool | `TurnBasedCombatEngine.cs` | Decide per-actor resource ownership before implementation |
 | AUD-06 | MEDIUM | Refill with Poison advances turn but neither damages nor decrements duration | `ResonanceRefillAction.cs` | Define and integrate canonical turn/status lifecycle |
 | AUD-07 | MEDIUM | Refill after combat end succeeds, restores resource and advances turn | `ResonanceRefillAction.cs` | Enforce combat lifecycle boundary |
@@ -518,7 +520,7 @@ AUD-01, AUD-02 and AUD-03 are **RESOLVED** by the verified corrections below; AU
 | AUD-11 | ResourcePool at Current=Max=100 accepted TrySpend(-10), leaving Current=110 |
 | AUD-12 | Invalid mastery stopped preflight application; ClassRestored true despite destination still audit.before |
 
-These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01, AUD-02 and AUD-03 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
+These original probes were ad-hoc in-memory checks, not committed test additions. AUD-01 through AUD-04 now have permanent failing-then-passing regressions; converting the remaining probes remains part of their future atomic repairs.
 
 ### AUD-01 Closure: Real Destination Validation
 
@@ -595,6 +597,30 @@ After correction, 68 new assertions pass: null class/mastery/mentor/tree destina
 
 **Self-audit and limitations:** no domain state owner or Codex rule changed; existing enriched metadata and ordered records survive, and generated snapshots copy all supported discovery/completion membership. Valid fact IDs are nonempty; externally corrupted sets or concurrent mutations are not supported transactions. Invalid Codex validation precedes mutation, but later failures in unrelated mission/unlock application still have no rollback; this is not a general save transaction repair. PlayerProgressionRuntimeState/LoadedPlayerSession do not own or disk-load Codex state. Tests exercise the actual file repository and snapshot service used by UnityV2SaveService, but UnityV2SaveService itself is outside the solution and no Unity Editor/Play Mode run was performed. No gameplay rewards, combat, UI, Unity, generators, schema version, AUD-04 through AUD-12 or their priorities were changed.
 
+### AUD-04 Closure: Canonical Skill Definition Validation
+
+**Status: RESOLVED (2026-11-02).** Scope is authoritative skill metadata in the existing player combat authorization path, not a new registry, combat executor, balance rule or progression restriction. The original reproduced observation above remains historical evidence. AUD-05 through AUD-12 are unchanged and open.
+
+**Ownership and root cause:** PlayerProgressionRuntimeState owns the live profiles and supplied canonical SkillDefinitionRegistry; ProgressionAwareCombatEngineFactory wires those references through CombatSkillTurnValidatorGateway, the orchestrator and CombatSkillUseValidator. The validator previously compared only ICombatSkill.Id with SkillProgress.Definition.Id, then evaluated the caller's RequiredUnlockId. Retention checked registration by ID, so a same-ID definition without the canonical requirement passed both checks. TurnBasedCombatEngine subsequently used that supplied progress for costs, mastery modifiers, skill Apply and XP. ID equality did not prove metadata equivalence.
+
+**Failing reproduction before production edits:** [CanonicalSkillDefinitionSmokeTests.cs](../src/Game.SmokeTests/CanonicalSkillDefinitionSmokeTests.cs) registers a canonical class-allowed skill requiring `unlock_aud04`, with cost 10 + 1 per level and ResonanceCost 2. An otherwise identical definition omits that unlock. The actual application factory/gateway/engine path accepted it with an empty UnlockProfile: turn 1 -> 2, Essence 20 -> 14 (11 spent, 5 regenerated), active Resonance 6 -> 4, enemy HP 100 -> 94, Apply executed and XP 0 -> 10. The regression threw on the expected unauthorized-execution assertion, exit `-532462766`. No cooldown field or cooldown mutation exists in the inspected skill/progress/engine contract; no cooldown guarantee is invented.
+
+**Authoritative metadata contract:** after structural ID checks, player validation with a SkillDefinitionRegistry resolves the canonical definition from that registry. Unknown ID returns `SkillDefinitionUnregistered`; missing caller/canonical Cost returns `SkillDefinitionInvalid`; differing metadata returns `SkillDefinitionConflict`. These enum values are appended without renumbering prior reasons. Matching requires every current SkillDefinition field by value: Id, Name, MaxLevel, Cost.BaseCost, Cost.CostPerLevel, Category, Targeting, EffectType, RequiredUnlockId and ResonanceCost. Strings use exact ordinal equality (null and empty are distinct metadata). Distinct definitions and SkillCost objects with identical values are accepted; reference identity is not required. Both player validator overloads enforce this when a registry is supplied. V3 unlock evaluation then uses the resolved canonical definition, followed by the unchanged class/mastery retention policy.
+
+**Authorization/execution consistency:** no engine or public API signature changed. SkillDefinition and SkillCost expose private setters, SkillProgress keeps its definition, and TurnRequest keeps its progress. Under the current single-threaded public API, the accepted metadata remains value-equivalent while the engine reads costs, max-level mastery modifiers and applies the skill. It does not validate one set of metadata and execute a weaker one. Preserving the original SkillProgress also preserves its existing level/XP rather than replacing it with a new progression object. Registry ownership remains unchanged. New definition fields must be included in this comparison and its regressions if added later.
+
+**Rejected-action semantics:** the existing engine emits one ActionBlocked with the structured reason, skips skill costs/Apply/XP/damage and performs normal end-turn processing. It still consumes a turn, regenerates Essence when allowed and ticks existing statuses; earlier cognition/debuff hooks can already have run. This is authorization rejection, not rollback of the entire turn. The corrected reproduction ends at turn 2, Essence 20, Resonance 6, enemy HP 100, Apply false and XP 0. A partially depleted resource test confirms end-turn regeneration remains in place.
+
+**Regression coverage:** 199 assertions in the existing Player Progression / Combat Validation group cover canonical locked requests; omitted/null/different unlock metadata (including an already-satisfied weaker requirement); each remaining metadata field independently; missing Cost on either side; null skill/progress/definition/context/request and unregistered definitions; stable gateway/event reasons; no skill spend/effects/XP on rejection; canonical and separate identical-copy execution; pre-existing level and per-level costs; legitimate unlocks; class switching, unavailable/available mentor teaching and retained mastery; mastery not overriding the canonical unlock; basic-attack validator bypass; explicit Enemy and LegacyBypass behavior; and both player validator overloads. All existing workflow assertions remain unchanged.
+
+**Executed verification (2026-11-02):**
+- `dotnet restore Fragments-of-Wisdom.sln`: exit 0.
+- `dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal`: baseline and final exit 0, 0 warnings/errors. One intermediate test-only build exited 1 for a missing Game.Domain.Common import; corrected before final verification.
+- `dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build`: baseline exit 0 / 1213; intentional red regression exit `-532462766`; final exit 0 / 1412 (V1 2, Shared 16, V2 371, V3 100, Progression 923), V1 events 38. Unchanged AUD-01 68, AUD-02 139 and AUD-03 107 assertions pass.
+- `git diff --check`: exit 0. Smoke runs used expanded execution permission for existing temporary-file persistence tests.
+
+**Self-audit and limitations:** no duplicate registry, validator or state owner was added. The production change is confined to CombatSkillUseValidator and its block-reason enum. Basic attacks, trusted Enemy/LegacyBypass contexts, the optional unvalidated engine constructor and the historical V3-only overload without a registry retain their existing contracts; they do not certify canonical player access. Application composition must select the progression-aware path for players. ICombatSkill implementations/passive hooks remain trusted executable code, not registry-owned code or a security sandbox; arbitrary malicious Apply logic, reflection and concurrent mutation are outside this metadata guarantee. No new skill-tree combat prerequisite is invented: tree unlocks remain facts with no automatic grant. Canonical numeric range/overflow validation is not expanded (AUD-09/AUD-11 remain open). No persistence, schemas, Unity assets, balance, other audit fix or generator changed. Unity Editor/Play Mode was not exercised.
+
 ### Architectural Risks and Inferences
 
 The following are source-grounded risks, **not additional reproduced findings**:
@@ -623,7 +649,7 @@ The following are source-grounded risks, **not additional reproduced findings**:
 | Generator commands are the current workflow | Historical snapshot generation can overwrite output and recreate retired docs; not part of current solution build |
 | Session naming implies automatic file loading | Loaded session/bootstrap compose prepared state; disk load remains explicit |
 
-**OPEN DECISIONS:** per-actor Resonance ownership; refill/status turn semantics; replacement vs merge save loading and durable migration; canonical definition/request identity contract; retained-skill class eligibility; bridging XP and retention mastery; mentor progression/slot commitments; Codex completion semantics; hybrid input/time authority; Sanctuary milestone selection and repetition; town capability mapping; final Nahual terminology; full narrative/content economy; Unity framework/platform and presentation boundary. No implicit approval follows from documenting a candidate solution.
+**OPEN DECISIONS:** per-actor Resonance ownership; refill/status turn semantics; replacement vs merge save loading and durable migration; retained-skill class eligibility; bridging XP and retention mastery; mentor progression/slot commitments; Codex completion semantics; hybrid input/time authority; Sanctuary milestone selection and repetition; town capability mapping; final Nahual terminology; full narrative/content economy; Unity framework/platform and presentation boundary. AUD-04 settles the current definition/request identity contract as full metadata value equality, not reference identity. No implicit approval follows from documenting a candidate solution.
 
 <a id="governance"></a>
 # Part VI: Development Governance
@@ -673,14 +699,14 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01, AUD-02 and AUD-03 missions are complete; the remaining nine reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. AUD-04 is the next candidate, not permission to start it automatically.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-04 missions are complete; the remaining eight reproduced findings remain open in their existing order. Every implementation item must complete the PETTO loop before the next. Priority 5a (AUD-09) remains the next candidate, not permission to start it automatically. Stop after AUD-04 for architectural review; do not begin AUD-05 or another repair implicitly.
 
 | Priority | Atomic purpose or approval gate | Traceability / acceptance |
 |---|---|---|
 | 1 (complete) | Validate real restore destinations before mutation | AUD-01 RESOLVED; null destinations rejected before target mutation; 68 regression assertions; individual restore methods unchanged |
 | 2 (complete) | Wire registry-aware semantic preflight into actual restore | AUD-02 RESOLVED; both coordinator overloads reject invalid scopes/nodes/discovery/prerequisite closure without mutation; 139 new assertions |
 | 3 (complete) | Preserve legacy Codex round trips | AUD-03 RESOLVED; optional schema-1 ID lists, existing merge semantics, full supported Codex round trip; 107 new V2 assertions |
-| 4 | Validate canonical skill metadata | AUD-04; same-ID alternative cannot bypass required unlock or cost facts |
+| 4 (complete) | Validate canonical skill metadata | AUD-04 RESOLVED; authoritative registry resolution and full metadata equality; 199 regression assertions; identical-value copies and engine lifecycle preserved |
 | 5a | Repair bounded mastery arithmetic | AUD-09; overflow-safe progress |
 | 5b | Report actual teaching delta | AUD-10; capped grant reports actual change |
 | 5c | Reject invalid ResourcePool spending | AUD-11; preserve Current/Max invariants |

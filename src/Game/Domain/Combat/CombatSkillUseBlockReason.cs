@@ -15,6 +15,9 @@ namespace Game.Domain.Combat
         V3UnlockProfileMissing,
         V3SkillLocked,
         V4ContextIncomplete,
-        V4SkillBlocked
+        V4SkillBlocked,
+        SkillDefinitionUnregistered,
+        SkillDefinitionConflict,
+        SkillDefinitionInvalid
     }
 }
