@@ -37,13 +37,7 @@ namespace Game.Domain.Combat.Resources
 
         public bool TryRefillFromReserve(int amount)
         {
-            if (amount <= 0)
-            {
-                return true;
-            }
-
-            int missingActive = Active.Max - Active.Current;
-            int refillAmount = Math.Min(amount, missingActive);
+            int refillAmount = GetRefillAmount(amount);
 
             if (refillAmount <= 0)
             {
@@ -57,6 +51,17 @@ namespace Game.Domain.Combat.Resources
 
             Active.Refill(refillAmount);
             return true;
+        }
+
+        // Rejected transfers must not start a turn or run its status/debuff hooks.
+        internal bool CanRefillFromReserve(int amount)
+        {
+            return Reserve.Current >= GetRefillAmount(amount);
+        }
+
+        private int GetRefillAmount(int amount)
+        {
+            return amount <= 0 ? 0 : Math.Min(amount, Active.Max - Active.Current);
         }
     }
 }
