@@ -40,7 +40,7 @@ namespace Game.SmokeTests
             for (int attempt = 0; attempt < 2; attempt++)
             {
                 ArgumentNullException failure = null;
-                V4ProgressRestoreResult result = null;
+                ProgressRestoreResult result = null;
                 try
                 {
                     result = fixture.Restore(fixture.Snapshot, includeBindings, destination);
@@ -110,7 +110,7 @@ namespace Game.SmokeTests
                 for (int attempt = 0; attempt < 2; attempt++)
                 {
                     Exception failure = null;
-                    V4ProgressRestoreResult result = null;
+                    ProgressRestoreResult result = null;
                     try
                     {
                         result = fixture.Restore(snapshot, includeBindings);
@@ -142,7 +142,7 @@ namespace Game.SmokeTests
                 var result = fixture.Restore(unknownClass, includeBindings);
                 Assert(
                     !result.FullyRestored && !result.ClassRestored
-                    && result.ClassFailureReason == V4ProgressRestoreFailureReason.ValidationFailed,
+                    && result.ClassFailureReason == ProgressRestoreFailureReason.ValidationFailed,
                     "AUD-01: registry rejection must report overall failure and retain class failure details.");
                 Assert(
                     fixture.CaptureState() == before,
@@ -180,12 +180,12 @@ namespace Game.SmokeTests
                 Trees.DiscoverNode("node_deep_sight", Tree);
             }
 
-            public V4ProgressRestoreResult Restore(
+            public ProgressRestoreResult Restore(
                 V2ProgressSnapshot snapshot,
                 bool includeBindings,
                 string missingDestination = "")
             {
-                var coordinator = new V4ProgressRestoreCoordinator();
+                var coordinator = new ProgressRestoreCoordinator();
                 var classes = missingDestination == "classProfile" ? null : Classes;
                 var mastery = missingDestination == "masteryProfile" ? null : Mastery;
                 var mentors = missingDestination == "mentorRelationshipProfile" ? null : Mentors;
