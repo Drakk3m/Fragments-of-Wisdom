@@ -26,6 +26,8 @@ namespace Game.SmokeTests
     {
         private static void RunV3SmokeTests()
         {
+            RunSection("AUD-07 terminal refill boundary assertions", RunTerminalRefillBoundarySmokeTests);
+
             RunSection("AUD-06 refill turn lifecycle assertions", RunRefillTurnLifecycleSmokeTests);
 
             RunSection(
