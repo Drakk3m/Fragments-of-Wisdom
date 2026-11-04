@@ -23,6 +23,10 @@ namespace Game.SmokeTests
         private static void RunPlayerProgressionFoundationSmokeTests()
         {
             RunSection(
+                "Combat diagnostic naming compatibility assertions",
+                RunCombatDiagnosticNamingCompatibilityTests);
+
+            RunSection(
                 "Progress restore API compatibility assertions",
                 RunProgressRestoreApiCompatibilityTests);
 
@@ -1321,7 +1325,7 @@ namespace Game.SmokeTests
                 result.IsAllowed
                 && result.SkillId == skillId
                 && result.IsPlayerAction
-                && result.V4AccessChecked
+                && result.ClassMasteryAccessChecked
                 && result.BlockReason == CombatSkillUseBlockReason.None,
                 "Valid player skill should pass composed combat skill use validation.");
         }
@@ -1348,10 +1352,10 @@ namespace Game.SmokeTests
 
             Assert(
                 !result.IsAllowed
-                && result.V3AccessChecked
-                && !result.V4AccessChecked
-                && result.BlockReason == CombatSkillUseBlockReason.V3SkillLocked
-                && result.V3BlockReason == SkillAccessPolicy.MissingUnlockBlockReason,
+                && result.UnlockAccessChecked
+                && !result.ClassMasteryAccessChecked
+                && result.BlockReason == CombatSkillUseBlockReasons.UnlockSkillLocked
+                && result.UnlockBlockReason == SkillAccessPolicy.MissingUnlockBlockReason,
                 "Locked V3 skill should be blocked with stable validator facts.");
         }
 
@@ -1385,9 +1389,9 @@ namespace Game.SmokeTests
 
             Assert(
                 !result.IsAllowed
-                && result.V4AccessChecked
-                && result.BlockReason == CombatSkillUseBlockReason.V4SkillBlocked
-                && result.V4BlockReason
+                && result.ClassMasteryAccessChecked
+                && result.BlockReason == CombatSkillUseBlockReasons.ClassMasterySkillBlocked
+                && result.ClassMasteryBlockReason
                     == MasteredSkillRetentionBlockReason.SkillNotAllowed,
                 "Non-mastered cross-class skill should be blocked by V4 access validation.");
         }
@@ -1427,7 +1431,7 @@ namespace Game.SmokeTests
 
             Assert(
                 result.IsAllowed
-                && result.V4AccessChecked
+                && result.ClassMasteryAccessChecked
                 && result.BlockReason == CombatSkillUseBlockReason.None,
                 "Mastered retained skill should pass V4 combat skill use validation.");
         }
@@ -1455,8 +1459,8 @@ namespace Game.SmokeTests
             Assert(
                 result.IsAllowed
                 && !result.IsPlayerAction
-                && !result.V3AccessChecked
-                && !result.V4AccessChecked,
+                && !result.UnlockAccessChecked
+                && !result.ClassMasteryAccessChecked,
                 "Explicit enemy mode should not require player unlock or V4 profiles.");
         }
 
@@ -1548,8 +1552,8 @@ namespace Game.SmokeTests
             Assert(
                 result.IsAllowed
                 && result.IsPlayerAction
-                && !result.V3AccessChecked
-                && !result.V4AccessChecked,
+                && !result.UnlockAccessChecked
+                && !result.ClassMasteryAccessChecked,
                 "Legacy bypass context should allow structurally valid skills without progression profiles.");
         }
 
@@ -1571,8 +1575,8 @@ namespace Game.SmokeTests
             Assert(
                 result.IsAllowed
                 && !result.IsPlayerAction
-                && !result.V3AccessChecked
-                && !result.V4AccessChecked,
+                && !result.UnlockAccessChecked
+                && !result.ClassMasteryAccessChecked,
                 "Enemy context should allow structurally valid skills without player progression profiles.");
         }
 
@@ -1669,7 +1673,7 @@ namespace Game.SmokeTests
             Assert(
                 context.HasCompletePlayerState
                 && result.IsAllowed
-                && result.V4AccessChecked
+                && result.ClassMasteryAccessChecked
                 && result.BlockReason == CombatSkillUseBlockReason.None,
                 "Complete player context should allow valid current-class access.");
         }
@@ -1707,9 +1711,9 @@ namespace Game.SmokeTests
 
             Assert(
                 !result.IsAllowed
-                && result.V4AccessChecked
-                && result.BlockReason == CombatSkillUseBlockReason.V4SkillBlocked
-                && result.V4BlockReason
+                && result.ClassMasteryAccessChecked
+                && result.BlockReason == CombatSkillUseBlockReasons.ClassMasterySkillBlocked
+                && result.ClassMasteryBlockReason
                     == MasteredSkillRetentionBlockReason.SkillNotAllowed,
                 "Complete player context should preserve blocked V4 access facts.");
         }
@@ -1833,7 +1837,7 @@ namespace Game.SmokeTests
                 legacyResult.IsAllowed
                 && enemyResult.IsAllowed
                 && playerResult.IsAllowed
-                && playerResult.V4AccessChecked,
+                && playerResult.ClassMasteryAccessChecked,
                 "Provider contexts should work with combat skill use validation.");
         }
 
@@ -2188,7 +2192,7 @@ namespace Game.SmokeTests
                 result.IsOrchestrated
                 && result.IsAllowed
                 && result.ValidationMode == CombatSkillUseValidationMode.Player
-                && result.Validation.V4AccessChecked,
+                && result.Validation.ClassMasteryAccessChecked,
                 "Player current-class skill should validate through orchestration.");
         }
 
@@ -2253,8 +2257,8 @@ namespace Game.SmokeTests
             Assert(
                 result.IsOrchestrated
                 && result.IsAllowed
-                && result.Validation.V4AccessChecked
-                && result.Validation.V4BlockReason
+                && result.Validation.ClassMasteryAccessChecked
+                && result.Validation.ClassMasteryBlockReason
                     == MasteredSkillRetentionBlockReason.None,
                 "Player retained mastered skill should validate through orchestration.");
         }
@@ -2319,8 +2323,8 @@ namespace Game.SmokeTests
                 && result.FailureStage
                     == CombatSkillValidationOrchestrationFailureStage.Validation
                 && result.Validation.BlockReason
-                    == CombatSkillUseBlockReason.V4SkillBlocked
-                && result.Validation.V4BlockReason
+                    == CombatSkillUseBlockReasons.ClassMasterySkillBlocked
+                && result.Validation.ClassMasteryBlockReason
                     == MasteredSkillRetentionBlockReason.SkillNotAllowed,
                 "Blocked cross-class skill should preserve validator failure facts through orchestration.");
         }
@@ -2623,7 +2627,7 @@ namespace Game.SmokeTests
             Assert(
                 result.IsAllowed
                 && result.ValidationMode == CombatSkillUseValidationMode.Player
-                && result.V4BlockReason
+                && result.ClassMasteryBlockReason
                     == MasteredSkillRetentionBlockReason.None,
                 "Turn validator gateway should allow a mastered retained skill.");
         }
@@ -2686,8 +2690,8 @@ namespace Game.SmokeTests
                 && result.FailureStage
                     == CombatSkillValidationOrchestrationFailureStage.Validation
                 && result.BlockReason
-                    == CombatSkillUseBlockReason.V4SkillBlocked
-                && result.V4BlockReason
+                    == CombatSkillUseBlockReasons.ClassMasterySkillBlocked
+                && result.ClassMasteryBlockReason
                     == MasteredSkillRetentionBlockReason.SkillNotAllowed,
                 "Turn validator gateway should preserve cross-class validation failure facts.");
         }
@@ -2964,7 +2968,7 @@ namespace Game.SmokeTests
                 && FindEventMessage(
                     runtime.EventLog,
                     GameEventType.ActionBlocked).Contains(
-                        CombatSkillUseBlockReason.V4SkillBlocked.ToString()),
+                        CombatSkillUseBlockReasons.ClassMasterySkillBlocked.ToString()),
                 "Blocked turn validation should emit one stable ActionBlocked event.");
 
             Assert(
@@ -3056,7 +3060,7 @@ namespace Game.SmokeTests
                     runtime.EventLog,
                     GameEventType.ActionBlocked) == 1
                 && blockedMessage.Contains(
-                    CombatSkillUseBlockReason.V4SkillBlocked.ToString())
+                    CombatSkillUseBlockReasons.ClassMasterySkillBlocked.ToString())
                 && !blockedMessage.Contains("sealed"),
                 "Turn validation should run before and preempt the SkillSeal check.");
         }
@@ -3869,7 +3873,7 @@ namespace Game.SmokeTests
                 CombatActorValidationClassificationFailureReason.None,
                 isAllowed
                     ? CombatSkillUseBlockReason.None
-                    : CombatSkillUseBlockReason.V4SkillBlocked,
+                    : CombatSkillUseBlockReasons.ClassMasterySkillBlocked,
                 string.Empty,
                 isAllowed
                     ? MasteredSkillRetentionBlockReason.None
@@ -6303,7 +6307,7 @@ namespace Game.SmokeTests
 
             Assert(
                 initialValidation.IsAllowed
-                && initialValidation.V4AccessChecked
+                && initialValidation.ClassMasteryAccessChecked
                 && initialValidation.BlockReason
                     == CombatSkillUseBlockReason.None,
                 "First-class skill should pass integrated combat skill use validation.");
@@ -6363,14 +6367,14 @@ namespace Game.SmokeTests
 
             Assert(
                 retainedValidation.IsAllowed
-                && retainedValidation.V4AccessChecked,
+                && retainedValidation.ClassMasteryAccessChecked,
                 "Mastered retained skill should pass validation after class switch.");
 
             Assert(
                 !blockedValidation.IsAllowed
                 && blockedValidation.BlockReason
-                    == CombatSkillUseBlockReason.V4SkillBlocked
-                && blockedValidation.V4BlockReason
+                    == CombatSkillUseBlockReasons.ClassMasterySkillBlocked
+                && blockedValidation.ClassMasteryBlockReason
                     == MasteredSkillRetentionBlockReason.SkillNotAllowed,
                 "Non-mastered cross-class skill should be blocked after class switch.");
 
@@ -6390,8 +6394,8 @@ namespace Game.SmokeTests
             Assert(
                 enemyValidation.IsAllowed
                 && !enemyValidation.IsPlayerAction
-                && !enemyValidation.V3AccessChecked
-                && !enemyValidation.V4AccessChecked,
+                && !enemyValidation.UnlockAccessChecked
+                && !enemyValidation.ClassMasteryAccessChecked,
                 "Enemy mode should allow a structurally valid skill without V4 profiles.");
 
             var mismatchValidation = validator.Validate(
@@ -6462,8 +6466,8 @@ namespace Game.SmokeTests
             Assert(
                 legacyResult.IsAllowed
                 && legacyResult.IsPlayerAction
-                && !legacyResult.V3AccessChecked
-                && !legacyResult.V4AccessChecked,
+                && !legacyResult.UnlockAccessChecked
+                && !legacyResult.ClassMasteryAccessChecked,
                 "Context workflow should allow a structurally valid legacy skill without V4 profiles.");
 
             var enemyResult = validator.Validate(
@@ -6473,8 +6477,8 @@ namespace Game.SmokeTests
             Assert(
                 enemyResult.IsAllowed
                 && !enemyResult.IsPlayerAction
-                && !enemyResult.V3AccessChecked
-                && !enemyResult.V4AccessChecked,
+                && !enemyResult.UnlockAccessChecked
+                && !enemyResult.ClassMasteryAccessChecked,
                 "Context workflow should allow a structurally valid enemy skill without player profiles.");
 
             var partialPlayerResult = validator.Validate(
@@ -6504,7 +6508,7 @@ namespace Game.SmokeTests
 
             Assert(
                 firstClassResult.IsAllowed
-                && firstClassResult.V4AccessChecked,
+                && firstClassResult.ClassMasteryAccessChecked,
                 "Context workflow should allow a current-class player skill.");
 
             masteryProfile.IncreaseProgress(
@@ -6524,7 +6528,7 @@ namespace Game.SmokeTests
 
             Assert(
                 retainedResult.IsAllowed
-                && retainedResult.V4AccessChecked,
+                && retainedResult.ClassMasteryAccessChecked,
                 "Context workflow should allow a mastered retained skill after class switch.");
 
             var blockedResult = validator.Validate(
@@ -6534,8 +6538,8 @@ namespace Game.SmokeTests
             Assert(
                 !blockedResult.IsAllowed
                 && blockedResult.BlockReason
-                    == CombatSkillUseBlockReason.V4SkillBlocked
-                && blockedResult.V4BlockReason
+                    == CombatSkillUseBlockReasons.ClassMasterySkillBlocked
+                && blockedResult.ClassMasteryBlockReason
                     == MasteredSkillRetentionBlockReason.SkillNotAllowed,
                 "Context workflow should reject a non-mastered cross-class skill.");
 
@@ -6603,7 +6607,7 @@ namespace Game.SmokeTests
             Assert(
                 legacyResult.IsAllowed
                 && legacyResult.IsPlayerAction
-                && !legacyResult.V4AccessChecked,
+                && !legacyResult.ClassMasteryAccessChecked,
                 "Provider workflow should create legacy bypass context accepted by the validator.");
 
             var enemyResult = validator.Validate(
@@ -6613,7 +6617,7 @@ namespace Game.SmokeTests
             Assert(
                 enemyResult.IsAllowed
                 && !enemyResult.IsPlayerAction
-                && !enemyResult.V4AccessChecked,
+                && !enemyResult.ClassMasteryAccessChecked,
                 "Provider workflow should create enemy context accepted without player profiles.");
 
             CombatSkillUseValidationContext incompletePlayerContext;
@@ -6652,7 +6656,7 @@ namespace Game.SmokeTests
 
             Assert(
                 firstClassResult.IsAllowed
-                && firstClassResult.V4AccessChecked,
+                && firstClassResult.ClassMasteryAccessChecked,
                 "Provider-created player context should validate a class-allowed skill.");
 
             masteryProfile.IncreaseProgress(
@@ -6666,7 +6670,7 @@ namespace Game.SmokeTests
 
             Assert(
                 retainedResult.IsAllowed
-                && retainedResult.V4AccessChecked,
+                && retainedResult.ClassMasteryAccessChecked,
                 "Provider-created player context should validate mastered retention after class switch.");
 
             var blockedResult = validator.Validate(
@@ -6676,8 +6680,8 @@ namespace Game.SmokeTests
             Assert(
                 !blockedResult.IsAllowed
                 && blockedResult.BlockReason
-                    == CombatSkillUseBlockReason.V4SkillBlocked
-                && blockedResult.V4BlockReason
+                    == CombatSkillUseBlockReasons.ClassMasterySkillBlocked
+                && blockedResult.ClassMasteryBlockReason
                     == MasteredSkillRetentionBlockReason.SkillNotAllowed,
                 "Provider-created player context should block non-mastered cross-class skills.");
         }
@@ -6865,7 +6869,7 @@ namespace Game.SmokeTests
             Assert(
                 playerResult.IsAllowed
                 && playerResult.IsPlayerAction
-                && playerResult.V4AccessChecked,
+                && playerResult.ClassMasteryAccessChecked,
                 "Actor classification workflow should produce a context accepted by the validator.");
         }
 
@@ -6999,7 +7003,7 @@ namespace Game.SmokeTests
                 && classAllowedResult.IsAllowed
                 && classAllowedResult.ValidationMode
                     == CombatSkillUseValidationMode.Player
-                && classAllowedResult.Validation.V4AccessChecked,
+                && classAllowedResult.Validation.ClassMasteryAccessChecked,
                 "Orchestrator workflow should validate a current-class player skill.");
 
             masteryProfile.IncreaseProgress(
@@ -7021,7 +7025,7 @@ namespace Game.SmokeTests
             Assert(
                 retainedResult.IsOrchestrated
                 && retainedResult.IsAllowed
-                && retainedResult.Validation.V4AccessChecked,
+                && retainedResult.Validation.ClassMasteryAccessChecked,
                 "Orchestrator workflow should validate mastered retention after class switch.");
 
             var blockedResult = orchestrator.Validate(
@@ -7041,7 +7045,7 @@ namespace Game.SmokeTests
                 && blockedResult.FailureStage
                     == CombatSkillValidationOrchestrationFailureStage.Validation
                 && blockedResult.Validation.BlockReason
-                    == CombatSkillUseBlockReason.V4SkillBlocked,
+                    == CombatSkillUseBlockReasons.ClassMasterySkillBlocked,
                 "Orchestrator workflow should block a non-mastered cross-class skill at validation.");
 
             var incompleteResult = orchestrator.Validate(

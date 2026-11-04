@@ -95,12 +95,12 @@ namespace Game.Domain.Combat
             var blockReason = result.Validation == null
                 ? CombatSkillUseBlockReason.None
                 : result.Validation.BlockReason;
-            var v3BlockReason = result.Validation == null
+            var unlockBlockReason = result.Validation == null
                 ? string.Empty
-                : result.Validation.V3BlockReason;
-            var v4BlockReason = result.Validation == null
+                : result.Validation.UnlockBlockReason;
+            var classMasteryBlockReason = result.Validation == null
                 ? MasteredSkillRetentionBlockReason.None
-                : result.Validation.V4BlockReason;
+                : result.Validation.ClassMasteryBlockReason;
 
             return new CombatSkillTurnValidationResult(
                 result.IsAllowed,
@@ -108,8 +108,8 @@ namespace Game.Domain.Combat
                 result.FailureStage,
                 classificationFailureReason,
                 blockReason,
-                v3BlockReason,
-                v4BlockReason);
+                unlockBlockReason,
+                classMasteryBlockReason);
         }
     }
 }

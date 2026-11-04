@@ -187,80 +187,80 @@ namespace Game.Domain.Combat
                 definition = canonical;
             }
 
-            bool v3AccessChecked = !string.IsNullOrEmpty(definition.RequiredUnlockId);
+            bool unlockAccessChecked = !string.IsNullOrEmpty(definition.RequiredUnlockId);
 
-            if (v3AccessChecked)
+            if (unlockAccessChecked)
             {
                 if (unlockProfile == null)
                 {
                     return Block(
                         skillId,
                         true,
-                        CombatSkillUseBlockReason.V3UnlockProfileMissing,
+                        CombatSkillUseBlockReasons.UnlockProfileMissing,
                         true,
                         false);
                 }
 
-                var v3Result = skillAccessPolicy.Evaluate(
+                var unlockResult = skillAccessPolicy.Evaluate(
                     definition,
                     unlockProfile);
 
-                if (!v3Result.IsAvailable)
+                if (!unlockResult.IsAvailable)
                 {
                     return Block(
                         skillId,
                         true,
-                        CombatSkillUseBlockReason.V3SkillLocked,
+                        CombatSkillUseBlockReasons.UnlockSkillLocked,
                         true,
                         false,
-                        v3Result.BlockReason);
+                        unlockResult.BlockReason);
                 }
             }
 
-            bool hasAnyV4Context = classProfile != null
+            bool hasAnyClassMasteryContext = classProfile != null
                 || classRegistry != null
                 || masteryProfile != null
                 || skillRegistry != null;
-            bool hasCompleteV4Context = classProfile != null
+            bool hasCompleteClassMasteryContext = classProfile != null
                 && classRegistry != null
                 && masteryProfile != null
                 && skillRegistry != null;
 
-            if (hasAnyV4Context && !hasCompleteV4Context)
+            if (hasAnyClassMasteryContext && !hasCompleteClassMasteryContext)
             {
                 return Block(
                     skillId,
                     true,
-                    CombatSkillUseBlockReason.V4ContextIncomplete,
-                    v3AccessChecked,
+                    CombatSkillUseBlockReasons.ClassMasteryContextIncomplete,
+                    unlockAccessChecked,
                     false);
             }
 
-            if (hasCompleteV4Context)
+            if (hasCompleteClassMasteryContext)
             {
-                var v4Result = combatSkillAccessService.Evaluate(
+                var classMasteryResult = combatSkillAccessService.Evaluate(
                     skillId,
                     classProfile,
                     classRegistry,
                     masteryProfile,
                     skillRegistry);
 
-                if (!v4Result.IsUsable)
+                if (!classMasteryResult.IsUsable)
                 {
                     return Block(
                         skillId,
                         true,
-                        CombatSkillUseBlockReason.V4SkillBlocked,
-                        v3AccessChecked,
+                        CombatSkillUseBlockReasons.ClassMasterySkillBlocked,
+                        unlockAccessChecked,
                         true,
                         string.Empty,
-                        v4Result.BlockReason);
+                        classMasteryResult.BlockReason);
                 }
 
-                return Allow(skillId, true, v3AccessChecked, true);
+                return Allow(skillId, true, unlockAccessChecked, true);
             }
 
-            return Allow(skillId, true, v3AccessChecked, false);
+            return Allow(skillId, true, unlockAccessChecked, false);
         }
 
         // The engine retains SkillProgress. Require value equality for all definition
@@ -284,15 +284,15 @@ namespace Game.Domain.Combat
         private static CombatSkillUseValidationResult Allow(
             string skillId,
             bool isPlayerAction,
-            bool v3AccessChecked,
-            bool v4AccessChecked)
+            bool unlockAccessChecked,
+            bool classMasteryAccessChecked)
         {
             return new CombatSkillUseValidationResult(
                 true,
                 skillId,
                 isPlayerAction,
-                v3AccessChecked,
-                v4AccessChecked,
+                unlockAccessChecked,
+                classMasteryAccessChecked,
                 CombatSkillUseBlockReason.None,
                 string.Empty,
                 MasteredSkillRetentionBlockReason.None);
@@ -302,21 +302,21 @@ namespace Game.Domain.Combat
             string skillId,
             bool isPlayerAction,
             CombatSkillUseBlockReason blockReason,
-            bool v3AccessChecked = false,
-            bool v4AccessChecked = false,
-            string v3BlockReason = "",
-            MasteredSkillRetentionBlockReason v4BlockReason =
+            bool unlockAccessChecked = false,
+            bool classMasteryAccessChecked = false,
+            string unlockBlockReason = "",
+            MasteredSkillRetentionBlockReason classMasteryBlockReason =
                 MasteredSkillRetentionBlockReason.None)
         {
             return new CombatSkillUseValidationResult(
                 false,
                 skillId,
                 isPlayerAction,
-                v3AccessChecked,
-                v4AccessChecked,
+                unlockAccessChecked,
+                classMasteryAccessChecked,
                 blockReason,
-                v3BlockReason,
-                v4BlockReason);
+                unlockBlockReason,
+                classMasteryBlockReason);
         }
     }
 }
