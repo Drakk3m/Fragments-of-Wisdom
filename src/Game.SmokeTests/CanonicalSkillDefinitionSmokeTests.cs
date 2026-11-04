@@ -51,7 +51,7 @@ namespace Game.SmokeTests
         {
             var locked = new CanonicalSkillFixture();
             AssertCanonicalRequestBlocked(locked, locked.Request(new SkillProgress(locked.Canonical)),
-                CombatSkillUseBlockReason.V3SkillLocked, "canonical locked skill");
+                CombatSkillUseBlockReasons.UnlockSkillLocked, "canonical locked skill");
 
             var conflicts = new Dictionary<string, SkillDefinition>
             {
@@ -221,7 +221,7 @@ namespace Game.SmokeTests
             fixture.State.ClassRegistry.Register(new ClassDefinition("class_other", "Other", new string[0]));
             fixture.State.ClassProfile.ChangeClassId("class_other", fixture.State.ClassRegistry);
             Assert(fixture.Gateway.Validate(request, fixture.Runtime).BlockReason
-                == CombatSkillUseBlockReason.V4SkillBlocked,
+                == CombatSkillUseBlockReasons.ClassMasterySkillBlocked,
                 "AUD-04 unlock alone must not bypass class/mastery restrictions.");
 
             var teaching = new MentorTeachingDefinition(MentorId.Lyra,
@@ -250,7 +250,7 @@ namespace Game.SmokeTests
                 MasteryRecord.MasteredProgress, lockedMastery.State.SkillRegistry);
             var lockedResult = lockedMastery.Gateway.Validate(
                 lockedMastery.Request(new SkillProgress(lockedMastery.Canonical)), lockedMastery.Runtime);
-            Assert(!lockedResult.IsAllowed && lockedResult.BlockReason == CombatSkillUseBlockReason.V3SkillLocked,
+            Assert(!lockedResult.IsAllowed && lockedResult.BlockReason == CombatSkillUseBlockReasons.UnlockSkillLocked,
                 "AUD-04 retention mastery must not override the canonical unlock requirement.");
             var conflictResult = lockedMastery.Gateway.Validate(lockedMastery.Request(new SkillProgress(
                 CanonicalSkillFixture.Definition(requiredUnlock: ""))), lockedMastery.Runtime);
@@ -280,7 +280,7 @@ namespace Game.SmokeTests
                 && compatibility.BlockReason == CombatSkillUseBlockReason.SkillDefinitionConflict,
                 "AUD-04 compatibility overload must also enforce canonical metadata when a registry is supplied.");
             Assert(validator.Validate(request, true, fixture.State.UnlockProfile,
-                null, null, null, null).BlockReason == CombatSkillUseBlockReason.V3SkillLocked,
+                null, null, null, null).BlockReason == CombatSkillUseBlockReasons.UnlockSkillLocked,
                 "AUD-04 V3-only compatibility validation without a registry retains its unlock check.");
 
             var basic = TurnRequest.BasicAttack(fixture.Player, fixture.Enemy);

@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Game.Domain.Classes;
 
 namespace Game.Domain.Combat
@@ -12,6 +13,21 @@ namespace Game.Domain.Combat
         public CombatSkillUseBlockReason BlockReason { get; private set; }
         public string V3BlockReason { get; private set; }
         public MasteredSkillRetentionBlockReason V4BlockReason { get; private set; }
+
+        // Legacy properties/constructor names remain the wire and source compatibility surface.
+        /// <summary>The unlock gate was reached, even if its profile was missing; not an allowed flag.</summary>
+        [JsonIgnore]
+        public bool UnlockAccessChecked { get { return V3AccessChecked; } }
+
+        /// <summary>The class-or-mastery policy was evaluated; not an allowed flag.</summary>
+        [JsonIgnore]
+        public bool ClassMasteryAccessChecked { get { return V4AccessChecked; } }
+
+        [JsonIgnore]
+        public string UnlockBlockReason { get { return V3BlockReason; } }
+
+        [JsonIgnore]
+        public MasteredSkillRetentionBlockReason ClassMasteryBlockReason { get { return V4BlockReason; } }
 
         public CombatSkillUseValidationResult(
             bool isAllowed,
