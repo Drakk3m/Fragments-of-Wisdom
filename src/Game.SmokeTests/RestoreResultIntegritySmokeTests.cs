@@ -35,7 +35,7 @@ namespace Game.SmokeTests
                     bindings, fixture.Classes.CurrentClassId, result.ClassRestored, result.MasteryRestored, result.FullyRestored);
                 Assert(fixture.CaptureState() == before,
                     "AUD-12 invalid mastery preflight preserves all populated destination values.");
-                Assert(result.MasteryFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
+                Assert(result.MasteryFailureReason == ProgressRestoreFailureReason.ValidationFailed
                     && result.MasteryFailureMessage.Contains("MasteryProfile"),
                     "AUD-12 the true mastery failure must remain identifiable.");
                 allFlagsAccurate &= !result.FullyRestored && !result.ClassRestored && !result.MasteryRestored
@@ -85,9 +85,9 @@ namespace Game.SmokeTests
                         for (int index = 0; index < 5; index++)
                         {
                             bool requested = index < 4 || bindings;
-                            var expected = !requested ? V4ProgressRestoreFailureReason.None
-                                : failed[index] ? V4ProgressRestoreFailureReason.ValidationFailed
-                                : V4ProgressRestoreFailureReason.NotApplied;
+                            var expected = !requested ? ProgressRestoreFailureReason.None
+                                : failed[index] ? ProgressRestoreFailureReason.ValidationFailed
+                                : ProgressRestoreFailureReason.NotApplied;
                             Assert(reasons[index] == expected,
                                 "AUD-12 invalid data and feasible-but-unapplied state have distinct diagnostics.");
                             Assert(!requested ? messages[index] == ""
@@ -128,8 +128,8 @@ namespace Game.SmokeTests
                 snapshot = format == 2 ? serializer.Deserialize("{\"SchemaVersion\":1}")
                     : serializer.Deserialize(serializer.Serialize(snapshot));
                 string before = CaptureAud12State(classes, mastery, mentors, trees, registry);
-                var coordinator = new V4ProgressRestoreCoordinator();
-                Func<V4ProgressRestoreResult> restore = () => bindings
+                var coordinator = new ProgressRestoreCoordinator();
+                Func<ProgressRestoreResult> restore = () => bindings
                     ? coordinator.Restore(snapshot, classes, mastery, mentors, trees, fixture.ClassRegistry,
                         fixture.SkillRegistry, fixture.MentorRegistry, fixture.Tree, registry)
                     : coordinator.Restore(snapshot, classes, mastery, mentors, trees, fixture.ClassRegistry,
@@ -166,7 +166,7 @@ namespace Game.SmokeTests
             }
         }
 
-        private static void AssertAud12SuccessfulFlags(V4ProgressRestoreResult result, bool bindings)
+        private static void AssertAud12SuccessfulFlags(ProgressRestoreResult result, bool bindings)
         {
             Assert(result.FullyRestored && result.ClassRestored && result.MasteryRestored
                 && result.MentorRelationshipsRestored && result.SkillTreeProgressRestored
@@ -175,7 +175,7 @@ namespace Game.SmokeTests
             var messages = Aud12Messages(result);
             var reasons = Aud12Reasons(result);
             for (int index = 0; index < 5; index++)
-                Assert(reasons[index] == V4ProgressRestoreFailureReason.None && messages[index] == "",
+                Assert(reasons[index] == ProgressRestoreFailureReason.None && messages[index] == "",
                     "AUD-12 successful/no-op/unrequested sections have no spurious failure diagnostics.");
         }
 
@@ -189,7 +189,7 @@ namespace Game.SmokeTests
                         new V2MasterySnapshot("skill_unknown", 25, MasteryRank.Practiced) }, 2);
                 var result = fixture.Restore(Aud12Snapshot(fixture.Snapshot, mastery: changing), bindings);
                 Assert(!result.FullyRestored && !result.MasteryRestored
-                    && result.MasteryFailureReason == V4ProgressRestoreFailureReason.ApplicationFailed
+                    && result.MasteryFailureReason == ProgressRestoreFailureReason.ApplicationFailed
                     && result.MasteryFailureMessage.Contains("MasteryProfile")
                     && result.MasteryFailureMessage.Contains("partial changes"),
                     "AUD-12 a real false return after feasible preflight must be reported as application failure.");
@@ -209,7 +209,7 @@ namespace Game.SmokeTests
                 new[] { new V2ClassSkillTreeBindingSnapshot(ClassId.Wanderer, SkillTreeId.Tlamatini) }, 3);
             var bindingResult = bindingFixture.Restore(Aud12Snapshot(bindingFixture.Snapshot, bindings: changingBindings), true);
             Assert(!bindingResult.FullyRestored && !bindingResult.ClassSkillTreeBindingsRestored
-                && bindingResult.ClassSkillTreeBindingsFailureReason == V4ProgressRestoreFailureReason.ApplicationFailed
+                && bindingResult.ClassSkillTreeBindingsFailureReason == ProgressRestoreFailureReason.ApplicationFailed
                 && bindingResult.ClassSkillTreeBindingsFailureMessage.Contains("ClassSkillTreeBindings"),
                 "AUD-12 real binding conflict after preflight is not silently reported as restored.");
             Assert(bindingResult.ClassRestored && bindingResult.MasteryRestored && bindingResult.MentorRelationshipsRestored
@@ -220,37 +220,37 @@ namespace Game.SmokeTests
 
         private static void AssertRestoreResultConstructorCompatibility()
         {
-            Assert((int)V4ProgressRestoreFailureReason.None == 0 && (int)V4ProgressRestoreFailureReason.ValidationFailed == 1,
+            Assert((int)ProgressRestoreFailureReason.None == 0 && (int)ProgressRestoreFailureReason.ValidationFailed == 1,
                 "AUD-12 stable existing failure reason values are not renumbered.");
-            var simple = new V4ProgressRestoreResult(true, true, true, true);
+            var simple = new ProgressRestoreResult(true, true, true, true);
             Assert(simple.FullyRestored && simple.ClassSkillTreeBindingsRestored && simple.ClassSkillTreeBindingsRequested,
                 "AUD-12 legacy four-boolean constructor retains its historical binding-success default.");
-            var explicitBinding = new V4ProgressRestoreResult(true, true, true, true, false);
+            var explicitBinding = new ProgressRestoreResult(true, true, true, true, false);
             Assert(!explicitBinding.FullyRestored
-                && explicitBinding.ClassSkillTreeBindingsFailureReason == V4ProgressRestoreFailureReason.ValidationFailed,
+                && explicitBinding.ClassSkillTreeBindingsFailureReason == ProgressRestoreFailureReason.ValidationFailed,
                 "AUD-12 legacy five-boolean constructor retains its failure mapping.");
-            var detailed = new V4ProgressRestoreResult(false, false, false, false,
-                V4ProgressRestoreFailureReason.ValidationFailed, V4ProgressRestoreFailureReason.None,
-                V4ProgressRestoreFailureReason.None, V4ProgressRestoreFailureReason.None, "class", null, null, null);
+            var detailed = new ProgressRestoreResult(false, false, false, false,
+                ProgressRestoreFailureReason.ValidationFailed, ProgressRestoreFailureReason.None,
+                ProgressRestoreFailureReason.None, ProgressRestoreFailureReason.None, "class", null, null, null);
             Assert(!detailed.FullyRestored && detailed.ClassSkillTreeBindingsRestored
                 && detailed.ClassFailureMessage == "class" && detailed.MasteryFailureMessage == "",
                 "AUD-12 existing detailed constructor preserves caller facts and null-message normalization.");
-            var detailedBinding = new V4ProgressRestoreResult(true, true, true, true, false,
-                V4ProgressRestoreFailureReason.None, V4ProgressRestoreFailureReason.None,
-                V4ProgressRestoreFailureReason.None, V4ProgressRestoreFailureReason.None,
-                V4ProgressRestoreFailureReason.ValidationFailed, null, null, null, null, "binding");
+            var detailedBinding = new ProgressRestoreResult(true, true, true, true, false,
+                ProgressRestoreFailureReason.None, ProgressRestoreFailureReason.None,
+                ProgressRestoreFailureReason.None, ProgressRestoreFailureReason.None,
+                ProgressRestoreFailureReason.ValidationFailed, null, null, null, null, "binding");
             Assert(!detailedBinding.FullyRestored && detailedBinding.ClassSkillTreeBindingsFailureMessage == "binding"
                 && detailedBinding.ClassFailureMessage == "",
                 "AUD-12 full public constructor remains source/behavior compatible.");
         }
 
-        private static V4ProgressRestoreFailureReason[] Aud12Reasons(V4ProgressRestoreResult result)
+        private static ProgressRestoreFailureReason[] Aud12Reasons(ProgressRestoreResult result)
         {
             return new[] { result.ClassFailureReason, result.MasteryFailureReason, result.MentorRelationshipsFailureReason,
                 result.SkillTreeProgressFailureReason, result.ClassSkillTreeBindingsFailureReason };
         }
 
-        private static string[] Aud12Messages(V4ProgressRestoreResult result)
+        private static string[] Aud12Messages(ProgressRestoreResult result)
         {
             return new[] { result.ClassFailureMessage, result.MasteryFailureMessage, result.MentorRelationshipsFailureMessage,
                 result.SkillTreeProgressFailureMessage, result.ClassSkillTreeBindingsFailureMessage };

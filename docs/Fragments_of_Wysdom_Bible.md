@@ -668,7 +668,7 @@ Snapshot facts include enriched Codex entries, Codex discovered/completed IDs, m
 - No-registry validation retains structural compatibility. Registry-aware validation additionally checks known scope/node IDs, unlocked nodes also discovered, and unlocked prerequisite closure.
 - Coordinator preflight now enforces these semantic checks for scoped and legacy tree progress (AUD-02 resolved). File loading still uses structural validation, and direct individual restore methods are unchanged; a valid JSON file alone is not proof of valid gameplay state.
 
-**Coordinator:** V4ProgressRestoreCoordinator first rejects null real destination profiles with `ArgumentNullException`; the binding overload also rejects a null destination binding registry. It then preflights class, mastery, mentor relationships, tree progress and bindings using temporary profiles and a copied binding registry. Before temporary tree restoration, it reuses V2ProgressSnapshotValidationService to check tree structure, discovery and prerequisite closure. The single-tree overload uses its explicit definition for legacy progress or one matching scoped tree. The binding overload uses registered definitions for scoped progress and its explicit tree for legacy progress. No missing definitions are synthesized. Semantic rejection sets `SkillTreeProgressRestored=false`, `SkillTreeProgressFailureReason=ValidationFailed` and `FullyRestored=false`. If any preflight fails, it returns structured subsystem facts without applying target profiles. Successful apply order remains:
+**Coordinator:** ProgressRestoreCoordinator is the canonical responsibility-based API; V4ProgressRestoreCoordinator remains a compatibility adapter (see [P8A](#restore-api-naming)). It first rejects null real destination profiles with `ArgumentNullException`; the binding overload also rejects a null destination binding registry. It then preflights class, mastery, mentor relationships, tree progress and bindings using temporary profiles and a copied binding registry. Before temporary tree restoration, it reuses V2ProgressSnapshotValidationService to check tree structure, discovery and prerequisite closure. The single-tree overload uses its explicit definition for legacy progress or one matching scoped tree. The binding overload uses registered definitions for scoped progress and its explicit tree for legacy progress. No missing definitions are synthesized. Semantic rejection sets `SkillTreeProgressRestored=false`, `SkillTreeProgressFailureReason=ValidationFailed` and `FullyRestored=false`. If any preflight fails, it returns structured subsystem facts without applying target profiles. Successful apply order remains:
 1. ClassProfile.
 2. MasteryProfile.
 3. MentorRelationshipProfile.
@@ -739,14 +739,14 @@ git status --short
 | Shared Domain Foundations | 332 |
 | V2 Narrative / Progression / Persistence | 371 |
 | V3 Combat / Skills / Resonance / Status / Stats | 686 |
-| Player Progression / Combat Validation | 2175 |
-| **Total** | **3566** |
+| Player Progression / Combat Validation | 2233 |
+| **Total** | **3624** |
 
-Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, AUD-05 player Resonance ownership contains **175**, AUD-09 overflow-safe mastery contains **186**, AUD-10 actual mastery delta contains **373**, and AUD-12 restore result integrity contains **518**, all already included in 2175. Historical V4/V5 labels and earlier counts are not current reporting groups.
+Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, AUD-05 player Resonance ownership contains **175**, AUD-09 overflow-safe mastery contains **186**, AUD-10 actual mastery delta contains **373**, AUD-12 restore result integrity contains **518**, and P8A restore API compatibility contains **58**, all already included in 2233. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
 The V2 group includes **107** AUD-03 Codex round-trip assertions; they are included in 371, not an additional reporting group.
 
-Shared Domain Foundations contains the original **16** domain-event assertions plus **316** AUD-11 resource-pool assertions. V3 contains the original **100** assertions plus **119** AUD-06 refill lifecycle, **247** AUD-07 terminal boundary and **220** AUD-08 Silence integrity assertions. Total 3566 is the freshly executed post-AUD-08 suite; earlier closure counts below remain historical evidence. AUD-08 corrects one AUD-06 expectation that previously required a misleading Silence diagnostic on refill; the other AUD-06 assertions and its count remain intact.
+Shared Domain Foundations contains the original **16** domain-event assertions plus **316** AUD-11 resource-pool assertions. V3 contains the original **100** assertions plus **119** AUD-06 refill lifecycle, **247** AUD-07 terminal boundary and **220** AUD-08 Silence integrity assertions. Total 3624 is the freshly executed post-P8A suite (3566 baseline plus 58 compatibility assertions); earlier closure counts below remain historical evidence. AUD-08 corrects one AUD-06 expectation that previously required a misleading Silence diagnostic on refill; the other AUD-06 assertions and its count remain intact.
 
 **Executed audit baseline (2026-10-30):** implementation `45fb4548ab18984940471b79d5643e16f5aa50f4`, Bible v3 `c11c74d1317f8ca279d8c0698b88d4af96350f94`; restore/build succeeded with 0 warnings and 0 errors; smoke 899 and V1 events 38; diff checks passed. Twelve additional in-memory probes against the compiled assembly reproduced the findings in Part V. They were not added to the suite and must not be counted as smoke assertions.
 
@@ -1242,7 +1242,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-12 missions are complete within their documented limits. Every implementation item must complete the PETTO loop before the next. Remaining priorities retain their existing order and require separate approval. Stop after AUD-08 for architectural review; do not begin priorities 8/9, Defend/Wait or another repair implicitly.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-12 missions are complete within their documented limits. Every implementation item must complete the PETTO loop before the next. P8A was subsequently authorized and completed as the isolated restore API naming step. Remaining priorities retain their existing order and require separate approval. Stop after P8A for architectural review; do not begin P8B, priority 9, Defend/Wait or another repair implicitly.
 
 **Explicit AUD-05 approval and closure (2026-11-03):** investigation paused at the design gate, then the user approved Option B. Player-only skill resource ownership is now enforced and verified by 175 permanent assertions. Existing priorities and AUD-06/AUD-07/AUD-08 scope are unchanged; no further implementation is authorized by this report.
 
@@ -1258,7 +1258,8 @@ Use the [verification commands](#verification). Green counts alone do not close 
 | 5d (complete) | Separate restore feasibility from applied facts | AUD-12 RESOLVED; applied flags from real operations, all false on preflight rejection, phase-aware diagnostics and explicit binding participation; 518 new assertions |
 | 6 (complete) | Audit/approve actor resource ownership and refill lifecycle | AUD-05 RESOLVED with approved player-only contract; AUD-06 RESOLVED with 119 shared lifecycle assertions; AUD-07 RESOLVED by 247 independent terminal-boundary assertions against unchanged production |
 | 7 (AUD-08 complete) | Correct remaining action/status contracts | AUD-08 RESOLVED: authoritative Silence blocking and coherent events; 220 assertions; Defend/Wait remain outside this closure and require a separate public-contract decision |
-| 8 | Resume deferred responsibility-based naming | Restore APIs and V3/V4 diagnostic facts only; preserve behavior and serialized names |
+| 8a (complete) | Responsibility-based restore API naming | P8A: canonical ProgressRestore APIs with V4 forwarding compatibility; 58 assertions and old-binary verification; no persistence rename |
+| 8b | Responsibility-based combat diagnostic naming | V3/V4 diagnostic facts only; preserve behavior and serialized names; not started or authorized by P8A |
 | 9 | Design/audit the visual boundary and playable slice | Consume ProgressionRuntimeDemoBootstrap; no duplicate state/engine/session; implementation only after approval |
 | 10 | Revisit long-term systems behind their design gates | Town after visual boundary, Sanctuary after milestone inputs, hybrid combat only after dedicated redesign audit |
 
@@ -1270,9 +1271,40 @@ Historical completion records retained: legacy V1/V3 guards; classes/mastery/men
 
 Completed neutral naming: V5RuntimeDemoBootstrap -> ProgressionRuntimeDemoBootstrap; V4SmokeTests -> PlayerProgressionFoundationSmokeTests; RunV4SmokeTests -> RunPlayerProgressionFoundationSmokeTests; reporting labels -> progression/session/bootstrap responsibilities; runtime helpers -> ProgressionRuntimeBootstrapSmokeTests; V4_Classes_Mastery_Foundation.md -> PlayerProgression_Foundation.md (now archived here). These historical file names are not current links. Audit defects reopen specific correctness gaps, not the fact that the foundations exist.
 
+<a id="restore-api-naming"></a>
+### P8A: Restore API Responsibility Naming
+
+**Verified 2026-11-04, branch `codex/rename-progress-restore-api`.** Baseline `c38c69d` is the latest fetched origin/main at preparation, with AUD-01 through AUD-12 integrated and resolved. P8A was the earliest remaining atomic naming item. This is a naming/compatibility change, not a gameplay or restoration repair.
+
+**Discovery gate inventory, completed before production edits:**
+- Public coordinator: parameterless and `V2ProgressSnapshotService` constructors; two nonvirtual `Restore` overloads with nine and ten parameters, the latter including `ClassSkillTreeBindingRegistry`.
+- Public result: four constructors (4 booleans; 5 booleans; 4 booleans + 4 reasons + 4 messages; 5 booleans + 5 reasons + 5 messages), 17 public readable facts, no public setters. The internal participation-aware constructor is implementation detail, not an external contract.
+- Failure enum: int-backed `None=0`, `ValidationFailed=1`, `NotApplied=2`, `ApplicationFailed=3`. Caller-supplied undefined enum values are not newly rejected or normalized.
+- All in-repository consumers were in PlayerProgressionFoundationSmokeTests, ProgressionRuntimeBootstrapSmokeTests, ProgressRestoreAtomicitySmokeTests, SemanticSkillTreeRestoreSmokeTests and RestoreResultIntegritySmokeTests. No separate production/Unity consumer of these three types was found.
+- No reflection/string lookup dependency, result persistence mapping, package publication configuration or SnapshotGenerator copy/reference of these APIs was found. Snapshot JSON uses private V2 DTOs and domain enums, not restore results or failure reasons. The generator was inspected but not executed or modified.
+- Active persistence prose and naming backlog referenced the old API; historical audit/archival references remain historical. No evidence establishes a published external contract or proves that external consumers do not exist; retain the full public entry-point surface conservatively.
+
+| Previous public type, retained | Canonical API for new/internal callers |
+|---|---|
+| V4ProgressRestoreCoordinator | ProgressRestoreCoordinator |
+| V4ProgressRestoreResult | ProgressRestoreResult |
+| V4ProgressRestoreFailureReason | ProgressRestoreFailureReason |
+
+**Single ownership and compatibility:** ProgressRestoreCoordinator owns the existing preflight/application implementation; ProgressRestoreResult owns completion and diagnostic facts. Their implementations match the baseline after identifier substitution. Both overload families, exception parameter names/messages, application order (class, mastery, mentors, tree, optional bindings), real applied-state reporting and existing public constructor defaults remain unchanged. V4ProgressRestoreCoordinator holds one canonical coordinator and forwards each call; V4ProgressRestoreResult holds its canonical result and forwards all facts, casting reason values without remapping ordinals. The old enum constants reference explicit canonical values. No duplicated restore algorithm, implicit type conversions, new restore framework or obsolete warnings are introduced. Legacy calls add one coordinator wrapper per coordinator and one result wrapper per returned result; canonical calls have no adapter allocation. Public result construction through the old API similarly adds one wrapper.
+
+All five existing consumer files now use the canonical names. The focused compatibility suite deliberately uses both families. Original AUD-01/02/12 matrices and runtime/bootstrap workflows execute the canonical API without copying their matrices into a second suite. Public names, namespace, assembly name, constructor/method signatures and public getter types of the old API remain available; parameter names retain named-argument compatibility. Private fields/setters and stack traces are not preserved contracts. The two API families are distinct nominal types, not aliases or assignable replacements.
+
+**Serialization invariants:** no V2 snapshot DTO, serializer, validation service, file repository, individual restore service or schema-version source changed. Schema remains 1; field names, stable IDs and domain-enum representations are unchanged. Tests verify byte-stable snapshot JSON round trips, numeric persisted mastery ranks, old JSON with only SchemaVersion, all 17 result facts/messages and reason numeric serialization. Restore result enums are not save fields; keeping their numeric values also protects callers that independently serialize diagnostics.
+
+**Verification evidence:** baseline restore/build/smoke passed with 3566 assertions and 38 V1 events. The new permanent suite adds 58 assertions for public surface, four constructor families, enum ordinals/undefined-value preservation, both overloads, successful and repeated merge restore, missing legacy fields, registry and semantic-tree preflight rejection without mutation, null destinations and controlled application failure. Final suite: 3624 assertions (V1 2, Shared 332, V2 371, V3 686, Progression 2233), V1 events 38. Existing audit subsection counts remain green and unchanged. Restore/build/smoke/diff-check/status commands exit 0; build has 0 warnings and 0 errors. No artificial red phase was created.
+
+**Binary compatibility experiment:** archived unchanged baseline source was built in an isolated temporary directory; only its `FragmentsOfWisdom.Game.dll` was replaced with the P8A library. The baseline smoke client then ran without recompilation against the replacement and passed all 3566 assertions / 38 events, exit 0, including its old V4 API calls and constructor coverage. This is concrete repository-client evidence, not certification of arbitrary downstream clients. An initial sandbox-temporary copy was unavailable on a subsequent call; the isolated baseline build replaced that incomplete experiment without changing project files.
+
+**Remaining limits:** unknown external clients, nonpublic reflection and custom serializers require their own verification. Restore remains sequential, merge-based and nontransactional after preflight: no rollback, isolation, new exception handling or stronger concurrent-input guarantee. Unity Editor/Play Mode was not exercised; no Unity assets or adapters changed. Historical versioned DTOs and generator documents remain intact. No P8B diagnostics, P9 visual work, combat behavior or additional audit repair is included.
+
 ### Unresolved Naming and Compatibility Work
 
-- V4ProgressRestoreCoordinator, V4ProgressRestoreResult and V4ProgressRestoreFailureReason still expose version prefixes.
+- P8A is complete: ProgressRestoreCoordinator, ProgressRestoreResult and ProgressRestoreFailureReason are canonical; V4-prefixed public entry points remain compatibility-only, not a second implementation.
 - V3AccessChecked / V4AccessChecked, V3BlockReason / V4BlockReason and V3UnlockProfileMissing / V3SkillLocked / V4ContextIncomplete / V4SkillBlocked need responsibility-based diagnostics in a behavior-preserving branch.
 - Defer IV2SavePathProvider, UnityV2SavePathProvider, UnityV2SaveService, V2ProgressSnapshot* and V2*Snapshot DTO renames: serialization/public API blast radius requires an isolated persistence plan.
 - Retain version-prefixed branch names, migration notes, schema history and explicit compatibility guards as provenance.

@@ -94,7 +94,7 @@ namespace Game.SmokeTests
             var masteryProfile = runtimeState.MasteryProfile;
             var skillTree = runtimeState.ClassSkillTreeBindingRegistry.GetSkillTree(
                 SkillTreeId.Tlamatini);
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),
@@ -455,7 +455,7 @@ namespace Game.SmokeTests
             var masteryProfile = runtimeState.MasteryProfile;
             var skillTree = runtimeState.ClassSkillTreeBindingRegistry.GetSkillTree(
                 SkillTreeId.Tlamatini);
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),
@@ -804,7 +804,7 @@ namespace Game.SmokeTests
             var skillTree = runtimeState.ClassSkillTreeBindingRegistry.GetSkillTree(
                 SkillTreeId.Tlamatini);
 
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),
@@ -1096,7 +1096,7 @@ namespace Game.SmokeTests
             var skillTree = runtimeState.ClassSkillTreeBindingRegistry.GetSkillTree(
                 SkillTreeId.Tlamatini);
 
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),
@@ -1419,7 +1419,7 @@ namespace Game.SmokeTests
                 ClassId.Tlamatini,
                 SkillTreeId.Tlamatini);
 
-            var result = new V4ProgressRestoreCoordinator().Restore(
+            var result = new ProgressRestoreCoordinator().Restore(
                 snapshot,
                 state.ClassProfile,
                 state.MasteryProfile,
@@ -1589,7 +1589,7 @@ namespace Game.SmokeTests
             var masteryProfile = state.MasteryProfile;
             var skillTree = state.ClassSkillTreeBindingRegistry.GetSkillTree(
                 SkillTreeId.Tlamatini);
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),
@@ -1947,7 +1947,7 @@ namespace Game.SmokeTests
             var skillRegistry = runtimeState.SkillRegistry;
             var skillTree = runtimeState.ClassSkillTreeBindingRegistry.GetSkillTree(
                 SkillTreeId.Tlamatini);
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),
@@ -2228,7 +2228,7 @@ namespace Game.SmokeTests
                     secondComposition.RuntimeState.ClassSkillTreeBindingRegistry),
                 "Player-session composition workflow should keep mutable bindings session-scoped.");
 
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),
@@ -2526,7 +2526,7 @@ namespace Game.SmokeTests
                     secondBootstrap.RuntimeState.ClassSkillTreeBindingRegistry),
                 "Player-session bootstrap workflow should keep mutable bindings session-scoped and separate between bootstraps.");
 
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),
@@ -2824,7 +2824,7 @@ namespace Game.SmokeTests
                     secondDemo.RuntimeState.ClassSkillTreeBindingRegistry),
                 "V5 runtime demo workflow should keep mutable bindings session-scoped and separate between demo bootstraps.");
 
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),

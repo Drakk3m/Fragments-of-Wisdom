@@ -23,6 +23,10 @@ namespace Game.SmokeTests
         private static void RunPlayerProgressionFoundationSmokeTests()
         {
             RunSection(
+                "Progress restore API compatibility assertions",
+                RunProgressRestoreApiCompatibilityTests);
+
+            RunSection(
                 "AUD-12 restore result integrity assertions",
                 RunRestoreResultIntegritySmokeTests);
 
@@ -4893,7 +4897,7 @@ namespace Game.SmokeTests
             var mentorProfile = new MentorRelationshipProfile();
             var skillTreeProgress = new SkillTreeProgressProfile();
 
-            var result = new V4ProgressRestoreCoordinator().Restore(
+            var result = new ProgressRestoreCoordinator().Restore(
                 snapshot,
                 classProfile,
                 masteryProfile,
@@ -4931,10 +4935,10 @@ namespace Game.SmokeTests
 
             Assert(
                 result.FullyRestored
-                && result.ClassFailureReason == V4ProgressRestoreFailureReason.None
-                && result.MasteryFailureReason == V4ProgressRestoreFailureReason.None
-                && result.MentorRelationshipsFailureReason == V4ProgressRestoreFailureReason.None
-                && result.SkillTreeProgressFailureReason == V4ProgressRestoreFailureReason.None,
+                && result.ClassFailureReason == ProgressRestoreFailureReason.None
+                && result.MasteryFailureReason == ProgressRestoreFailureReason.None
+                && result.MentorRelationshipsFailureReason == ProgressRestoreFailureReason.None
+                && result.SkillTreeProgressFailureReason == ProgressRestoreFailureReason.None,
                 "Successful V4 restore should have no failure reasons.");
 
             Assert(
@@ -4962,7 +4966,7 @@ namespace Game.SmokeTests
                 "Class preflight failure means no subsystem was applied.");
 
             Assert(
-                result.ClassFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
+                result.ClassFailureReason == ProgressRestoreFailureReason.ValidationFailed
                 && result.ClassFailureMessage.Contains("ClassProfile"),
                 "V4 restore coordinator should expose class restore failure details.");
         }
@@ -4984,7 +4988,7 @@ namespace Game.SmokeTests
                 "Mastery preflight failure means no subsystem was applied.");
 
             Assert(
-                result.MasteryFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
+                result.MasteryFailureReason == ProgressRestoreFailureReason.ValidationFailed
                 && result.MasteryFailureMessage.Contains("MasteryProfile"),
                 "V4 restore coordinator should expose mastery restore failure details.");
         }
@@ -5006,7 +5010,7 @@ namespace Game.SmokeTests
                 "Mentor preflight failure means no subsystem was applied.");
 
             Assert(
-                result.MentorRelationshipsFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
+                result.MentorRelationshipsFailureReason == ProgressRestoreFailureReason.ValidationFailed
                 && result.MentorRelationshipsFailureMessage.Contains("MentorRelationshipProfile"),
                 "V4 restore coordinator should expose mentor relationship restore failure details.");
         }
@@ -5028,7 +5032,7 @@ namespace Game.SmokeTests
                 "Tree preflight failure means no subsystem was applied.");
 
             Assert(
-                result.SkillTreeProgressFailureReason == V4ProgressRestoreFailureReason.ValidationFailed
+                result.SkillTreeProgressFailureReason == ProgressRestoreFailureReason.ValidationFailed
                 && result.SkillTreeProgressFailureMessage.Contains("SkillTreeProgressProfile"),
                 "V4 restore coordinator should expose skill tree progress restore failure details.");
         }
@@ -5049,8 +5053,8 @@ namespace Game.SmokeTests
                 "V4 restore coordinator partial failure should not look like full success.");
 
             Assert(
-                result.ClassFailureReason != V4ProgressRestoreFailureReason.None
-                && result.SkillTreeProgressFailureReason != V4ProgressRestoreFailureReason.None
+                result.ClassFailureReason != ProgressRestoreFailureReason.None
+                && result.SkillTreeProgressFailureReason != ProgressRestoreFailureReason.None
                 && result.ClassFailureMessage.Length > 0
                 && result.SkillTreeProgressFailureMessage.Length > 0,
                 "V4 restore coordinator partial failure should expose enough facts for UI or debug explanations.");
@@ -5075,7 +5079,7 @@ namespace Game.SmokeTests
                 "V4 restore coordinator should restore class skill tree bindings successfully.");
 
             Assert(
-                result.ClassSkillTreeBindingsFailureReason == V4ProgressRestoreFailureReason.None
+                result.ClassSkillTreeBindingsFailureReason == ProgressRestoreFailureReason.None
                 && result.ClassSkillTreeBindingsFailureMessage == string.Empty,
                 "Successful binding restore should expose no binding failure details.");
         }
@@ -5098,7 +5102,7 @@ namespace Game.SmokeTests
 
             Assert(
                 result.ClassSkillTreeBindingsFailureReason
-                    == V4ProgressRestoreFailureReason.ValidationFailed
+                    == ProgressRestoreFailureReason.ValidationFailed
                 && result.ClassSkillTreeBindingsFailureMessage.Contains("ClassSkillTreeBindings"),
                 "V4 restore coordinator should expose binding restore failure details.");
         }
@@ -5125,7 +5129,7 @@ namespace Game.SmokeTests
             var classProfile = new ClassProfile();
             var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
 
-            var result = new V4ProgressRestoreCoordinator().Restore(
+            var result = new ProgressRestoreCoordinator().Restore(
                 snapshot,
                 classProfile,
                 new MasteryProfile(),
@@ -5153,7 +5157,7 @@ namespace Game.SmokeTests
                     "skill_deep_sight",
                     MentorId.Lyra,
                     "node_deep_sight"),
-                delegate(V4ProgressRestoreResult result)
+                delegate(ProgressRestoreResult result)
                 {
                     return !result.ClassRestored;
                 },
@@ -5168,7 +5172,7 @@ namespace Game.SmokeTests
                     "skill_unknown",
                     MentorId.Lyra,
                     "node_deep_sight"),
-                delegate(V4ProgressRestoreResult result)
+                delegate(ProgressRestoreResult result)
                 {
                     return !result.MasteryRestored;
                 },
@@ -5183,7 +5187,7 @@ namespace Game.SmokeTests
                     "skill_deep_sight",
                     "mentor_unknown",
                     "node_deep_sight"),
-                delegate(V4ProgressRestoreResult result)
+                delegate(ProgressRestoreResult result)
                 {
                     return !result.MentorRelationshipsRestored;
                 },
@@ -5198,7 +5202,7 @@ namespace Game.SmokeTests
                     "skill_deep_sight",
                     MentorId.Lyra,
                     "node_unknown"),
-                delegate(V4ProgressRestoreResult result)
+                delegate(ProgressRestoreResult result)
                 {
                     return !result.SkillTreeProgressRestored;
                 },
@@ -5216,7 +5220,7 @@ namespace Game.SmokeTests
             var skillTreeProgress = new SkillTreeProgressProfile();
             var bindingRegistry = BuildTestClassSkillTreeBindingRegistry();
 
-            var result = new V4ProgressRestoreCoordinator().Restore(
+            var result = new ProgressRestoreCoordinator().Restore(
                 snapshot,
                 classProfile,
                 masteryProfile,
@@ -5250,17 +5254,17 @@ namespace Game.SmokeTests
 
             Assert(
                 result.MasteryFailureReason
-                    == V4ProgressRestoreFailureReason.ValidationFailed
+                    == ProgressRestoreFailureReason.ValidationFailed
                 && result.MasteryFailureMessage.Contains("MasteryProfile")
-                && result.ClassFailureReason == V4ProgressRestoreFailureReason.NotApplied
+                && result.ClassFailureReason == ProgressRestoreFailureReason.NotApplied
                 && result.MentorRelationshipsFailureReason
-                    == V4ProgressRestoreFailureReason.NotApplied,
+                    == ProgressRestoreFailureReason.NotApplied,
                 "Preflight failure distinguishes invalid mastery from feasible but unapplied subsystems.");
         }
 
         private static void AssertV4PreflightFailurePreventsProfileMutation(
             V2ProgressSnapshot snapshot,
-            System.Func<V4ProgressRestoreResult, bool> failedSubsystemAssertion,
+            System.Func<ProgressRestoreResult, bool> failedSubsystemAssertion,
             string message)
         {
             var classProfile = new ClassProfile();
@@ -5268,7 +5272,7 @@ namespace Game.SmokeTests
             var mentorProfile = new MentorRelationshipProfile();
             var skillTreeProgress = new SkillTreeProgressProfile();
 
-            var result = new V4ProgressRestoreCoordinator().Restore(
+            var result = new ProgressRestoreCoordinator().Restore(
                 snapshot,
                 classProfile,
                 masteryProfile,
@@ -7114,7 +7118,7 @@ namespace Game.SmokeTests
             var skillRegistry = state.SkillRegistry;
             var skillTree = state.ClassSkillTreeBindingRegistry.GetSkillTree(
                 SkillTreeId.Tlamatini);
-            var restoreResult = new V4ProgressRestoreCoordinator().Restore(
+            var restoreResult = new ProgressRestoreCoordinator().Restore(
                 BuildCompleteV4SnapshotWithBinding(
                     ClassId.Tlamatini,
                     SkillTreeId.Tlamatini),
@@ -8158,9 +8162,9 @@ namespace Game.SmokeTests
                     new[] { skillTreeNodeId }));
         }
 
-        private static V4ProgressRestoreResult RestoreCompleteV4Snapshot(V2ProgressSnapshot snapshot)
+        private static ProgressRestoreResult RestoreCompleteV4Snapshot(V2ProgressSnapshot snapshot)
         {
-            return new V4ProgressRestoreCoordinator().Restore(
+            return new ProgressRestoreCoordinator().Restore(
                 snapshot,
                 new ClassProfile(),
                 new MasteryProfile(),
@@ -8200,11 +8204,11 @@ namespace Game.SmokeTests
                 });
         }
 
-        private static V4ProgressRestoreResult RestoreCompleteV4SnapshotWithBindings(
+        private static ProgressRestoreResult RestoreCompleteV4SnapshotWithBindings(
             V2ProgressSnapshot snapshot,
             ClassSkillTreeBindingRegistry bindingRegistry)
         {
-            return new V4ProgressRestoreCoordinator().Restore(
+            return new ProgressRestoreCoordinator().Restore(
                 snapshot,
                 new ClassProfile(),
                 new MasteryProfile(),

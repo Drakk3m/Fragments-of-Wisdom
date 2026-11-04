@@ -92,7 +92,7 @@ namespace Game.SmokeTests
                 var result = fixture.Restore(snapshot, includeBindings);
                 string after = fixture.CaptureState();
                 Assert(!result.FullyRestored && !result.SkillTreeProgressRestored
-                    && result.SkillTreeProgressFailureReason == V4ProgressRestoreFailureReason.ValidationFailed,
+                    && result.SkillTreeProgressFailureReason == ProgressRestoreFailureReason.ValidationFailed,
                     "AUD-02: " + scenario + " must fail tree restore; standalone valid=" + standaloneValid
                     + ", FullyRestored=" + result.FullyRestored + ", state changed=" + (before != after)
                     + ", child unlocked=" + fixture.Trees.IsUnlocked(SemanticTreeChild, fixture.Tree)
@@ -111,7 +111,7 @@ namespace Game.SmokeTests
             var serializer = new V2ProgressSnapshotJsonSerializer();
             snapshot = serializer.Deserialize(serializer.Serialize(snapshot));
             var result = fixture.Restore(snapshot, includeBindings);
-            Assert(result.FullyRestored && result.SkillTreeProgressFailureReason == V4ProgressRestoreFailureReason.None
+            Assert(result.FullyRestored && result.SkillTreeProgressFailureReason == ProgressRestoreFailureReason.None
                 && fixture.Trees.IsUnlocked(SemanticTreeRoot, fixture.Tree)
                 && fixture.Trees.IsUnlocked(SemanticTreeChild, fixture.Tree),
                 "AUD-02: valid closure must restore through JSON and either coordinator overload.");
@@ -134,7 +134,7 @@ namespace Game.SmokeTests
             permissiveTree.RegisterNode(new SkillTreeNodeDefinition(SemanticTreeChild,
                 "skill_balance_ritual", Array.Empty<string>()), fixture.SkillRegistry);
             string before = fixture.CaptureState();
-            var coordinator = new V4ProgressRestoreCoordinator();
+            var coordinator = new ProgressRestoreCoordinator();
             var result = coordinator.Restore(invalid, fixture.Classes, fixture.Mastery, fixture.Mentors,
                 fixture.Trees, fixture.ClassRegistry, fixture.SkillRegistry, fixture.MentorRegistry,
                 permissiveTree, fixture.Bindings);
