@@ -13,7 +13,7 @@ namespace Game.Domain.Combat
         private readonly CombatPassivePipeline pipeline;
         private readonly DamageResolver damageResolver;
         private readonly DebuffResolver debuffResolver;
-        private readonly StatusEffectResolver statusEffectResolver;
+        private readonly CombatTurnLifecycle turnLifecycle;
         private readonly ICombatSkillTurnValidator skillTurnValidator;
 
         public TurnBasedCombatEngine(
@@ -33,7 +33,7 @@ namespace Game.Domain.Combat
             this.skillTurnValidator = skillTurnValidator;
             damageResolver = new DamageResolver(random);
             debuffResolver = new DebuffResolver(random, pipeline);
-            statusEffectResolver = new StatusEffectResolver();
+            turnLifecycle = new CombatTurnLifecycle();
         }
 
         public void StartCombat(CombatRuntimeContext runtime)
@@ -75,16 +75,8 @@ namespace Game.Domain.Combat
                 runtime.EventLog.Add(GameEventType.CognitionTriggered, "Atlas teaching FÃ³rmula Estable reduces skill cost.");
             }
 
-            runtime.EventLog.Add(GameEventType.TurnStarted, "Turn " + runtime.TurnNumber + ": " + request.Attacker.Name + " acts.");
-
-            request.Attacker.Flags.ResetTurnFlags();
-            request.Attacker.Debuffs.OnTurnStart(request.Attacker, context);
-            request.Attacker.Debuffs.OnBeforeAction(context);
-
-            if (!request.Attacker.IsAlive)
+            if (!turnLifecycle.Begin(runtime, context))
             {
-                runtime.EventLog.Add(GameEventType.CombatEnded, request.Attacker.Name + " is defeated by status effects.");
-                runtime.EndCombat();
                 return;
             }
 
@@ -232,23 +224,7 @@ namespace Game.Domain.Combat
             CombatRuntimeContext runtime,
             CombatContext context)
         {
-            if (!context.Attacker.Flags.ResourceRegenBlocked)
-            {
-                context.Attacker.Resource.Regenerate(5);
-                runtime.EventLog.Add(GameEventType.ResourceRegenerated, context.Attacker.Name + " regenerates 5 Essence.");
-            }
-
-            context.Attacker.Debuffs.OnAfterAction(context.Attacker, context);
-            statusEffectResolver.TickTurnBoundary(context.Attacker);
-            if (!context.Attacker.IsAlive)
-            {
-                runtime.EventLog.Add(GameEventType.CombatEnded, context.Attacker.Name + " is defeated by status effects.");
-                runtime.EndCombat();
-                return;
-            }
-
-            runtime.EventLog.Add(GameEventType.TurnEnded, "Turn " + runtime.TurnNumber + " ends.");
-            runtime.AdvanceTurn();
+            turnLifecycle.Complete(runtime, context);
         }
     }
 }

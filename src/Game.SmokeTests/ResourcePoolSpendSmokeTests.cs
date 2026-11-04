@@ -255,8 +255,8 @@ namespace Game.SmokeTests
                 "AUD-11 zero Essence and zero Resonance skill remains executable without player pool spending.");
             bool refilled = new ResonanceRefillAction().Execute(fixture.Resonance, fixture.Runtime, 7);
             Assert(refilled && fixture.Resonance.Active.Current == 27 && fixture.Resonance.Reserve.Current == 43
-                && fixture.Runtime.TurnNumber == 5 && fixture.Player.Resource.Current == 15,
-                "AUD-11 existing explicit refill moves seven reserve points and consumes its usual turn.");
+                && fixture.Runtime.TurnNumber == 5 && fixture.Player.Resource.Current == 20,
+                "AUD-11 transfer bounds remain intact; AUD-06 refill now includes canonical end-turn Essence regeneration.");
         }
     }
 }

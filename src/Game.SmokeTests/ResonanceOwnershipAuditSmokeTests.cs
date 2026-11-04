@@ -231,8 +231,8 @@ namespace Game.SmokeTests
                 && fixture.Resonance.Reserve.Current == 45 && fixture.Runtime.TurnNumber == 5,
                 "AUD-05 workflow preserves the player's existing explicit reserve-to-active refill.");
             Assert(fixture.Progress.Experience == 10 && enemyProgress.Experience == 0
-                && fixture.Player.Resource.Current == 15 && fixture.Enemy.Resource.Current == 15,
-                "AUD-05 workflow refill does not change skill XP or either actor's Essence.");
+                && fixture.Player.Resource.Current == 20 && fixture.Enemy.Resource.Current == 15,
+                "AUD-05 ownership and XP remain unchanged; AUD-06 refill regenerates only the acting player's Essence.");
         }
 
         private sealed class ResonanceOwnershipFixture
