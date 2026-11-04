@@ -234,8 +234,6 @@ namespace Game.Domain.Combat.StatusEffects
 '@
 
 Write-RepoFile -Path "src/Game/Domain/Combat/StatusEffects/SilenceDebuff.cs" -Content @'
-using Game.Domain.Common;
-
 namespace Game.Domain.Combat.StatusEffects
 {
     public class SilenceDebuff : BaseDebuff
@@ -257,7 +255,10 @@ namespace Game.Domain.Combat.StatusEffects
 
         public override void OnBeforeAction(CombatContext context)
         {
-            context.EventLog.Add(GameEventType.ActionBlocked, context.Attacker.Name + " is silenced. Skill blocking hook is active.");
+            if (!IsExpired)
+            {
+                context.SkillsBlockedBySilence = true;
+            }
         }
     }
 }
@@ -1037,6 +1038,13 @@ namespace Game.Domain.Combat
 
             if (request.ActionType == TurnActionType.Skill)
             {
+                if (context.SkillsBlockedBySilence)
+                {
+                    runtime.EventLog.Add(GameEventType.ActionBlocked, request.Attacker.Name + " is silenced and cannot use skills.");
+                    EndTurn(runtime, context);
+                    return;
+                }
+
                 context.ResourceCost = request.SkillProgress.GetBaseCost();
                 context.ResourceCostMultiplier *= request.SkillProgress.GetMasteryCostMultiplier();
                 pipeline.OnBeforeSkillCostCalculated(context);

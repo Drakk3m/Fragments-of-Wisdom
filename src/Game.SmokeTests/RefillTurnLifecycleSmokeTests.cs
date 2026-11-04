@@ -163,8 +163,8 @@ namespace Game.SmokeTests
                 && fixture.Player.Debuffs.Active.Count == 2,
                 "AUD-06 ResourceBlock suppresses Essence regeneration and expiring debuffs are removed.");
             Assert(fixture.Resonance.Active.Current == 8 && fixture.Enemy.Stats.CurrentHealth == 100
-                && fixture.Progress.Experience == 0 && ContainsEvent(fixture.Runtime.EventLog, GameEventType.ActionBlocked),
-                "AUD-06 Blind has no offensive work to modify; legacy Silence remains diagnostic only, not a new refill blocker.");
+                && fixture.Progress.Experience == 0 && !ContainsEvent(fixture.Runtime.EventLog, GameEventType.ActionBlocked),
+                "AUD-06 Blind has no offensive work to modify; AUD-08 Silence neither blocks refill nor emits a false block diagnostic.");
             fixture.Engine.ExecuteTurn(fixture.Runtime, TurnRequest.BasicAttack(fixture.Player, fixture.Enemy));
             Assert(!fixture.Player.Flags.ResourceRegenBlocked && fixture.Player.Resource.Current == 15
                 && fixture.Player.Stats.CurrentHealth == 80 && poison.RemainingTurns == 1

@@ -1,5 +1,3 @@
-using Game.Domain.Common;
-
 namespace Game.Domain.Combat.StatusEffects
 {
     public class SilenceDebuff : BaseDebuff
@@ -21,7 +19,10 @@ namespace Game.Domain.Combat.StatusEffects
 
         public override void OnBeforeAction(CombatContext context)
         {
-            context.EventLog.Add(GameEventType.ActionBlocked, context.Attacker.Name + " is silenced. Skill blocking hook is active.");
+            if (!IsExpired)
+            {
+                context.SkillsBlockedBySilence = true;
+            }
         }
     }
 }

@@ -98,6 +98,13 @@ namespace Game.Domain.Combat
                     }
                 }
 
+                if (context.SkillsBlockedBySilence)
+                {
+                    runtime.EventLog.Add(GameEventType.ActionBlocked, request.Attacker.Name + " is silenced and cannot use skills.");
+                    EndTurn(runtime, context);
+                    return;
+                }
+
                 if (request.Attacker.StatusEffects.HasActive(StatusEffectType.SkillSeal))
                 {
                     runtime.EventLog.Add(GameEventType.ActionBlocked, request.Attacker.Name + " is sealed and cannot use skills.");

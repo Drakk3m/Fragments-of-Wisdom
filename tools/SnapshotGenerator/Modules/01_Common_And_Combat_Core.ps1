@@ -434,6 +434,9 @@ namespace Game.Domain.Combat
         public bool RevealOneEnemyTrait { get; set; }
         public bool IsFirstSkillOfCombat { get; set; }
 
+        // Per-action capability restriction; only the engine's Skill branch consumes it.
+        internal bool SkillsBlockedBySilence { get; set; }
+
         public CleanseType? RequestedCleanse { get; set; }
 
         public List<StatusApplicationRequest> DebuffsToApply { get; private set; }
