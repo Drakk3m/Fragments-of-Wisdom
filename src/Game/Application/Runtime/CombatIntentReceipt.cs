@@ -9,6 +9,10 @@ namespace Game.Application.Runtime
         public bool AcceptedForExecution { get; }
         public bool InvocationStarted { get; }
         public bool InvocationCompleted { get; }
+        public CombatActorSide ActorSide { get; }
+        public bool OpportunityConsumed { get; }
+        public CombatTurnFlowSnapshot FlowBefore { get; }
+        public CombatTurnFlowSnapshot FlowAfter { get; }
         public CombatEncounterSnapshot Before { get; }
         public CombatEncounterSnapshot After { get; }
         public CombatEventBatch EventBatch { get; }
@@ -25,6 +29,7 @@ namespace Game.Application.Runtime
             CombatIntentDisposition disposition, CombatIntentAdmissionReason admissionReason,
             bool invocationStarted, bool invocationCompleted,
             CombatEncounterSnapshot before, CombatEncounterSnapshot after, CombatEventBatch eventBatch,
+            CombatActorSide actorSide, CombatTurnFlowSnapshot flowBefore, CombatTurnFlowSnapshot flowAfter,
             bool? refillResult = null, string faultType = null, string faultMessage = null,
             string observationFailureMessage = null)
         {
@@ -33,6 +38,9 @@ namespace Game.Application.Runtime
             AcceptedForExecution = disposition != CombatIntentDisposition.AdmissionRejected;
             InvocationStarted = invocationStarted;
             InvocationCompleted = invocationCompleted;
+            ActorSide = actorSide;
+            FlowBefore = flowBefore;
+            FlowAfter = flowAfter;
             Before = before;
             After = after;
             EventBatch = eventBatch;
@@ -42,11 +50,9 @@ namespace Game.Application.Runtime
             ObservationFailureMessage = observationFailureMessage;
             EncounterIsTerminal = after == null ? (bool?)null
                 : after.CombatEnded || !after.Player.IsAlive || !after.Enemy.IsAlive;
-            foreach (var item in eventBatch.Events)
-            {
-                if (item.Type == GameEventType.TurnStarted) TurnStartedObserved = true;
-                if (item.Type == GameEventType.TurnEnded) TurnEndedObserved = true;
-            }
+            TurnStartedObserved = eventBatch.Contains(GameEventType.TurnStarted);
+            TurnEndedObserved = eventBatch.Contains(GameEventType.TurnEnded);
+            OpportunityConsumed = AcceptedForExecution && TurnStartedObserved;
         }
     }
 }

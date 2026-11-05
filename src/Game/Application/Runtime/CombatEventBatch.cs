@@ -18,5 +18,12 @@ namespace Game.Application.Runtime
             for (int i = startIndex; i < endIndex; i++) events.Add(new CombatEventSnapshot(i, log[i]));
             Events = events.AsReadOnly();
         }
+
+        internal bool Contains(GameEventType type)
+        {
+            foreach (var item in Events)
+                if (item.Type == type) return true;
+            return false;
+        }
     }
 }
