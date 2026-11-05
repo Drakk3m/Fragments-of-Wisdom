@@ -22,6 +22,8 @@ namespace Game.SmokeTests
     {
         private static void RunPlayerProgressionFoundationSmokeTests()
         {
+            RunSection("Combat intent boundary assertions", RunCombatIntentBoundarySmokeTests);
+
             RunSection(
                 "Combat encounter projection assertions",
                 RunCombatEncounterProjectionSmokeTests);
