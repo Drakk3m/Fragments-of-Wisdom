@@ -7,7 +7,7 @@ namespace Game.Application.Runtime
 {
     /// <summary>
     /// Single-threaded encounter owner. Mutable dependencies stay inside the application
-    /// boundary; no actions, presentation projections or cross-encounter persistence here.
+    /// boundary; detached reads do not execute actions or persist cross-encounter state.
     /// </summary>
     public sealed class CombatEncounterComposition
     {
@@ -77,6 +77,20 @@ namespace Game.Application.Runtime
                 state = CombatEncounterState.Faulted;
                 throw;
             }
+        }
+
+        /// <summary>
+        /// Copies currently observable state without executing gameplay. Call between
+        /// mutations on the owning thread; observation during start hooks is rejected.
+        /// </summary>
+        public CombatEncounterSnapshot GetSnapshot()
+        {
+            if (state == CombatEncounterState.Starting)
+            {
+                throw new InvalidOperationException("Cannot capture an encounter while it is starting.");
+            }
+
+            return new CombatEncounterSnapshot(State, Runtime, preparation.Skills, Progression.SkillRegistry);
         }
 
         internal PreparedCombatSkillBinding GetSkillBinding(string skillId)

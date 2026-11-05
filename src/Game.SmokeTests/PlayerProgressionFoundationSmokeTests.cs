@@ -23,6 +23,10 @@ namespace Game.SmokeTests
         private static void RunPlayerProgressionFoundationSmokeTests()
         {
             RunSection(
+                "Combat encounter projection assertions",
+                RunCombatEncounterProjectionSmokeTests);
+
+            RunSection(
                 "Combat encounter composition assertions",
                 RunCombatEncounterCompositionSmokeTests);
 
