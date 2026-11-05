@@ -66,9 +66,11 @@ namespace Game.SmokeTests
             Assert(next == first.EventBatch.StartIndex, "P9.3 explicit ranges recover the unconsumed start prefix without skipping it.");
             next = first.EventBatch.EndIndex;
             Assert(owner.ReadEvents(next).Events.Count == 0, "P9.3 successive reads at EndIndex contain no duplicate events.");
+            var enemy = owner.AdvanceEnemyTurn();
+            next = enemy.EventBatch.EndIndex;
             var skill = owner.SubmitIntent(CombatIntent.Skill(f.Skill.Id));
             AssertCompletedIntent(skill);
-            Assert(skill.Before.TurnNumber == 2 && skill.After.TurnNumber == 3
+            Assert(skill.Before.TurnNumber == 3 && skill.After.TurnNumber == 4
                 && skill.EventBatch.StartIndex == next && f.Progress.Experience == 10,
                 "P9.3 skill receipt begins at the previous end and grants XP once.");
             Assert(f.Resonance.Active.Current == 18 && f.Passive.Costs == 1
@@ -78,7 +80,7 @@ namespace Game.SmokeTests
                 "P9.3 prepared executable is applied once.");
             AssertEventBatchMatchesLog(skill.EventBatch, f.Log);
             next = skill.EventBatch.EndIndex;
-            owner.SubmitIntent(CombatIntent.BasicAttack()); // Simulate losing this receipt.
+            owner.AdvanceEnemyTurn(); // Simulate losing this receipt.
             var beforeRecovery = CaptureProjectionSource(owner, f);
             var recovered = owner.ReadEvents(next);
             Assert(recovered.Events.Count(e => e.Type == GameEventType.BasicAttackUsed) == 1
@@ -87,7 +89,7 @@ namespace Game.SmokeTests
             Assert(owner.ReadEvents(recovered.EndIndex).Events.Count == 0
                 && CaptureProjectionSource(owner, f) == beforeRecovery,
                 "P9.3 recovery and empty follow-up do not execute, consume RNG or alter state.");
-            Assert(prefix.Events.Concat(first.EventBatch.Events).Concat(skill.EventBatch.Events).Concat(recovered.Events)
+            Assert(prefix.Events.Concat(first.EventBatch.Events).Concat(enemy.EventBatch.Events).Concat(skill.EventBatch.Events).Concat(recovered.Events)
                 .Select(e => e.Index).SequenceEqual(Enumerable.Range(0, recovered.EndIndex)),
                 "P9.3 consumer cursor protocol delivers every index once, without gaps or duplicates.");
             Assert(JsonSerializer.Serialize(owner.ReadEvents(first.EventBatch.StartIndex, first.EventBatch.EndIndex))
@@ -170,6 +172,7 @@ namespace Game.SmokeTests
             Assert(f.Progress.Experience == 0 && f.Resonance.Active.Current == 20 && f.Enemy.Stats.CurrentHealth == 100 && f.Passive.Costs == 0,
                 "P9.3 no skill spending/effect/XP occurs for engine authorization rejection.");
             state.MasteryProfile.IncreaseProgress(f.Skill.Id, 100, state.SkillRegistry);
+            owner.AdvanceEnemyTurn();
             var retained = owner.SubmitIntent(CombatIntent.Skill(f.Skill.Id));
             AssertCompletedIntent(retained);
             Assert(f.Progress.Experience == 10 && f.Resonance.Active.Current == 18,
@@ -200,12 +203,15 @@ namespace Game.SmokeTests
                 "P9.3 refill preserves exact existing event ordering.");
             foreach (int amount in new[] { 0, -1, int.MinValue })
             {
+                owner.AdvanceEnemyTurn();
                 var noop = owner.SubmitIntent(CombatIntent.Refill(amount));
                 AssertCompletedIntent(noop);
                 Assert(noop.RefillResult == true && noop.TurnEndedObserved && f.Resonance.Active.Current == 16
                     && f.Resonance.Reserve.Current == 46, "P9.3 nonpositive refill keeps existing no-transfer consumed-turn semantics.");
             }
+            owner.AdvanceEnemyTurn();
             owner.SubmitIntent(CombatIntent.Refill(int.MaxValue));
+            owner.AdvanceEnemyTurn();
             var full = owner.SubmitIntent(CombatIntent.Refill(10));
             Assert(full.RefillResult == true && full.TurnEndedObserved && f.Resonance.Active.Current == 20 && f.Resonance.Reserve.Current == 42,
                 "P9.3 full-pool no-op and oversized refill preserve domain clamping.");
@@ -302,6 +308,7 @@ namespace Game.SmokeTests
                 && result.EventBatch.Events.Count(e => e.Type == GameEventType.TurnStarted) == 1,
                 "P9.3 one admitted call means one apply, one XP grant and one resource spend.");
             probe.BeforeApply = null;
+            owner.AdvanceEnemyTurn();
             AssertCompletedIntent(owner.SubmitIntent(intent));
             Assert(probe.Calls == 2 && f.Progress.Experience == 20, "P9.3 a later explicit submission is a new action, not a hidden retry.");
 

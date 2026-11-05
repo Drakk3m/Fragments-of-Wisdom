@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Game.Domain.Combat;
 using Game.Domain.Combat.Resources;
+using Game.Domain.Common;
 using Game.Domain.Player;
 
 namespace Game.Application.Runtime
@@ -15,6 +16,7 @@ namespace Game.Application.Runtime
         private readonly CombatEncounterPreparation preparation;
         private readonly Dictionary<string, PreparedCombatSkillBinding> skillsById;
         private CombatEncounterState state = CombatEncounterState.Prepared;
+        private CombatTurnFlowPhase flowPhase = CombatTurnFlowPhase.NotStarted;
         private bool commandInFlight;
         private bool startAttempted;
         private int startEventIndex;
@@ -77,6 +79,7 @@ namespace Game.Application.Runtime
                 ValidatePreparation();
                 Engine.StartCombat(Runtime);
                 state = CombatEncounterState.Started;
+                flowPhase = CombatTurnFlowPhase.AwaitingPlayer;
                 return true;
             }
             catch (Exception exception)
@@ -93,7 +96,7 @@ namespace Game.Application.Runtime
 
         /// <summary>
         /// Copies currently observable state without executing gameplay. Call between
-        /// mutations on the owning thread; observation during start hooks is rejected.
+        /// mutations on the owning thread; observation during start/command hooks is rejected.
         /// </summary>
         public CombatEncounterSnapshot GetSnapshot()
         {
@@ -103,15 +106,34 @@ namespace Game.Application.Runtime
 
         public CombatIntentReceipt SubmitIntent(CombatIntent intent)
         {
+            return ExecuteCommand(intent, CombatActorSide.Player);
+        }
+
+        public CombatIntentReceipt AdvanceEnemyTurn()
+        {
+            return ExecuteCommand(null, CombatActorSide.Enemy);
+        }
+
+        public CombatTurnFlowSnapshot GetTurnFlowSnapshot()
+        {
+            var observedState = State;
+            return new CombatTurnFlowSnapshot(observedState == CombatEncounterState.Faulted ? CombatTurnFlowPhase.Faulted
+                : observedState == CombatEncounterState.Terminal ? CombatTurnFlowPhase.Terminal : flowPhase);
+        }
+
+        private CombatIntentReceipt ExecuteCommand(CombatIntent intent, CombatActorSide actorSide)
+        {
             if (commandInFlight || state == CombatEncounterState.Starting)
-                return RejectIntent(CombatIntentAdmissionReason.CommandInFlight, false);
+                return RejectIntent(CombatIntentAdmissionReason.CommandInFlight, false, actorSide);
 
             commandInFlight = true;
             try
             {
-                var reason = CheckAdmission(intent);
-                if (reason != CombatIntentAdmissionReason.None) return RejectIntent(reason, true);
+                var reason = CheckAdmission(intent, actorSide);
+                if (reason != CombatIntentAdmissionReason.None) return RejectIntent(reason, true, actorSide);
 
+                var flowBefore = GetTurnFlowSnapshot();
+                flowPhase = actorSide == CombatActorSide.Player ? CombatTurnFlowPhase.ResolvingPlayer : CombatTurnFlowPhase.ResolvingEnemy;
                 int startIndex = Runtime.EventLog.Events.Count;
                 CombatEncounterSnapshot before = null;
                 bool invoked = false;
@@ -120,24 +142,32 @@ namespace Game.Application.Runtime
                 try
                 {
                     before = CaptureSnapshot();
-                    if (intent.Type == CombatIntentType.ResonanceRefill)
+                    if (actorSide == CombatActorSide.Player && intent.Type == CombatIntentType.ResonanceRefill)
                     {
                         invoked = true;
                         refillResult = new ResonanceRefillAction().Execute(Runtime.ResonanceProfile, Runtime, intent.RefillAmount);
                     }
                     else
                     {
-                        var binding = intent.Type == CombatIntentType.PreparedSkill ? GetSkillBinding(intent.SkillId) : null;
-                        var request = binding == null
-                            ? TurnRequest.BasicAttack(Runtime.Player, Runtime.Enemy)
-                            : TurnRequest.SkillAction(Runtime.Player, Runtime.Enemy, binding.Skill, binding.Progress);
+                        var binding = actorSide == CombatActorSide.Player && intent.Type == CombatIntentType.PreparedSkill
+                            ? GetSkillBinding(intent.SkillId) : null;
+                        var request = actorSide == CombatActorSide.Enemy
+                            ? TurnRequest.BasicAttack(Runtime.Enemy, Runtime.Player)
+                            : binding == null ? TurnRequest.BasicAttack(Runtime.Player, Runtime.Enemy)
+                                : TurnRequest.SkillAction(Runtime.Player, Runtime.Enemy, binding.Skill, binding.Progress);
                         invoked = true;
                         Engine.ExecuteTurn(Runtime, request);
                     }
                     completed = true;
                     var after = CaptureSnapshot();
+                    var events = CopyEvents(startIndex, Runtime.EventLog.Events.Count);
+                    // Only the authoritative lifecycle's start consumes an opportunity, not bools or counters.
+                    if (State == CombatEncounterState.Started)
+                        flowPhase = events.Contains(GameEventType.TurnStarted)
+                            ? (actorSide == CombatActorSide.Player ? CombatTurnFlowPhase.AwaitingEnemy : CombatTurnFlowPhase.AwaitingPlayer)
+                            : flowBefore.Phase;
                     return new CombatIntentReceipt(CombatIntentDisposition.Completed, CombatIntentAdmissionReason.None,
-                        invoked, completed, before, after, CopyEvents(startIndex, Runtime.EventLog.Events.Count), refillResult);
+                        invoked, completed, before, after, events, actorSide, flowBefore, GetTurnFlowSnapshot(), refillResult);
                 }
                 catch (Exception exception)
                 {
@@ -146,7 +176,8 @@ namespace Game.Application.Runtime
                     string observationFailure;
                     var after = TryCaptureSnapshot(out observationFailure);
                     return new CombatIntentReceipt(CombatIntentDisposition.Faulted, CombatIntentAdmissionReason.None,
-                        invoked, completed, before, after, CopyEvents(startIndex, Runtime.EventLog.Events.Count), refillResult,
+                        invoked, completed, before, after, CopyEvents(startIndex, Runtime.EventLog.Events.Count),
+                        actorSide, flowBefore, GetTurnFlowSnapshot(), refillResult,
                         exception.GetType().FullName, exception.Message, observationFailure);
                 }
             }
@@ -177,11 +208,14 @@ namespace Game.Application.Runtime
             return CopyEvents(startEventIndex, startEventEndIndex);
         }
 
-        private CombatIntentAdmissionReason CheckAdmission(CombatIntent intent)
+        private CombatIntentAdmissionReason CheckAdmission(CombatIntent intent, CombatActorSide actorSide)
         {
             if (state == CombatEncounterState.Faulted) return CombatIntentAdmissionReason.EncounterFaulted;
             if (state != CombatEncounterState.Started) return CombatIntentAdmissionReason.EncounterNotStarted;
             if (State == CombatEncounterState.Terminal) return CombatIntentAdmissionReason.EncounterTerminal;
+            if (actorSide == CombatActorSide.Enemy)
+                return flowPhase == CombatTurnFlowPhase.AwaitingEnemy ? CombatIntentAdmissionReason.None : CombatIntentAdmissionReason.NoEnemyOpportunity;
+            if (flowPhase != CombatTurnFlowPhase.AwaitingPlayer) return CombatIntentAdmissionReason.NotPlayerOpportunity;
             if (intent == null) return CombatIntentAdmissionReason.NullIntent;
             switch (intent.Type)
             {
@@ -197,13 +231,14 @@ namespace Game.Application.Runtime
             }
         }
 
-        private CombatIntentReceipt RejectIntent(CombatIntentAdmissionReason reason, bool capture)
+        private CombatIntentReceipt RejectIntent(CombatIntentAdmissionReason reason, bool capture, CombatActorSide actorSide)
         {
             int cursor = Runtime.EventLog.Events.Count;
             string observationFailure = null;
             var snapshot = capture ? TryCaptureSnapshot(out observationFailure) : null;
+            var flow = GetTurnFlowSnapshot();
             return new CombatIntentReceipt(CombatIntentDisposition.AdmissionRejected, reason, false, false,
-                snapshot, snapshot, CopyEvents(cursor, cursor), observationFailureMessage: observationFailure);
+                snapshot, snapshot, CopyEvents(cursor, cursor), actorSide, flow, flow, observationFailureMessage: observationFailure);
         }
 
         private CombatEncounterSnapshot CaptureSnapshot()

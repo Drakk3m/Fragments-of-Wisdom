@@ -11,6 +11,8 @@ namespace Game.Application.Runtime
         EncounterTerminal,
         EncounterFaulted,
         CommandInFlight,
-        ResonanceUnavailable
+        ResonanceUnavailable,
+        NotPlayerOpportunity,
+        NoEnemyOpportunity
     }
 }
