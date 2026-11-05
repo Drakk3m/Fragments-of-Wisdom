@@ -42,6 +42,7 @@ A passing backend suite does not certify Unity, balance, complete content or a p
 - [P9.2 read-only combat projections](#combat-readonly-projections)
 - [P9.3 combat intent and event batches](#combat-intent-event-boundary)
 - [P9.4 combat encounter turn flow](#combat-turn-flow)
+- [P9.5 external presentation workflow verification](#combat-presentation-verification)
 - [Part VII: Historical Decisions & Reference Archive](#historical-archive)
 - [Preservation matrix and source inventory](#preservation-matrix)
 
@@ -721,6 +722,7 @@ One implementation status per row; VERIFIED is deliberately limited to the named
 | Detached combat observations | Accepted P9.2 scope | VERIFIED | CombatEncounterComposition.GetSnapshot and seven immutable application read models | 149 projection assertions; no mutable domain references, caching, action availability, commands or Unity HUD |
 | Combat intent and event boundary | Accepted P9.3 scope | VERIFIED | Existing owner SubmitIntent, ReadEvents and ReadStartEvents | 174 assertions; authoritative engine/refill delegation, detached receipts, explicit consumer cursor, reentry/fault guards; no gameplay rule changes |
 | Encounter turn flow | Accepted P9.4 scope | VERIFIED | Same owner gates SubmitIntent and AdvanceEnemyTurn; immutable flow facts | 336 assertions; player/enemy basic-attack alternation, lifecycle-evidenced consumption, terminal/fault suppression; no Domain changes |
+| External headless presentation workflow | Accepted P9.5 verification | VERIFIED | Separate non-friend executable drives public P9.1-P9.4 APIs | 230 external assertions; legitimate victory/defeat, consumer cursor recovery and partial faults; no production changes or Unity claim |
 | Narrative evaluators and candidate discovery | Accepted foundation | PARTIAL | `src/Game/Domain/Narrative/`, `Codex/`, `Missions/` | V2SmokeTests; complete quests, dialogue and route consequences absent |
 | Snapshot/file persistence | Accepted foundation | PARTIAL | `src/Game/Domain/Progress/` | V2/progression save cases pass; AUD-01/AUD-02/AUD-03/AUD-12 resolved; no general transactional rollback guarantee |
 | Equipment-taught skill metadata | Promising full loop | CODE FOUNDATION | `src/Game/Domain/Equipment/EquipmentDefinition.cs` | TaughtSkillId is not a verified equipment-learning workflow |
@@ -740,6 +742,7 @@ Run from the repository root using the solution's .NET SDK:
 dotnet restore Fragments-of-Wisdom.sln
 dotnet build Fragments-of-Wisdom.sln --no-restore -v:minimal
 dotnet run --project src/Game.SmokeTests/Game.SmokeTests.csproj --no-build
+dotnet run --project src/Game.PresentationBoundary.SmokeTests/Game.PresentationBoundary.SmokeTests.csproj --no-build
 git diff --check
 git status --short
 ```
@@ -751,13 +754,15 @@ git status --short
 | V2 Narrative / Progression / Persistence | 371 |
 | V3 Combat / Skills / Resonance / Status / Stats | 686 |
 | Player Progression / Combat Validation | 3186 |
-| **Total** | **4577** |
+| **Core smoke subtotal (Game.SmokeTests)** | **4577** |
+| External Presentation Boundary (separate executable) | 230 |
+| **Combined verification total (both commands)** | **4807** |
 
 Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, AUD-05 player Resonance ownership contains **175**, AUD-09 overflow-safe mastery contains **186**, AUD-10 actual mastery delta contains **373**, AUD-12 restore result integrity contains **518**, P8A restore API compatibility contains **58**, P8B combat diagnostic compatibility contains **138**, P9.1 encounter composition contains **156**, P9.2 combat projections contain **149**, P9.3 combat intent boundary contains **174**, and P9.4 encounter turn flow contains **336**, all already included in 3186. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
 The V2 group includes **107** AUD-03 Codex round-trip assertions; they are included in 371, not an additional reporting group.
 
-Shared Domain Foundations contains the original **16** domain-event assertions plus **316** AUD-11 resource-pool assertions. V3 contains the original **100** assertions plus **119** AUD-06 refill lifecycle, **247** AUD-07 terminal boundary and **220** AUD-08 Silence integrity assertions. Total 4577 is the freshly executed post-P9.4 suite (4241 baseline plus 336 turn-flow assertions); earlier closure counts below remain historical evidence. AUD-08 corrects one AUD-06 expectation that previously required a misleading Silence diagnostic on refill; the other AUD-06 assertions and its count remain intact.
+Shared Domain Foundations contains the original **16** domain-event assertions plus **316** AUD-11 resource-pool assertions. V3 contains the original **100** assertions plus **119** AUD-06 refill lifecycle, **247** AUD-07 terminal boundary and **220** AUD-08 Silence integrity assertions. The unchanged core suite still reports 4577; P9.5 independently adds 230 external-consumer assertions, for 4807 across both required runs. Solution build compiles both executables but does not run either automatically. Earlier closure counts below remain historical evidence. AUD-08 corrects one AUD-06 expectation that previously required a misleading Silence diagnostic on refill; the other AUD-06 assertions and its count remain intact.
 
 **Executed audit baseline (2026-10-30):** implementation `45fb4548ab18984940471b79d5643e16f5aa50f4`, Bible v3 `c11c74d1317f8ca279d8c0698b88d4af96350f94`; restore/build succeeded with 0 warnings and 0 errors; smoke 899 and V1 events 38; diff checks passed. Twelve additional in-memory probes against the compiled assembly reproduced the findings in Part V. They were not added to the suite and must not be counted as smoke assertions.
 
@@ -1253,7 +1258,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-12 missions are complete within their documented limits. Every implementation item must complete the PETTO loop before the next. P8A and P8B were subsequently authorized and completed as separate API naming/compatibility steps. P9 design/audit and the subsequently authorized P9.1 composition, P9.2 read-only projections, P9.3 intent/event boundary and P9.4 encounter turn flow are complete; visual implementation remains unstarted. Remaining priorities retain their existing order and require separate approval. Stop after P9.4 for architectural review; P9.5, Defend/Wait and all later implementation remain unauthorized.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-12 missions are complete within their documented limits. Every implementation item must complete the PETTO loop before the next. P8A and P8B were subsequently authorized and completed as separate API naming/compatibility steps. P9 design/audit, P9.1 composition, P9.2 read-only projections, P9.3 intent/event boundary, P9.4 encounter turn flow and the subsequently authorized P9.5 external headless verification are complete within their stated limits; visual implementation remains unstarted. Remaining priorities retain their existing order and require separate approval. Stop after P9.5 for independent architectural review and merge; P9.6, Defend/Wait and all later implementation remain unauthorized.
 
 **Explicit AUD-05 approval and closure (2026-11-03):** investigation paused at the design gate, then the user approved Option B. Player-only skill resource ownership is now enforced and verified by 175 permanent assertions. Existing priorities and AUD-06/AUD-07/AUD-08 scope are unchanged; no further implementation is authorized by this report.
 
@@ -1271,7 +1276,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 | 7 (AUD-08 complete) | Correct remaining action/status contracts | AUD-08 RESOLVED: authoritative Silence blocking and coherent events; 220 assertions; Defend/Wait remain outside this closure and require a separate public-contract decision |
 | 8a (complete) | Responsibility-based restore API naming | P8A: canonical ProgressRestore APIs with V4 forwarding compatibility; 58 assertions and old-binary verification; no persistence rename |
 | 8b (complete) | Responsibility-based combat diagnostic naming | P8B: canonical diagnostic views and typed constants; legacy constructors, enum strings and JSON intact; 138 assertions and old-binary verification |
-| 9 (audit, P9.1 through P9.4 complete; visual implementation not started) | Visual boundary and playable slice | P9 audit preserved; single-owner composition, projections, intent/events and alternating turn flow verified; P9.5 and later boundary/Unity steps require separate approval |
+| 9 (audit, P9.1 through P9.5 complete; visual implementation not started) | Visual boundary and playable slice | P9 audit preserved; public-only headless consumer verifies existing single-owner boundary; P9.6 remains unauthorized pending independent review and merge |
 | 10 | Revisit long-term systems behind their design gates | Town after visual boundary, Sanctuary after milestone inputs, hybrid combat only after dedicated redesign audit |
 
 Each 5a-5d is a separate repair candidate, not a combined cleanup branch. Each combat repair after priority 6 also needs one purpose. Historical proposed branch names `codex/rename-progress-restore-api`, `codex/rename-combat-validation-diagnostics` and `codex/visual-smoke-demo-design-audit` remain traceable here; no branch is created by this document.
@@ -1749,6 +1754,86 @@ The same private ExecuteCommand path handles both public entries. The enemy bran
 **Executed evidence:** baseline **4241** plus **336** = **4577** assertions: V1 **2**, Shared **332**, V2 **371**, V3 **686**, Player Progression / Combat Validation **3186**; V1 events **38**. Final restore/build/smoke/diff-check/status exit **0**, build **0 warnings / 0 errors**. An initial test-authoring build exited **1** with CS1729 (missing allowsStacking constructor argument in the new SkillSeal fixture; 0 warnings/1 error); fixing only that test yielded passing builds/smokes. This is an additive scheduling feature, not a fabricated defect reproduction. All AUD/P8 and existing persistence/old-JSON suites remain green. These focused integrated workflows are the verification iteration for this feature.
 
 **Scope and remaining gates:** three new immutable flow/side types; existing owner, receipt, admission enum and internal event-type helper; focused smoke suite, runner registration and P9.3 test migration; this Bible only for docs. Domain, engine formulas, resource/status/authorization rules, save schemas, factory/session, Unity and generators remain unchanged. Scheduling is encounter-local transient state, not resumable/persisted combat. No AI, enemy skills, initiative, party/multiple enemies, Defend/Wait, animations, UI or automatic advancement. Unity/Android and visual pacing remain unverified. Stop after P9.4 for independent architectural review: no PR, merge or P9.5/later implementation.
+
+<a id="combat-presentation-verification"></a>
+### P9.5: External Combat Presentation Workflow Verification
+
+**COMPLETE for public application APIs and headless interaction only (2026-11-05).** Branch `codex/combat-presentation-boundary-workflow-verification` starts from freshly fetched origin/main `72f6bca`; merge-base verifies P9.4 commit `24b941112e7e5bd074b6ff5a4e36cb8432c5fc1b` is included. Baseline restore/build/core smoke exit 0, **4577 assertions**, **38 V1 events**, zero warnings/errors. This verification does not produce a playable game or authorize P9.6.
+
+#### Discovery and External Boundary
+
+Public construction already suffices. PlayerSessionBootstrap constructs one PlayerSessionComposition, which constructs one LoadedPlayerSession. Its RuntimeState and registries are public trusted-composition APIs, as are ClassProfile assignment, MasteryProfile progression, SkillDefinition/SkillProgress constructors, CombatEntity/resources, PreparedCombatSkillBinding, CombatEncounterPreparation and CombatEncounterComposition constructors. The test registers one canonical skill definition in its session and binds the existing BalanceRitualSkill to matching progress; its numeric fixture metadata is not a new production content catalog or balance rule. Canonical metadata is validated by the existing owner. No new factory, visibility change or production fix is required.
+
+**Trusted assembly versus presentation:** TrustedEncounterAssembly builds each independent scenario through those public APIs, configures status/passive hooks before handoff and returns only the encounter owner (plus an expected exception reference to the test harness for identity verification). It never constructs an engine or CombatRuntimeContext. The existing owner creates those through the existing loaded-session factory. No setup reference to entities, progress, pools, session, log or hook is passed to PresentationConsumer. One owner/session/log exists per scenario; independently constructed scenarios are separate tests, not parallel owners of the same encounter. Hooks installed on Start use the same authoritative log; preparation remains fresh-log validated.
+
+`Game.PresentationBoundary.SmokeTests` is a separate net10.0 executable referencing Game, included in Debug/Release solution builds. Its unique assembly name is not the existing friend assembly `FragmentsOfWisdom.Game.SmokeTests`. No friend grant or project reference to that smoke suite was added. Existing P9.1/P9.2/P9.3/P9.4 tests use friend-only engine/runtime inspection for their own contracts and remain unchanged; they are not claimed as external-consumer proof. The external executable compiles using public members only. Supplemental reflection inspects public property metadata and friend-attribute names; it never reads private/internal fields, invokes hidden members or constructs inaccessible types. Public projection graph checks exclude mutable entities, SkillProgress, ResonanceProfile, engine, runtime and session references.
+
+#### Adapter API Inventory
+
+| API / retained value | Responsibility and access |
+|---|---|
+| CombatEncounterComposition | The consumer's only live gameplay handle; created by trusted composition, not by the view |
+| Start() | Gameplay-affecting, explicit once; no implicit start from reads |
+| SubmitIntent(BasicAttack / Skill(id) / Refill(amount)) | Gameplay-affecting, centrally gated player command; receipt is not a generic success verdict |
+| AdvanceEnemyTurn() | Gameplay-affecting, explicit pending enemy basic attack; no automatic animation-driven replay |
+| GetSnapshot(), GetTurnFlowSnapshot() | Read-only fresh detached combat/flow observations; full snapshot reads reject in-flight capture |
+| ReadStartEvents(), ReadEvents(cursor, optionalEnd) | Read-only indexed immutable copies; no hidden acknowledgement or engine execution |
+| State, StartFailure, ExecutionFailure | Public lifecycle/original exception diagnostics; exception objects stay separate from detached receipt values |
+| CombatIntentReceipt and nested values | Immutable observed admission/invocation/consumption/flow/partial-state facts and event batch |
+| Consumer cursor, displayed values and transcript | Test-only presentation state, never authoritative gameplay or a production event bus/store |
+
+The public bootstrap/session APIs can still manufacture engines for trusted application composition; they are not capabilities handed to this consumer. The boundary is disciplined dependency ownership, not a security sandbox preventing arbitrary code from referencing other public Domain types. Public projection absence checks and actual non-friend compilation establish the intended adapter contract without widening it.
+
+#### Consumer and Recovery Protocol
+
+PresentationConsumer holds one owner, detached display snapshots, one integer cursor and a presentation transcript. It submits intentions and reads phase facts; it neither calculates damage/availability nor accesses mutable source objects. All display messages are copied verbatim. A deliberately misleading start message containing TurnEnded and damage text does not create lifecycle or damage facts.
+
+Normal Start delivery is acknowledged before the first action. For a receipt whose start is ahead of the cursor, ReadEvents(cursor, start) supplies the missing prefix first. Previously acknowledged overlapping indices are skipped. A rejected receipt does not acknowledge any range, including older pending Start/fault events. The simulator stages each batch's display values locally and updates displayed entries/cursor only after all items process successfully. The failure test throws after one staged item: nothing from that batch is published, its cursor remains unchanged, and ReadEvents(cursor) can replay it. A previously completed prefix may already be acknowledged; each range commits independently. This is a test consumer convention, not a new domain transaction or a guarantee about irreversible real animations.
+
+Lost enemy receipts recover events and current snapshots, never gameplay, through ReadEvents(cursor) and read-only observation. Historical reads preserve original values without executing turns. A late duplicate receipt does not redisplay already acknowledged indices. End-to-end comparison verifies every displayed Index/Type/Message against the public projection of the authoritative log, with no gaps or duplicates. A second identically prepared encounter inserts extra snapshots/start/full-log reads between actions; the complete varying-RNG-driven final state and event stream remain identical. This is external observational evidence, not access to an internal RNG counter.
+
+**Future input/animation policy:** the owner rejects extra player input while AwaitingEnemy and duplicate enemy advancement after returning AwaitingPlayer. A real adapter must also disable input/advancement while its prior receipt is being presented, then call AdvanceEnemyTurn once at the explicit presentation-completion point. Do not schedule from TurnNumber, retry an action after display failure, or interpret a consumed blocked skill as free admission rejection. P9.5 tests headless gating and staged processing; real animation/input races, asynchronous cancellation and engine/UI threading are not verified. On Terminal/Faulted, stop submitting, display available final/partial snapshots, consume remaining events and retain fault diagnostics. Neither state permits further action, rollback or automatic retry.
+
+#### Complete Executed Workflow Transcripts
+
+Rows below record every successful action, not computed damage estimates. All ranges are half-open. The executable also prints every admission rejection: unknown skill immediately after Start; an extra player submission after each live player action; duplicate enemy advance after each live enemy action; both entries after termination. These reject with SkillNotPrepared, NotPlayerOpportunity, NoEnemyOpportunity and EncounterTerminal respectively, with empty ranges at the displayed cursor and unchanged state.
+
+| Player victory operation | Event range / cursor | Phase after | Player/enemy HP | Player Essence / active Resonance / skill XP |
+|---|---|---|---|---|
+| Start | [0,2) / 2 | AwaitingPlayer | 100 / 30 | 40 / 20 / 0 |
+| Player basic | [2,7) / 7 | AwaitingEnemy | 99 / 24 | 40 / 20 / 0 |
+| Enemy basic | [7,12) / 12 | AwaitingPlayer | 93 / 24 | 40 / 20 / 0 |
+| Player Balance Ritual | [12,20) / 20 | AwaitingEnemy | 92 / 18 | 38 / 18 / 10 |
+| Enemy basic, existing Burn lifecycle | [20,26) / 26 | AwaitingPlayer | 87 / 13 | 38 / 18 / 10 |
+| Player refill(4) | [26,30) / 30 | AwaitingEnemy | 86 / 13 | 40 / 20 / 10 |
+| Enemy basic, existing Burn lifecycle | [30,37) / 37 | AwaitingPlayer | 81 / 8 | 40 / 20 / 10 |
+| Player basic | [37,42) / 42 | AwaitingEnemy | 81 / 2 | 40 / 20 / 10 |
+| Enemy basic | [42,47) / 47 | AwaitingPlayer | 75 / 2 | 40 / 20 / 10 |
+| Player lethal basic | [47,51) / 51 | Terminal | 75 / 0 | 40 / 20 / 10 |
+
+The player starts with an existing three-boundary Poison status (potency 1). Initial and first-receipt collections remain immutable after later status ticks, skill XP, refill and terminal actions. Final event cursor **51** accounts for every emitted event exactly once. No actor is killed by test-side mutation after handoff; the final basic attack is legitimate and no enemy retaliation follows.
+
+| Enemy victory operation | Event range / cursor | Phase after | Player/enemy HP | Player Essence / active Resonance / skill XP |
+|---|---|---|---|---|
+| Start | [0,2) / 2 | AwaitingPlayer | 15 / 100 | 40 / 20 / 0 |
+| Player basic | [2,7) / 7 | AwaitingEnemy | 15 / 94 | 40 / 20 / 0 |
+| Enemy basic | [7,12) / 12 | AwaitingPlayer | 9 / 94 | 40 / 20 / 0 |
+| Player Balance Ritual | [12,20) / 20 | AwaitingEnemy | 9 / 88 | 38 / 18 / 10 |
+| Enemy basic | [20,26) / 26 | AwaitingPlayer | 4 / 83 | 38 / 18 / 10 |
+| Player refill(4) | [26,30) / 30 | AwaitingEnemy | 4 / 83 | 40 / 20 / 10 |
+| Enemy lethal basic | [30,35) / 35 | Terminal | 0 / 78 | 40 / 20 / 10 |
+
+Other executed cases: class-blocked and cross-class mastery 99 skills emit ActionBlocked, no XP/Resonance spending and AwaitingEnemy; mastery 100 permits the existing skill. Early reserve denial returns false, consumes no opportunity and stays AwaitingPlayer. A trusted preconfigured hook drains reserve after Begin: false still consumes and yields AwaitingEnemy. Missing Resonance is false/null and rejects refill; a present zero-capacity active pool is true/non-null/zero, not treated as absent. Recovery scenario acknowledges a missing Start prefix, loses an enemy receipt, then recovers a failed skill-batch presentation to cursor **20** with unchanged gameplay and no duplicate indices.
+
+**Fault evidence:** separately preconfigured player/enemy hooks apply existing public damage/resource mutations during authoritative execution, append one diagnostic event and throw the configured original exception. The consumer cannot access those hooks. Player fault ends with HP **93**, Essence **37**, fault range **[3,5)**, recovered cursor **5**; enemy fault follows a legitimate refill(0), ends with enemy HP **23**, enemy Essence **37**, range **[7,9)**, cursor **9**. Both retain the exact original exception and ExecuteTurn stack, expose partial snapshots and Faulted/no eligible actor, grant no skill XP and reject both later entries. Post-fault rejection does not acknowledge pending fault events. Recovery leaves state unchanged: no retry, rollback or normal end-turn regeneration is fabricated.
+
+#### Verification and Remaining Limits
+
+The standalone executable passes **230 assertions**; unchanged Game.SmokeTests passes **4577**, including P9.1 **156**, P9.2 **149**, P9.3 **174**, P9.4 **336**, every AUD/P8 regression and **38 V1 events**. Combined verification is **4807**, not a claim that the core runner contains the external checks. Restore, final solution build, independent external build, both smoke runs, diff-check and status exit **0**; final builds have **0 warnings / 0 errors**. The solution includes the new project so compilation is permanent, but both executables must be run using the commands in the current verification section.
+
+**Investigation failures preserved:** the initial restricted solution build exited 1 without compiler errors in its summary; a diagnostic serial build exposed a denied compiler-server named pipe, and independent compilation also identified test-authoring CS0246/CS0535 from a missing public Resolvers namespace import (0 warnings/2 errors). Correcting the test import and using approved expanded execution allowed a clean build. The first external run exited 1 after **204** passing assertions because the test installed a debuff into the encounter log before preparation; production correctly rejected the non-fresh log. Moving that trusted fixture installation into its preconfigured Start hook preserved the existing contract, one log and consumer separation. No production defect or public composition gap was hidden with internal access.
+
+**Changed scope:** solution registration, four files in the new external verification project (project, trusted assembler, consumer, runner) and this Bible. No production source, existing tests, friend configuration, gameplay formulas, save schema, Unity or generator changes. This verifies public .NET application APIs, external compilation and headless interaction only. It does **not** verify Unity assembly/API compatibility, Editor import, rendering, animation, Android packaging, device performance, real input races or a playable game. Snapshot durability, cross-encounter save/exit behavior, asynchronous presentation rollback and untrusted executable plugins are not added. No new architectural blocker was found for the scoped public workflow; platform integration requires its separate gate. Audit findings/priorities remain unchanged. Stop for independent architectural review: no PR, merge or P9.6 until this verification is reviewed and merged.
 
 ### Unresolved Naming and Compatibility Work
 
