@@ -4,12 +4,18 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Game.SmokeTests", "src\Game.SmokeTests\Game.SmokeTests.csproj", "{C4773A3E-AB22-435C-4BD2-C40E21862EE9}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Game.PresentationBoundary.SmokeTests", "src\Game.PresentationBoundary.SmokeTests\Game.PresentationBoundary.SmokeTests.csproj", "{BB89B8DF-373F-41B7-AE9A-B227A806AD78}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BB89B8DF-373F-41B7-AE9A-B227A806AD78}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BB89B8DF-373F-41B7-AE9A-B227A806AD78}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BB89B8DF-373F-41B7-AE9A-B227A806AD78}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BB89B8DF-373F-41B7-AE9A-B227A806AD78}.Release|Any CPU.Build.0 = Release|Any CPU
 		{C4773A3E-AB22-435C-4BD2-C40E21862EE9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{C4773A3E-AB22-435C-4BD2-C40E21862EE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C4773A3E-AB22-435C-4BD2-C40E21862EE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
