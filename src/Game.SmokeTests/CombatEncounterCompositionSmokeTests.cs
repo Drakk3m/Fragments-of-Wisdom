@@ -368,8 +368,8 @@ namespace Game.SmokeTests
         private static void AssertEncounterPublicBoundary()
         {
             var publicProperties = typeof(CombatEncounterComposition).GetProperties();
-            Assert(publicProperties.Length == 2
-                && publicProperties.All(p => p.Name == "State" || p.Name == "StartFailure"),
+            Assert(publicProperties.Length == 3
+                && publicProperties.All(p => p.Name == "State" || p.Name == "StartFailure" || p.Name == "ExecutionFailure"),
                 "P9.1 public owner exposes lifecycle/diagnostics only, not mutable gameplay objects.");
             Assert(typeof(CombatEncounterPreparation).GetProperties().Length == 0,
                 "P9.1 preparation does not expose mutable dependency getters.");
