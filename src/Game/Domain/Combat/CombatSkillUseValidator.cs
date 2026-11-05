@@ -265,7 +265,7 @@ namespace Game.Domain.Combat
 
         // The engine retains SkillProgress. Require value equality for all definition
         // fields so authorization and execution cannot consume conflicting metadata.
-        private static bool HasCanonicalMetadata(
+        internal static bool HasCanonicalMetadata(
             SkillDefinition definition,
             SkillDefinition canonical)
         {
