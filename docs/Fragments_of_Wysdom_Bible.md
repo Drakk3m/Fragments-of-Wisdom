@@ -44,6 +44,7 @@ A passing backend suite does not certify Unity, balance, complete content or a p
 - [P9.4 combat encounter turn flow](#combat-turn-flow)
 - [P9.5 external presentation workflow verification](#combat-presentation-verification)
 - [P9.6 Unity runtime compatibility spike](#unity-runtime-compatibility)
+- [P9.6B second-PC Editor acceptance preparation](#unity-editor-acceptance-preparation)
 - [Part VII: Historical Decisions & Reference Archive](#historical-archive)
 - [Preservation matrix and source inventory](#preservation-matrix)
 
@@ -1280,7 +1281,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 | 7 (AUD-08 complete) | Correct remaining action/status contracts | AUD-08 RESOLVED: authoritative Silence blocking and coherent events; 220 assertions; Defend/Wait remain outside this closure and require a separate public-contract decision |
 | 8a (complete) | Responsibility-based restore API naming | P8A: canonical ProgressRestore APIs with V4 forwarding compatibility; 58 assertions and old-binary verification; no persistence rename |
 | 8b (complete) | Responsibility-based combat diagnostic naming | P8B: canonical diagnostic views and typed constants; legacy constructors, enum strings and JSON intact; 138 assertions and old-binary verification |
-| 9 (audit, P9.1 through P9.5 complete; P9.6 Editor gate blocked) | Visual boundary and playable slice | P9.6 Standard 2.1 build and repeated host workflows pass; actual Unity import/execution UNVERIFIED; CONDITIONAL GO does not authorize P9.7 |
+| 9 (audit, P9.1 through P9.5 complete; P9.6 Editor gate blocked) | Visual boundary and playable slice | P9.6 Standard 2.1 build passes; P9.6B second-PC fixture/staging prepared and host-checked; actual Unity import/execution UNVERIFIED; CONDITIONAL GO does not authorize P9.7 |
 | 10 | Revisit long-term systems behind their design gates | Town after visual boundary, Sanctuary after milestone inputs, hybrid combat only after dedicated redesign audit |
 
 Each 5a-5d is a separate repair candidate, not a combined cleanup branch. Each combat repair after priority 6 also needs one purpose. Historical proposed branch names `codex/rename-progress-restore-api`, `codex/rename-combat-validation-diagnostics` and `codex/visual-smoke-demo-design-audit` remain traceable here; no branch is created by this document.
@@ -1914,6 +1915,154 @@ git status --short
 These projects are intentionally outside the solution; the commands are a separate compatibility gate. No extra gameplay assertions are attributed to the core suite. A restricted environment inventory attempt failed with Service Control Manager access denied (dotnet --info exit 1); approved execution succeeded, and subsequent builds/tests succeeded. The Editor absence is not a compiler failure.
 
 **Remaining acceptance work:** independently review this branch, then obtain an explicitly selected installed/licensed Unity 6.3 LTS patch and verify actual API profile, import dependency resolution, real public encounter execution, JSON round trips and exception/cursor behavior. Review stripping/AOT and platform save paths separately before Android claims. No scenes, UI, assets, Unity project, installation, gameplay/source/schema changes, PR or merge were added. P9.6 is partially evidenced and remains blocked at the actual Editor gate; stop for architectural review, not P9.7.
+
+<a id="unity-editor-acceptance-preparation"></a>
+### P9.6B: Reproducible Unity Editor Acceptance Preparation
+
+**PREPARATION VERIFIED; actual Editor acceptance UNVERIFIED (2026-11-06).** Branch `codex/unity-editor-acceptance-p9-6` starts from fetched origin/main `e4f25d3c4307e65c864f5e4fea9600726d541809`; ancestry check confirms P9.6 commit `00e608a9f46984eacf66747a7aac1df4910541ae`. The work PC still has no Unity installation. No Editor version, successful import, Mono execution or accepted P9.6 completion is invented. P9.6 remains **CONDITIONAL GO**, with its actual Editor gate open; this preparation does not authorize P9.7.
+
+#### Project and Artifact Ownership
+
+The isolated host is `unity/FragmentsOfWysdom.Acceptance/`:
+
+| Version-controlled input | Purpose |
+|---|---|
+| Assets/Acceptance/Editor/AcceptanceTests.cs | Seven NUnit Edit Mode cases against public application APIs |
+| Assets/Acceptance/Editor/AcceptanceEnvironment.cs | Editor-only profile configuration and real environment/artifact evidence |
+| Assets/Acceptance/Editor/FragmentsOfWysdom.Acceptance.Editor.asmdef | Editor-only test assembly; no friend privilege |
+| Assets/Acceptance/Editor/Generated/*.cs.meta | Stable metadata for two generated, unchanged P9.5 test-helper copies |
+| Assets/Plugins/Backend/*.dll.meta | Six stable Editor-only plugin importers; reference validation enabled |
+| Assets folder .meta files | Stable folder identities; sixteen metadata files total |
+| Packages/manifest.template.json | Empty dependency template; actual Test Framework version is selected from the installed Editor |
+| ProjectSettings/.gitkeep | Structure only; no fabricated ProjectVersion.txt or serialized Editor settings |
+
+No scenes, cameras, MonoBehaviour controller, HUD, artwork or new gameplay are included. The test assembler performs trusted setup through public APIs; the consumer receives the existing owner, detached values and a presentation cursor. It never constructs another engine or authoritative event log. Fault cases reuse P9.5's preconfigured trusted hooks; no view-side mutation or gameplay retry is added.
+
+`tools/UnityAcceptance/Stage-Backend.ps1` uses the existing compatibility project, **locked restore**, **Release build**, netstandard2.1/C#9 and exact equality of all **266** production source paths. It does not alter the net10 backend/project/solution, copy gameplay sources into Assets, or build an independently maintained implementation. The two copied sources are **test helpers only**, from Game.PresentationBoundary.SmokeTests: TrustedEncounterAssembly and PresentationConsumer. Their authoritative originals remain unchanged; generated copies are ignored and refreshed by the script.
+
+The script checks the complete resolved package graph and runtime paths against a reviewed allowlist, verifies copied build dependencies against their selected package-asset hashes, rejects unexpected DLLs and fails on missing inputs. It copies only these six DLLs, never a glob of the host/NuGet output:
+
+| Staged DLL | Reviewed source |
+|---|---|
+| FragmentsOfWisdom.Game.dll | Existing compatibility target, Release/netstandard2.1 |
+| Microsoft.Bcl.AsyncInterfaces.dll | Package 10.0.8, lib/netstandard2.1 |
+| System.IO.Pipelines.dll | Package 10.0.8, lib/netstandard2.0 |
+| System.Runtime.CompilerServices.Unsafe.dll | Package 6.1.2, lib/netstandard2.0 |
+| System.Text.Encodings.Web.dll | Package 10.0.8, lib/netstandard2.0 |
+| System.Text.Json.dll | Package 10.0.8, lib/netstandard2.0 |
+
+System.Buffers 4.6.1, System.Memory 4.6.3 and System.Threading.Tasks.Extensions 4.6.3 resolve to empty Standard 2.1 profile placeholders and are **not copied**. No net10 framework DLL, NUnit/NUnitLite DLL, PDB, deps.json or runtimeconfig is staged. There is only one Game assembly identity. Unity's actual dependency resolution, including potential collisions with Editor-provided assemblies, remains unverified: do not disable importer reference validation or arbitrarily add framework DLLs to suppress errors.
+
+Staging is repeatable: all six DLL and two helper hashes remain identical on a repeated run. Close this Unity project before staging. Unexpected files are rejected, not deleted. Evidence/staged-artifacts.json records the source commit, dirty-worktree fact, SDK, framework/language/source count, lock hash, exact origin/version/assembly identity/SHA-256 of each DLL, helper hashes and UTC staging time. Timestamp changes do not imply changed artifacts. Generated files are confined to this acceptance host; its scoped ignore rules exclude DLLs/helper copies, Evidence, Unity caches/settings, generated package manifests/locks and IDE output. Existing repository-wide ignore behavior is otherwise unchanged.
+
+#### Version Selection and Editor Runner
+
+**Exact patch remains OPEN / UNVERIFIED until selected on the personal PC.** Choose an installed final Unity **6.3 LTS (6000.3.xfN)** release in Hub, with a valid license. No installer is run by these scripts. The [Unity 6.3 package documentation](https://docs.unity.com/en-us/engine/6000.3/manual/packages-list/packages-all/pack-core/com-unity-test-framework) identifies Test Framework as an Editor-coupled core package; it does not establish the former fixed BuiltInPackages/com.unity.test-framework directory as a portable installation contract. Core package classification is not proof of that physical layout.
+
+The hardened runner inventories only the selected Windows Editor's Data/Resources/PackageManager directory, to depth four: unpacked package.json files and com.unity.test-framework-*.tgz / com.unity.test-framework@*.tgz archives. Archive metadata is read with tar without extracting files. Reparse-point candidates are rejected; project/global caches, other Editors and registry fallback are not searched. Exact package identity/version and any declared unity/unityRelease minimum are checked against the selected Editor. Missing, malformed, too-new or conflicting metadata fails closed. Multiple versions are ambiguous, not an invitation to choose the highest; equivalent same-version metadata is selected deterministically by representation/path only after all candidates agree.
+
+The generated manifest references that installation's actual package folder or tarball with file:, using [Unity's supported local dependency formats](https://docs.unity.com/en-us/engine/6000.3/manual/packages-list/dependencies-lp/upm-localpath). No replacement Test Framework is silently downloaded or version invented, and Unity/importer compatibility checks remain enabled. Package resolution and transitive dependencies still require real Editor verification. This bounded discovery policy is not a claim that every 6.3 patch uses one of the supported physical layouts. package-discovery.json preserves the search root, candidates, metadata, selected source/hash and errors. If no reliable version is found, verify/repair the exact installation in Hub, inspect the package through [Package Manager Locate/Open Manifest](https://docs.unity.com/en-us/engine/6000.3/manual/packages-list/package-inspection/upm-inspect), and submit the discovery report/local metadata for review. Do not use an arbitrary version override, another Editor's cache or disabled signature/reference validation as recovery.
+
+`Invoke-EditorAcceptance.ps1 -UnityEditor <path> -PrepareOnly` obtains the installed Editor's exact version using its documented `-version` command, validates the 6000.3 final-release family, stages the backend and generates local ProjectVersion.txt and Packages/manifest.json from that evidence. Preparation does not run tests. [Unity CLI documentation](https://docs.unity.com/en-us/engine/6000.3/manual/unity-editor/command-line-arguments/editor) distinguishes version reporting from launching the Editor.
+
+Without -PrepareOnly, the same runner first invokes AcceptanceEnvironment.Configure in a separate batch process to set Standalone **ApiCompatibilityLevel.NET_Standard (.NET Standard 2.1)**, then launches EditMode tests filtered to the acceptance assembly. This setting uses the [documented PlayerSettings API](https://docs.unity3d.com/6000.3/Documentation/ScriptReference/PlayerSettings.SetApiCompatibilityLevel.html); it does not change gameplay. The test invocation deliberately omits -quit, following the [Test Framework CLI contract](https://docs.unity.com/en-us/engine/6000.3/manual/programming-environment/test-framework-introduction/reference-command-line). Each process has a bounded wait, and the runner preserves logs on timeout/failure. No automatic test/action retry is used.
+
+#### Editor Test Inventory and Evidence
+
+| Case | Required observations |
+|---|---|
+| BackendIdentityAndPublicBoundary | Loaded Game assembly is Standard 2.1, expected identity, no test friend privilege or mutable runtime/engine exposure |
+| PublicEncounterThroughTerminal(false) | Public bootstrap/preparation, Start/start events, detached snapshots, attack, pending enemy, explicit advance, canonical skill/XP/Resonance, successful refill, legitimate player victory, terminal rejection |
+| PublicEncounterThroughTerminal(true) | Same public flow with legitimate enemy victory and no terminal retaliation |
+| LostReceiptRecoveryDoesNotReplayOrDuplicate | Missing start prefix/lost enemy receipt recovered by reads; duplicate receipt produces no repeated presentation indices or gameplay |
+| OriginalFaultPreservesPartialStateWithoutRetry(false) | Player fault retains original exception/stack, partial HP/Essence, no skill XP, faulted flow and no retry |
+| OriginalFaultPreservesPartialStateWithoutRetry(true) | Same guarantees for the explicitly advanced enemy fault |
+| ProductionJsonSnapshotRoundTripAndLegacyDefaults | Real V2ProgressSnapshotJsonSerializer including nested reflection DTOs: class/mastery/mentor/scoped tree/bindings/Codex facts round-trip; legacy schema-1 missing fields remain safe |
+
+OneTimeSetUp additionally verifies actual Unity version, desktop target, Standard 2.1 profile, Mono, resolved Test Framework identity and all six **loaded** DLL hashes against the staged manifest, plus both helper hashes. It records runtime/profile/version/package/time and assembly identities/hashes in environment.txt. A different Editor-provided DLL cannot silently count as the staged candidate. Dependency/reflection failures retain exceptions and diagnostics; a compile/import failure may occur before setup, so the Editor log is essential.
+
+Each batch run creates a unique Evidence/run-UTC-GUID directory before preflight. execution.json records the stage, status, failure classification, exception/error record/stack, recovery guidance and test-verification state even when execution stops before XML exists. Each launched process has its own stdout/stderr and process JSON with arguments, timestamps, raw exit code, timeout and launch exception. Available preparation metadata, staged manifest, discovered package metadata, generated manifest/lock, staging.log, configure.log, Editor.log, results.xml and environment.txt are retained; failure.txt preserves the error record. No log cleanup occurs on rejection.
+
+CompilationFailed, AssemblyResolutionFailed, PackageResolutionFailed and AssetImportFailed classify recognized log diagnostics, even with exit zero. ProcessLaunchFailed, ProcessTimedOut and EditorProcessFailed preserve launch/timeout/otherwise-unclassified nonzero failures. Matching log paths, lines and text remain in execution.json. Classification patterns are diagnostic heuristics, not proof that an unfamiliar log is harmless: a nonzero exit or missing XML still fails. Configuration/import failure stops before test launch. The runner requires **exactly seven passed cases**, a Passed root result, exit zero and environment evidence matching the selected Editor/package plus Standard/Mono facts. MissingTestResults leaves TestOutcome=NotVerified, never successful or partially completed; malformed XML, zero/skipped/failed cases and mismatched environment evidence also fail. Exceptions are rethrown, retaining a nonzero runner exit. Result XML includes names and failure stacks when generated. This is evidence for independent review, not automatic closure of P9.6. A GUI run writes a separate Evidence/gui-UTC directory; export XML and copy the corresponding Editor log there manually.
+
+#### Two-Computer Procedure
+
+On the personal Windows PC, install/use PowerShell 7.2+, .NET SDK 10 (this preparation was verified with **10.0.204**) and an explicitly selected licensed Unity 6.3 LTS patch. Clone the Git repository or fetch the branch in an existing clean clone; no manual transfer of gameplay sources or DLLs is needed.
+
+```powershell
+git clone https://github.com/Drakk3m/Fragments-of-Wisdom.git
+Set-Location Fragments-of-Wisdom
+git fetch origin
+git switch --track origin/codex/unity-editor-acceptance-p9-6
+$editor = Read-Host 'Full path to the selected installed Unity.exe'
+pwsh -NoProfile -File tools/UnityAcceptance/Invoke-EditorAcceptance.ps1 -UnityEditor $editor -PrepareOnly
+```
+
+For an existing local branch, switch to that branch without recreating it. **Prepare before the first Hub open**, so generated DLLs/helpers exist beside their tracked metadata and Hub can see a real ProjectVersion.txt. In Hub, Add/Open `unity/FragmentsOfWysdom.Acceptance` with that exact selected Editor. Allow package resolution/import; inspect Console errors without changing production code.
+
+GUI fallback: select a desktop Windows Standalone target, use **Tools > Fragments of Wysdom > Configure Acceptance Profile**, then **Window > General > Test Runner**, EditMode, run all seven acceptance cases. Export the results XML and copy Editor.log (Console > Open Editor Log) into the reported Evidence/gui-UTC directory. Keep environment.txt, the staged manifest, and resolved Packages/manifest.json and packages-lock.json alongside them. Do not report success if the assembly/test cases are missing.
+
+For reproducible command-line evidence, close the project in the Editor, then run:
+
+```powershell
+pwsh -NoProfile -File tools/UnityAcceptance/Invoke-EditorAcceptance.ps1 -UnityEditor $editor
+```
+
+Share the **entire generated run directory**, including failures/logs, for independent architectural review; inspect local paths in logs before sharing outside the project team. Do not commit evidence, DLLs, generated settings or package lockfiles. Do not merge or start P9.7. The exact Editor patch/Test Framework versions must accompany the results so another PC can select the same installation, not silently upgrade to another patch.
+
+#### Executed Checks and Remaining Gates
+
+Executed on the work PC, **not Unity**:
+
+| Check | Result |
+|---|---|
+| Existing solution restore/build | PASS, exit 0, zero warnings/errors |
+| Core smoke | PASS, 4577 assertions: V1 2, Shared 332, V2 371, V3 686, Progression 3186 |
+| V1 legacy events | 38 |
+| Original external smoke | PASS, 230; original combined baseline remains 4807 |
+| Compatibility locked restore/build and host smoke | PASS, exit 0, zero warnings/errors; repeated 230 assertions |
+| Stage-Backend, Release build and repeated hash check | PASS, exit 0, six DLLs/two helpers unchanged on repeat |
+| Unexpected DLL negative probe | Expected exit 1 before copying; previous six artifacts unchanged; only the temporary probe was removed |
+| Missing Editor path negative probe | Expected exit 1 with explicit no-install diagnostic; no fabricated Editor version |
+| PowerShell parser / project JSON / metadata inspection | PASS; Editor-only asmdef, valid template, sixteen unique GUIDs |
+| HostCheck locked restore/build/run | PASS, exit 0; seven cases in Debug and repeated in Release, zero failures/skips/warnings; Release host Game DLL hash equals the staged candidate |
+| git diff --check | PASS |
+| Real Editor prepare/import/configuration/Mono/JSON execution | UNVERIFIED: no Unity installed |
+| IL2CPP/AOT/stripping, Android, performance and platform save-file operations | UNVERIFIED / outside this preparation |
+
+HostCheck is a separate net10 NUnitLite 3.14 executable with its own lockfile, outside the solution. It links the exact fixture logic and authoritative two helpers against the compatibility project; UNITY_EDITOR is not defined, so it **does not compile or exercise AcceptanceEnvironment**. Its seven passing cases do not prove Unity's bundled NUnit compatibility, compiler/importers, Mono, Standard JSON runtime assets, package layout or PlayerSettings API execution. No fake Unity assemblies or production test hooks were introduced. Original baselines and existing AUD regressions remain unchanged.
+
+Additional work-PC commands after the normal verification and P9.6 compatibility commands:
+
+```powershell
+pwsh -NoProfile -File tools/UnityAcceptance/Test-AcceptanceRunner.ps1
+pwsh -NoProfile -File tools/UnityAcceptance/Stage-Backend.ps1
+dotnet restore tools/UnityAcceptance/HostCheck/HostCheck.csproj --locked-mode
+dotnet build tools/UnityAcceptance/HostCheck/HostCheck.csproj --no-restore -c Release -v:minimal
+dotnet run --project tools/UnityAcceptance/HostCheck/HostCheck.csproj --no-build -c Release -- --result=unity/FragmentsOfWysdom.Acceptance/Evidence/host-check-release.xml
+git diff --check
+```
+
+#### P9.6B Follow-Up: Acceptance Runner Hardening
+
+**Executed 2026-11-06; real Unity acceptance remains UNVERIFIED.** Changes are restricted to Invoke-EditorAcceptance.ps1, its new AcceptanceRunner.psm1 helper, the separate Test-AcceptanceRunner.ps1 infrastructure regression script and this Bible. Production gameplay, existing smoke tests, all seven Editor scenarios, staging inputs, architecture and the audit backlog are unchanged. The helper centralizes runner diagnostics/discovery, not a new gameplay or acceptance implementation.
+
+| Re-executed verification | Evidence |
+|---|---|
+| Original solution restore/build | Exit 0; zero warnings/errors |
+| Original core smoke | Exit 0; V1 2 / Shared 332 / V2 371 / V3 686 / Progression 3186 = **4577**, with **38 V1 events** |
+| Original external smoke | Exit 0; **230**, original combined total **4807** |
+| Compatibility locked restore/build/external smoke | Exit 0; zero warnings/errors; **230** repeated assertions, counted separately |
+| HostCheck locked restore, Debug and Release build/run | Exit 0; zero build warnings/errors; **7/7 cases in each configuration**, no failed/skipped cases; hardening-host-debug.xml and hardening-host-release.xml retained locally |
+| Stage-Backend repeated twice | Both exit 0, zero build warnings/errors; **six DLL hashes and two helper hashes identical** |
+| Runner infrastructure regressions | Exit 0; **46 assertions** using explicitly synthetic package/log/XML fixtures and real PowerShell child-process capture, not Unity execution |
+| PowerShell parser / git diff --check | PASS for all four runner/staging PowerShell files; diff clean |
+
+Runner regressions cover missing/wrong Editor paths and invalid version families; absent package roots/identity, corrupt JSON, missing/range versions, unsupported minimums, ambiguous/conflicting metadata, equivalent duplicate metadata, unpacked/versioned folders and tarballs without extraction. They also cover four pre-XML diagnostic classes, nonzero exits, timeout classification, missing/malformed/zero/skipped XML, absent/mismatched environment evidence, retained child stderr/raw exit 23 and launch exceptions. Invoking the actual runner with a missing Editor path returns expected nonzero exit and writes a unique failed execution summary plus failure.txt; no fake Unity executable is run. Fixture package/Editor versions are parser data, not recommended or installed versions. These 46 checks and the host cases are not added to the original gameplay smoke totals.
+
+An approval-service usage limit interrupted the first verification attempt before build execution; the resumed full sequence completed successfully. That interruption is not a Unity/compiler failure. Remaining gates: discover the actual selected installation, resolve/import its real Test Framework and staged assemblies, compile Editor-only code, execute all seven tests on Mono with matching environment/hash evidence, and obtain independent review. Actual Unity timeout/import failures and alternate real installation layouts remain unobserved here. No Editor installation, PR, merge or P9.7 work is performed.
+
+**Final P9.6 gate:** execute the real Editor procedure on the personal PC, retain all seven test results plus import/runtime/dependency/profile evidence, investigate any incompatibility without production changes absent approval, and obtain independent architectural acceptance. Editor Mono success still does not settle Android, IL2CPP/AOT, stripping, filesystem semantics or P9.7 authorization. The single audit backlog and prior resolved findings retain their status and priority.
 
 ### Unresolved Naming and Compatibility Work
 

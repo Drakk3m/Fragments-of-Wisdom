@@ -1,3 +1,19 @@
 bin/
 obj/
 .dotnet_home/
+
+# Generated outputs of the isolated P9.6 acceptance host only.
+/unity/FragmentsOfWysdom.Acceptance/Library/
+/unity/FragmentsOfWysdom.Acceptance/Temp/
+/unity/FragmentsOfWysdom.Acceptance/Logs/
+/unity/FragmentsOfWysdom.Acceptance/UserSettings/
+/unity/FragmentsOfWysdom.Acceptance/Evidence/
+/unity/FragmentsOfWysdom.Acceptance/Packages/manifest.json
+/unity/FragmentsOfWysdom.Acceptance/Packages/packages-lock.json
+/unity/FragmentsOfWysdom.Acceptance/ProjectSettings/*
+!/unity/FragmentsOfWysdom.Acceptance/ProjectSettings/.gitkeep
+/unity/FragmentsOfWysdom.Acceptance/Assets/Plugins/Backend/*.dll
+/unity/FragmentsOfWysdom.Acceptance/Assets/Acceptance/Editor/Generated/*.cs
+/unity/FragmentsOfWysdom.Acceptance/*.csproj
+/unity/FragmentsOfWysdom.Acceptance/*.sln
+/unity/FragmentsOfWysdom.Acceptance/*.slnx
