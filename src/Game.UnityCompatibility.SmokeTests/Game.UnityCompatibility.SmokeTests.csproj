@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>FragmentsOfWisdom.Game.UnityCompatibility.SmokeTests</AssemblyName>
+    <RootNamespace>Game.PresentationBoundary.SmokeTests</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreIgnoreFailedSources>false</RestoreIgnoreFailedSources>
+    <NuGetAudit>true</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Game.UnityCompatibility/Game.UnityCompatibility.csproj" />
+    <Compile Include="../Game.PresentationBoundary.SmokeTests/*.cs" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>
