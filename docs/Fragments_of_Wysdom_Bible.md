@@ -43,6 +43,7 @@ A passing backend suite does not certify Unity, balance, complete content or a p
 - [P9.3 combat intent and event batches](#combat-intent-event-boundary)
 - [P9.4 combat encounter turn flow](#combat-turn-flow)
 - [P9.5 external presentation workflow verification](#combat-presentation-verification)
+- [P9.6 Unity runtime compatibility spike](#unity-runtime-compatibility)
 - [Part VII: Historical Decisions & Reference Archive](#historical-archive)
 - [Preservation matrix and source inventory](#preservation-matrix)
 
@@ -723,6 +724,7 @@ One implementation status per row; VERIFIED is deliberately limited to the named
 | Combat intent and event boundary | Accepted P9.3 scope | VERIFIED | Existing owner SubmitIntent, ReadEvents and ReadStartEvents | 174 assertions; authoritative engine/refill delegation, detached receipts, explicit consumer cursor, reentry/fault guards; no gameplay rule changes |
 | Encounter turn flow | Accepted P9.4 scope | VERIFIED | Same owner gates SubmitIntent and AdvanceEnemyTurn; immutable flow facts | 336 assertions; player/enemy basic-attack alternation, lifecycle-evidenced consumption, terminal/fault suppression; no Domain changes |
 | External headless presentation workflow | Accepted P9.5 verification | VERIFIED | Separate non-friend executable drives public P9.1-P9.4 APIs | 230 external assertions; legitimate victory/defeat, consumer cursor recovery and partial faults; no production changes or Unity claim |
+| Unity runtime compatibility | Authorized P9.6 spike | CONDITIONAL GO / EDITOR UNVERIFIED | Same-source Standard 2.1/C#9 DLL build and external workflows on .NET host | 230 repeated host assertions; no installed Editor; actual import/execution acceptance remains blocked |
 | Narrative evaluators and candidate discovery | Accepted foundation | PARTIAL | `src/Game/Domain/Narrative/`, `Codex/`, `Missions/` | V2SmokeTests; complete quests, dialogue and route consequences absent |
 | Snapshot/file persistence | Accepted foundation | PARTIAL | `src/Game/Domain/Progress/` | V2/progression save cases pass; AUD-01/AUD-02/AUD-03/AUD-12 resolved; no general transactional rollback guarantee |
 | Equipment-taught skill metadata | Promising full loop | CODE FOUNDATION | `src/Game/Domain/Equipment/EquipmentDefinition.cs` | TaughtSkillId is not a verified equipment-learning workflow |
@@ -757,6 +759,8 @@ git status --short
 | **Core smoke subtotal (Game.SmokeTests)** | **4577** |
 | External Presentation Boundary (separate executable) | 230 |
 | **Combined verification total (both commands)** | **4807** |
+
+P9.6 separately reruns the same **230** external assertions against the Standard 2.1 candidate on a .NET 10 host. These are repeated compatibility checks, not new core assertions or Unity evidence. Run the additional [compatibility commands](#unity-runtime-compatibility) when checking that build target.
 
 Legacy V1 events: **38**, a separate guardrail, not additional assertions. The Progression integrated-workflow subsection contains **186**, AUD-01 restore destination integrity contains **68**, AUD-02 semantic skill tree restore contains **139**, AUD-04 canonical skill definition contains **199**, AUD-05 player Resonance ownership contains **175**, AUD-09 overflow-safe mastery contains **186**, AUD-10 actual mastery delta contains **373**, AUD-12 restore result integrity contains **518**, P8A restore API compatibility contains **58**, P8B combat diagnostic compatibility contains **138**, P9.1 encounter composition contains **156**, P9.2 combat projections contain **149**, P9.3 combat intent boundary contains **174**, and P9.4 encounter turn flow contains **336**, all already included in 3186. Historical V4/V5 labels and earlier counts are not current reporting groups.
 
@@ -1258,7 +1262,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 <a id="current-backlog"></a>
 ## Single Current Audit-Driven Backlog
 
-**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-12 missions are complete within their documented limits. Every implementation item must complete the PETTO loop before the next. P8A and P8B were subsequently authorized and completed as separate API naming/compatibility steps. P9 design/audit, P9.1 composition, P9.2 read-only projections, P9.3 intent/event boundary, P9.4 encounter turn flow and the subsequently authorized P9.5 external headless verification are complete within their stated limits; visual implementation remains unstarted. Remaining priorities retain their existing order and require separate approval. Stop after P9.5 for independent architectural review and merge; P9.6, Defend/Wait and all later implementation remain unauthorized.
+**PROPOSED PRIORITY, PENDING EXPLICIT ARCHITECTURAL APPROVAL.** This replaces the old naming-first ordering as the recommended roadmap, not as authorization to implement fixes. The archived backlog is historical only. The explicitly authorized AUD-01 through AUD-12 missions are complete within their documented limits. Every implementation item must complete the PETTO loop before the next. P8A and P8B were subsequently authorized and completed as separate API naming/compatibility steps. P9 design/audit, P9.1 composition, P9.2 read-only projections, P9.3 intent/event boundary, P9.4 encounter turn flow and P9.5 external headless verification are complete within their stated limits. Subsequently authorized P9.6 has compatible-build and .NET-host evidence only: CONDITIONAL GO, actual Unity Editor import/execution blocked by the absent Editor. Visual implementation remains unstarted. Remaining priorities retain their existing order and require separate approval. Stop after P9.6 for independent architectural review; the actual Editor acceptance gate remains open, and P9.7, Defend/Wait and later implementation remain unauthorized.
 
 **Explicit AUD-05 approval and closure (2026-11-03):** investigation paused at the design gate, then the user approved Option B. Player-only skill resource ownership is now enforced and verified by 175 permanent assertions. Existing priorities and AUD-06/AUD-07/AUD-08 scope are unchanged; no further implementation is authorized by this report.
 
@@ -1276,7 +1280,7 @@ Use the [verification commands](#verification). Green counts alone do not close 
 | 7 (AUD-08 complete) | Correct remaining action/status contracts | AUD-08 RESOLVED: authoritative Silence blocking and coherent events; 220 assertions; Defend/Wait remain outside this closure and require a separate public-contract decision |
 | 8a (complete) | Responsibility-based restore API naming | P8A: canonical ProgressRestore APIs with V4 forwarding compatibility; 58 assertions and old-binary verification; no persistence rename |
 | 8b (complete) | Responsibility-based combat diagnostic naming | P8B: canonical diagnostic views and typed constants; legacy constructors, enum strings and JSON intact; 138 assertions and old-binary verification |
-| 9 (audit, P9.1 through P9.5 complete; visual implementation not started) | Visual boundary and playable slice | P9 audit preserved; public-only headless consumer verifies existing single-owner boundary; P9.6 remains unauthorized pending independent review and merge |
+| 9 (audit, P9.1 through P9.5 complete; P9.6 Editor gate blocked) | Visual boundary and playable slice | P9.6 Standard 2.1 build and repeated host workflows pass; actual Unity import/execution UNVERIFIED; CONDITIONAL GO does not authorize P9.7 |
 | 10 | Revisit long-term systems behind their design gates | Town after visual boundary, Sanctuary after milestone inputs, hybrid combat only after dedicated redesign audit |
 
 Each 5a-5d is a separate repair candidate, not a combined cleanup branch. Each combat repair after priority 6 also needs one purpose. Historical proposed branch names `codex/rename-progress-restore-api`, `codex/rename-combat-validation-diagnostics` and `codex/visual-smoke-demo-design-audit` remain traceable here; no branch is created by this document.
@@ -1834,6 +1838,82 @@ The standalone executable passes **230 assertions**; unchanged Game.SmokeTests p
 **Investigation failures preserved:** the initial restricted solution build exited 1 without compiler errors in its summary; a diagnostic serial build exposed a denied compiler-server named pipe, and independent compilation also identified test-authoring CS0246/CS0535 from a missing public Resolvers namespace import (0 warnings/2 errors). Correcting the test import and using approved expanded execution allowed a clean build. The first external run exited 1 after **204** passing assertions because the test installed a debuff into the encounter log before preparation; production correctly rejected the non-fresh log. Moving that trusted fixture installation into its preconfigured Start hook preserved the existing contract, one log and consumer separation. No production defect or public composition gap was hidden with internal access.
 
 **Changed scope:** solution registration, four files in the new external verification project (project, trusted assembler, consumer, runner) and this Bible. No production source, existing tests, friend configuration, gameplay formulas, save schema, Unity or generator changes. This verifies public .NET application APIs, external compilation and headless interaction only. It does **not** verify Unity assembly/API compatibility, Editor import, rendering, animation, Android packaging, device performance, real input races or a playable game. Snapshot durability, cross-encounter save/exit behavior, asynchronous presentation rollback and untrusted executable plugins are not added. No new architectural blocker was found for the scoped public workflow; platform integration requires its separate gate. Audit findings/priorities remain unchanged. Stop for independent architectural review: no PR, merge or P9.6 until this verification is reviewed and merged.
+
+<a id="unity-runtime-compatibility"></a>
+### P9.6: Unity Runtime Compatibility Spike
+
+**CONDITIONAL GO; Editor acceptance BLOCKED / UNVERIFIED (2026-11-06).** Authorized branch `codex/unity-runtime-compatibility-spike` starts from fetched origin/main `1084ac5`; ancestry verification includes P9.5 commit `7db71de3a1cf94e26b51a5dcee82c29cea3c9a0e`. Baseline and final solution verification retain **4577 core + 230 external = 4807 assertions**, **38 V1 events**, zero build warnings/errors. No production source or existing test was changed. This is build/host evidence, not a completed Unity integration. **P9.7 remains unauthorized and cannot begin on this conditional result.**
+
+#### Environment and Version Gate
+
+Windows x64 (10.0.26200), .NET SDK **10.0.204**, MSBuild **18.3.3**, host **10.0.8**; installed runtimes include .NET 8.0.33 and 10.0.8. No SDK workloads or global.json. No Unity Editor/Hub found in standard locations, PATH, running processes or installed-app inventory; the user explicitly confirmed no Unity is installed. No Editor patch, configured Unity API level, license or command-line Editor execution can be certified. No installation or global configuration change was performed.
+
+**Documentary candidate, not an installed environment:** Unity **6.3 LTS**, with **.NET Standard 2.1** API compatibility. The official [Unity support policy](https://unity.com/releases/unity-6/support), [API profile/plugin documentation](https://docs.unity.com/en-us/engine/6000.3/manual/programming-environment/overview-of-dot-net-in-unity/dotnet-profile-support) and [C# compiler documentation](https://docs.unity3d.com/6000.3/Documentation/Manual/csharp-compiler.html) establish a supported LTS line, Standard 2.1 profile and C# 9 language baseline. Unity does not support arbitrary .NET Core-targeted plugins. These documents justify a build candidate, not a claim that this backend or its packages have executed in that Editor.
+
+The repository's existing three projects remain net10.0; Game uses latest language and no explicit NuGet packages. There is no runnable Unity project (ProjectVersion/Packages manifest/asmdef) establishing a current Editor target. Legacy adapters/tooling outside src/Game are not certified by this spike.
+
+#### Strategy Decision
+
+| Strategy | Ownership, dependencies and cost | Decision |
+|---|---|---|
+| A: source assembly in Unity | Can retain one source tree, but requires Unity assembly layout, compiler/import verification and explicit JSON package integration; copying gameplay files would create drift | Not implemented |
+| B: reusable compatible DLL | Separate build target links the same authoritative source; locks dependency versions and isolates build output; future Editor still must resolve/import plugin dependencies | Preferred; build verified only |
+
+`src/Game.UnityCompatibility/Game.UnityCompatibility.csproj` targets **netstandard2.1 / C# 9.0**. Evaluated Compile inputs match all **266** original Game source files exactly, including Domain, Application and Slice; bin/obj are excluded. No source files are copied or conditionally replaced, no gameplay fork, second engine or serialization implementation exists. The net10 production project and solution remain unchanged. The alternate artifact retains assembly name `FragmentsOfWisdom.Game`; it replaces, never accompanies, the net10 artifact in a future host. This candidate intentionally adds no friend-assembly grants.
+
+System.Text.Json **10.0.8** is explicit, matching the inspected host baseline, not claimed as the latest package. The [official package metadata](https://www.nuget.org/packages/System.Text.Json/10.0.8) includes a netstandard2.0 asset. Committed NuGet lock files pin resolved versions/content hashes. This build overrides repository defaults to enable NuGet auditing and reject failed restore sources; locked restore is the verification command. Restore emitted no audit warnings; that is not a blanket security certification.
+
+Resolved package closure: System.Text.Json, System.Text.Encodings.Web, Microsoft.Bcl.AsyncInterfaces and System.IO.Pipelines **10.0.8**; System.Runtime.CompilerServices.Unsafe **6.1.2**; System.Buffers **4.6.1**; System.Memory and System.Threading.Tasks.Extensions **4.6.3**. Assets select Standard 2.0 for JSON/Encodings/Pipelines/Unsafe and Standard 2.1 for AsyncInterfaces. Buffers/Memory/Tasks.Extensions select empty Standard 2.1 placeholders because the profile supplies those APIs. CopyLocalLockFileAssemblies exposes the five nonempty dependency DLLs beside Game for inspection. Do not blindly copy framework duplicates or host net10 assets into Unity; actual plugin resolution remains unverified. Generated binaries/caches stay ignored, not committed.
+
+#### Compatibility Findings and Source Boundaries
+
+| Area / exact source reference | Classification | Evidence / remaining requirement |
+|---|---|---|
+| src/Game/Game.csproj:3,6 net10/latest | Requires adaptation | Original DLL is not the Unity deployment artifact; separate Standard 2.1/C#9 build succeeds without production edits |
+| All 266 production C# files | Compatible with evidence (compile only) | Standard 2.1 reference API and C#9 compilation passes; this does not execute Unity's own compiler/runtime |
+| Application/Runtime/CombatEncounterComposition.cs:45,69,101,107,112,194 | Compatible with evidence (.NET host); Unity unverified | Existing public composition, Start, snapshots, intent, enemy advance and indexed events pass external workflows against the alternate DLL |
+| Domain/Progress/V2ProgressSnapshotJsonSerializer.cs:38,48,356 | Likely compatible, unverified in Unity | Reflection-backed JSON with private nested DTO types compiles; actual package loading, serializer behavior and stripping/AOT preservation require Editor/platform tests |
+| Domain/Combat/CombatSkillUseValidationResult.cs:19-29 and CombatSkillTurnValidationResult.cs:17-20 | Requires dependency integration | JsonIgnore attributes are also in combat diagnostic types; excluding only the save serializer would not remove the JSON dependency |
+| Domain/Progress/V2ProgressSnapshotFileRepository.cs:63-85,97-121 | Likely compatible, platform-unverified | Synchronous directory/write/replace/move/delete/read APIs compile; writable host paths, backup/replace semantics and Android permissions are not proven |
+| CombatEncounterComposition.cs:20,126-186 commandInFlight | Likely compatible under existing single-thread contract | Reentrancy guard is not a lock; future adapter must serialize commands on its host thread, not introduce concurrent authority |
+| Reflection/dynamic/native/platform dependencies | No direct production loader/native dependency found | Source scan found no Assembly.Load, DllImport, unsafe/dynamic execution, explicit Task/Thread/lock or Unity imports; JSON reflection remains the material indirect exception |
+| Public API visibility / detached results / original exceptions | Compatible with evidence (.NET host) | Existing non-friend external consumer compiles and passes; no test hooks or public surface expansion |
+| Unity Editor import/execution and IL2CPP stripping | Blocked | Editor absent; no actual import, license check, Mono execution, AOT build or link preservation evidence |
+| Android build/performance | Not applicable to this mission's execution | Future platform acceptance, not implied by reference-profile compilation or desktop host success |
+
+References above are under src/Game unless a full path is shown. No demonstrated production-source incompatibility required the architectural stop gate. JSON plugin deployment/AOT and host filesystem behavior remain acceptance risks, not silently fixed or claimed safe.
+
+#### Host Verification, Not an Editor Probe
+
+`src/Game.UnityCompatibility.SmokeTests/Game.UnityCompatibility.SmokeTests.csproj` links the existing three external smoke source files unchanged and references only the alternate Game project. It is explicitly a **net10 host executable**, not a Unity test. It reuses the trusted public fixture and consumer instead of writing another simulator. Its **230 repeated assertions** cover prepared canonical skill bindings, one session/owner/engine/log, Start events, detached snapshots, player basic/skill/refill, explicit pending enemy advancement, legitimate victory/defeat, cursor recovery, blocked actions and original partial-fault exceptions.
+
+Both the built Standard DLL and the copy loaded from the host output had identical SHA-256 `8EDBAB1BC2D22834BB5835857500681B4B05BB0A87A7A8DBEAC5C9274D54F87D` in this Debug build. Evaluated target is netstandard2.1, language 9.0; the host assets identify that project framework. This records which artifact was exercised, not a portable reproducible-binary hash promise across SDKs/paths. Host execution uses .NET 10 framework dependencies; it does **not** prove execution of the Standard JSON package assets, Unity plugin resolution or Unity persistence. Existing core JSON/file smoke tests remain net10 evidence.
+
+| Verification | Executed result |
+|---|---|
+| Original solution restore/build | PASS, exit 0, 0 warnings/errors |
+| Original core smoke | PASS, exit 0, 4577 assertions |
+| Original P9.5 external smoke | PASS, exit 0, 230 assertions |
+| V1 legacy events | 38 |
+| Candidate Standard 2.1/C#9 build and locked restore | PASS, exit 0, 0 warnings/errors |
+| Same external workflows against candidate DLL on .NET 10 | PASS, exit 0, 230 repeated assertions; separate from the 4807 baseline |
+| Unity Editor compilation/import | UNVERIFIED, Editor unavailable |
+| Real encounter executed in Unity | UNVERIFIED; no Editor executed |
+| Android build | NOT IN SCOPE |
+
+Additional commands, from the repository root, after the unchanged solution verification commands:
+
+```powershell
+dotnet restore src/Game.UnityCompatibility.SmokeTests/Game.UnityCompatibility.SmokeTests.csproj --locked-mode
+dotnet build src/Game.UnityCompatibility.SmokeTests/Game.UnityCompatibility.SmokeTests.csproj --no-restore -v:minimal
+dotnet run --project src/Game.UnityCompatibility.SmokeTests/Game.UnityCompatibility.SmokeTests.csproj --no-build
+git diff --check
+git status --short
+```
+
+These projects are intentionally outside the solution; the commands are a separate compatibility gate. No extra gameplay assertions are attributed to the core suite. A restricted environment inventory attempt failed with Service Control Manager access denied (dotnet --info exit 1); approved execution succeeded, and subsequent builds/tests succeeded. The Editor absence is not a compiler failure.
+
+**Remaining acceptance work:** independently review this branch, then obtain an explicitly selected installed/licensed Unity 6.3 LTS patch and verify actual API profile, import dependency resolution, real public encounter execution, JSON round trips and exception/cursor behavior. Review stripping/AOT and platform save paths separately before Android claims. No scenes, UI, assets, Unity project, installation, gameplay/source/schema changes, PR or merge were added. P9.6 is partially evidenced and remains blocked at the actual Editor gate; stop for architectural review, not P9.7.
 
 ### Unresolved Naming and Compatibility Work
 

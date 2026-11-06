@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>FragmentsOfWisdom.Game</AssemblyName>
+    <RootNamespace>Game</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreIgnoreFailedSources>false</RestoreIgnoreFailedSources>
+    <NuGetAudit>true</NuGetAudit>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Game/**/*.cs" Exclude="../Game/bin/**;../Game/obj/**" Link="%(RecursiveDir)%(Filename)%(Extension)" />
+    <PackageReference Include="System.Text.Json" Version="10.0.8" />
+  </ItemGroup>
+</Project>
