@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <AssemblyName>FragmentsOfWysdom.Acceptance.HostCheck</AssemblyName>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreIgnoreFailedSources>false</RestoreIgnoreFailedSources>
+    <NuGetAudit>true</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Game.UnityCompatibility/Game.UnityCompatibility.csproj" />
+    <Compile Include="../../../src/Game.PresentationBoundary.SmokeTests/TrustedEncounterAssembly.cs" Link="TrustedEncounterAssembly.cs" />
+    <Compile Include="../../../src/Game.PresentationBoundary.SmokeTests/PresentationConsumer.cs" Link="PresentationConsumer.cs" />
+    <Compile Include="../../../unity/FragmentsOfWysdom.Acceptance/Assets/Acceptance/Editor/AcceptanceTests.cs" Link="AcceptanceTests.cs" />
+    <PackageReference Include="NUnitLite" Version="3.14.0" />
+  </ItemGroup>
+</Project>
